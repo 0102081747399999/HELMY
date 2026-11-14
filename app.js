@@ -1,4 +1,4 @@
-// app.js - Main Application Logic for Hilmy Telecom POS Hub
+// app.js - Main Application Logic for Hilmy Telecom POS Hub (Optimized for Laptop / Desktop POS)
 import { 
   Store, 
   subscribeToStore, 
@@ -25,6 +25,9 @@ const AppState = {
   activeSpeakerTab: 'all',
   activePhoneBrand: 'all',
   activePhoneStatus: 'all',
+  posCatalogCategory: 'all',
+  posCatalogSearch: '',
+  sidebarCollapsed: false,
   cart: [],
   cartDiscount: 0,
   deleteTarget: null, // { type: 'product'|'vodafone_tx'|'vodafone_reset', id: string, extra: any }
@@ -33,24 +36,238 @@ const AppState = {
 };
 
 // ==========================================
+// THEME & COLOR CUSTOMIZER SYSTEM
+// ==========================================
+const THEME_OPTIONS = {
+  'dark-onyx': {
+    id: 'dark-onyx',
+    name: 'الأسود الداكن الفاخر (Dark Slate / Onyx)',
+    desc: 'تصميم داكن فخم عالي التباين بلمسات تيتانيوم وسماوي مثلج (مريح جداً للعين)',
+    badge: 'داكن فاخر',
+    previewHex: ['#090d16', '#162032', '#38bdf8']
+  },
+  'red-magic': {
+    id: 'red-magic',
+    name: 'ريد ماجيك القرمزي (Red Magic Crimson)',
+    desc: 'طابع رياضي فخم باللون القرمزي والأسود الملكي',
+    badge: 'الخيار الافتراضي (هوية الموقع) ★',
+    previewHex: ['#0d090d', '#20131d', '#f43f5e']
+  },
+  'emerald': {
+    id: 'emerald',
+    name: 'الزمردي المالي (Emerald Green POS)',
+    desc: 'تصميم أنيق باللون الأخضر الزمردي المريح للعينيات المالية',
+    badge: 'مالي راقي',
+    previewHex: ['#061a14', '#0e3126', '#34d399']
+  },
+  'royal-purple': {
+    id: 'royal-purple',
+    name: 'البنفسجي الملكي الحديث (Royal Violet)',
+    desc: 'لمسة عصرية راقية وجذابة بدرجات البنفسجي الفخم',
+    badge: 'مودرن',
+    previewHex: ['#0d0818', '#1e1136', '#a78bfa']
+  },
+  'classic-navy': {
+    id: 'classic-navy',
+    name: 'الكحلي والسماوي الأصلي (Classic Navy & Sky Blue)',
+    desc: 'المظهر الكحلي المكتبي الكلاسيكي والأزرق الملكي',
+    badge: 'كلاسيك',
+    previewHex: ['#0a192f', '#112240', '#3b82f6']
+  },
+  'vanilla': {
+    id: 'vanilla',
+    name: 'الفانيلا والبيج الفاخر (Vanilla Cream & Gold)',
+    desc: 'ثيم فاتح هادئ وراقي لمحبي الواجهات الفاتحة والواضحة',
+    badge: 'فاتح أنيق',
+    previewHex: ['#f8fafc', '#ffffff', '#2563eb']
+  }
+};
+
+export function initTheme() {
+  const savedTheme = localStorage.getItem('pos_color_theme') || 'red-magic';
+  const savedAccent = localStorage.getItem('pos_accent_color');
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  if (savedAccent) {
+    document.documentElement.style.setProperty('--accent-color', savedAccent);
+    document.documentElement.style.setProperty('--accent-hover', adjustColorBrightness(savedAccent, -20));
+  }
+}
+
+window.openThemeModal = () => {
+  renderThemeModalOptions();
+  const modal = document.getElementById('modal-theme-customizer');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closeThemeModal = () => {
+  const modal = document.getElementById('modal-theme-customizer');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.selectTheme = (themeId) => {
+  if (!THEME_OPTIONS[themeId]) return;
+  document.documentElement.setAttribute('data-theme', themeId);
+  localStorage.setItem('pos_color_theme', themeId);
+  // Remove custom accent to revert to theme default
+  localStorage.removeItem('pos_accent_color');
+  document.documentElement.style.removeProperty('--accent-color');
+  document.documentElement.style.removeProperty('--accent-hover');
+  renderThemeModalOptions();
+  showToast(`تم تفعيل ثيم: ${THEME_OPTIONS[themeId].name}`, 'palette');
+};
+
+window.setCustomAccentColor = (hex) => {
+  if (!hex) return;
+  document.documentElement.style.setProperty('--accent-color', hex);
+  document.documentElement.style.setProperty('--accent-hover', adjustColorBrightness(hex, -20));
+  localStorage.setItem('pos_accent_color', hex);
+  showToast(`تم تعيين اللون المخصص: ${hex}`, 'format_color_fill');
+};
+
+window.resetAccentColor = () => {
+  localStorage.removeItem('pos_accent_color');
+  document.documentElement.style.removeProperty('--accent-color');
+  document.documentElement.style.removeProperty('--accent-hover');
+  showToast("تمت استعادة اللون الافتراضي للثيم النشط", 'refresh');
+};
+
+function adjustColorBrightness(hex, percent) {
+  let num = parseInt(hex.replace('#',''), 16),
+      amt = Math.round(2.55 * percent),
+      R = (num >> 16) + amt,
+      B = (num >> 8 & 0x00FF) + amt,
+      G = (num & 0x0000FF) + amt;
+  return '#' + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (B<255?B<1?0:B:255)*0x100 + (G<255?G<1?0:G:255)).toString(16).slice(1);
+}
+
+function renderThemeModalOptions() {
+  const container = document.getElementById('theme-options-container');
+  if (!container) return;
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark-onyx';
+
+  container.innerHTML = Object.keys(THEME_OPTIONS).map(key => {
+    const t = THEME_OPTIONS[key];
+    const isSelected = t.id === currentTheme;
+    const dots = t.previewHex.map(hex => `<span class="w-4 h-4 rounded-full border border-white/20 shadow-sm" style="background-color: ${hex}"></span>`).join('');
+    return `
+      <div 
+        onclick="window.selectTheme('${t.id}')"
+        class="flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+          isSelected 
+            ? 'border-secondary bg-secondary/10 shadow-md ring-2 ring-secondary/30' 
+            : 'border-outline-variant/30 hover:border-secondary/50 hover:bg-surface-container-low'
+        }">
+        <div class="flex items-center gap-3.5">
+          <div class="flex items-center -space-x-1.5 space-x-reverse p-1.5 bg-black/20 rounded-lg shrink-0">
+            ${dots}
+          </div>
+          <div class="flex flex-col">
+            <div class="flex items-center gap-2">
+              <span class="font-headline-sm font-bold text-on-surface text-base">${t.name}</span>
+              ${t.badge ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-secondary text-white' : 'bg-surface-container text-on-surface-variant'}">${t.badge}</span>` : ''}
+            </div>
+            <p class="font-body-sm text-on-surface-variant text-xs mt-0.5">${t.desc}</p>
+          </div>
+        </div>
+        <div class="shrink-0 mr-2">
+          <span class="w-6 h-6 rounded-full flex items-center justify-center border ${
+            isSelected ? 'bg-secondary text-white border-secondary' : 'border-outline-variant/50 text-transparent'
+          }">
+            <span class="material-symbols-outlined text-sm font-bold">${isSelected ? 'check' : ''}</span>
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Live Clock & Date for Laptop Header
+function startLiveClock() {
+  const clockEl = document.getElementById('header-live-clock');
+  const dateEl = document.getElementById('header-live-date');
+
+  const update = () => {
+    const now = new Date();
+    if (clockEl) {
+      clockEl.innerText = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    }
+    if (dateEl) {
+      dateEl.innerText = now.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+  };
+  update();
+  setInterval(update, 1000);
+}
+
+// Fullscreen Toggle for Laptop Cashier
+window.toggleFullscreen = () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => {
+      console.warn(`Error attempting to enable fullscreen: ${err.message}`);
+    });
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    }
+  }
+};
+
+// Sidebar Collapse / Expand Toggle for Laptops
+window.toggleSidebar = () => {
+  AppState.sidebarCollapsed = !AppState.sidebarCollapsed;
+  const sidebar = document.getElementById('app-sidebar');
+  const mainWrapper = document.getElementById('main-content-wrapper');
+  const header = document.getElementById('app-header');
+
+  if (AppState.sidebarCollapsed) {
+    sidebar?.classList.add('sidebar-collapsed');
+    mainWrapper?.classList.remove('pr-72');
+    mainWrapper?.classList.add('pr-20');
+    header?.classList.remove('right-72');
+    header?.classList.add('right-20');
+  } else {
+    sidebar?.classList.remove('sidebar-collapsed');
+    mainWrapper?.classList.remove('pr-20');
+    mainWrapper?.classList.add('pr-72');
+    header?.classList.remove('right-20');
+    header?.classList.add('right-72');
+  }
+};
+
+// ==========================================
 // INITIALIZATION
 // ==========================================
 
 window.addEventListener('DOMContentLoaded', () => {
+  // Initialize Theme Engine
+  initTheme();
+
   // Initialize Realtime Firebase Synchronization
   initRealtimeSync();
+
+  // Start Header Live Clock
+  startLiveClock();
 
   // Subscribe UI to data store updates
   subscribeToStore((event, data, store) => {
     console.log(`Store event: ${event}`);
     renderCurrentView();
     updateGlobalHeaderBadges();
+    if (!document.getElementById('modal-quick-pos')?.classList.contains('hidden')) {
+      renderPOSCatalog(AppState.posCatalogCategory, AppState.posCatalogSearch);
+    }
   });
 
   // Setup navigation handlers
   setupNavigation();
 
-  // Setup Keyboard Shortcuts (F1, F2, F3, F4, ESC)
+  // Setup Keyboard Shortcuts (F1, F2, F4, F7, ESC)
   setupKeyboardShortcuts();
 
   // Setup Global Hardware Barcode Scanner Listener
@@ -87,7 +304,7 @@ function setupNavigation() {
     });
   });
 
-  // Also catch in-page link navigation
+  // Catch in-page link navigation
   document.addEventListener('click', (e) => {
     const targetLink = e.target.closest('a[data-path]');
     if (targetLink) {
@@ -107,10 +324,10 @@ export function navigateTo(path) {
     const isCurrent = link.getAttribute('data-path') === path;
     if (isCurrent) {
       link.setAttribute('aria-current', 'page');
-      link.className = "flex items-center gap-space-sm px-space-md py-space-sm rounded-lg transition-all bg-secondary text-on-secondary font-bold shadow-[0_4px_6px_-1px_rgba(10,25,47,0.07)]";
+      link.className = "flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary text-on-primary font-title-md shadow-md ring-1 ring-sky-accent/40";
     } else {
       link.removeAttribute('aria-current');
-      link.className = "flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all";
+      link.className = "flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-navy-card hover:text-sky-accent transition-colors";
     }
   });
 
@@ -158,25 +375,19 @@ function renderCurrentView() {
 // ==========================================
 
 function updateGlobalHeaderBadges() {
-  // Cash Drawer Balance
   const drawerBal = Store.drawer ? (Store.drawer.currentCash || 0) : 0;
   const headerCash = document.getElementById('header-cash-balance');
   const sidebarDrawerVal = document.getElementById('sidebar-drawer-val');
   if (headerCash) headerCash.innerText = `${formatMoney(drawerBal)} ج.م`;
   if (sidebarDrawerVal) sidebarDrawerVal.innerText = formatMoney(drawerBal);
 
-  // Today's total sales
   const todayStr = new Date().toISOString().split('T')[0];
   const todaySales = Store.salesInvoices.filter(inv => (inv.timestamp || '').startsWith(todayStr));
   const totalSalesVal = todaySales.reduce((acc, inv) => acc + (inv.totalAmount || 0), 0);
 
-  // Total Vodafone Balance across all 18 lines
   const totalVodaBalance = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.balance) || 0), 0);
-
-  // Critical Low Stock Count (qty <= 2)
   const lowStockCount = Store.products.filter(p => (p.category !== 'phones' && (p.quantity || 0) <= 2) || (p.category === 'phones' && p.status === 'available')).length;
 
-  // Update elements if present
   setElemText('stat-dash-drawer', formatMoney(drawerBal));
   setElemText('stat-dash-voda', formatMoney(totalVodaBalance));
   setElemText('stat-dash-sales', formatMoney(totalSalesVal));
@@ -191,32 +402,31 @@ function updateGlobalHeaderBadges() {
 function renderDashboard() {
   updateGlobalHeaderBadges();
 
-  // Render Recent Invoices
   const invoicesTbody = document.getElementById('dash-recent-invoices');
   if (invoicesTbody) {
-    const recent = Store.salesInvoices.slice(0, 5);
+    const recent = Store.salesInvoices.slice(0, 7);
     if (recent.length === 0) {
       invoicesTbody.innerHTML = `
         <tr>
           <td colspan="6" class="py-12 text-center text-on-surface-variant">
             <div class="flex flex-col items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-[36px] text-outline-variant">receipt_long</span>
+              <span class="material-symbols-outlined text-[36px] opacity-40">receipt_long</span>
               <p class="font-headline-sm text-headline-sm">لا توجد مبيعات مسجلة حتى الآن</p>
-              <button onclick="window.triggerQuickPOS()" class="text-secondary hover:underline font-label-md text-label-md">+ بدء بيع سريع (F2)</button>
+              <button onclick="window.triggerQuickPOS()" class="text-secondary hover:underline font-label-md text-label-md font-bold">+ بدء بيع سريع (F2)</button>
             </div>
           </td>
         </tr>
       `;
     } else {
       invoicesTbody.innerHTML = recent.map(inv => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-lowest/50 transition-colors">
-          <td class="py-3 px-4 font-code-mono text-secondary font-bold">${inv.invoiceNumber}</td>
-          <td class="py-3 px-4 font-code-mono text-on-surface-variant">${formatTime(inv.timestamp)}</td>
-          <td class="py-3 px-4 font-label-md">${inv.items ? inv.items.map(i => `${i.name} (x${i.quantity})`).join(', ') : '-'}</td>
-          <td class="py-3 px-4 font-code-mono font-bold text-on-surface">${formatMoney(inv.totalAmount)} ج.م</td>
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
+          <td class="py-3 px-4 font-numeric-table text-secondary font-bold">${inv.invoiceNumber}</td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant">${formatTime(inv.timestamp)}</td>
+          <td class="py-3 px-4 font-label-md font-bold">${inv.items ? inv.items.map(i => `${i.name} (×${i.quantity})`).join(', ') : '-'}</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-on-surface">${formatMoney(inv.totalAmount)} ج.م</td>
           <td class="py-3 px-4 text-on-surface-variant font-label-sm">${inv.customerName || 'عميل نقدي'}</td>
           <td class="py-3 px-4 text-center">
-            <button onclick="window.printInvoiceReceipt('${inv.id}')" class="p-1 rounded-md text-secondary hover:bg-secondary/10 transition-colors" title="طباعة الإيصال">
+            <button onclick="window.printInvoiceReceipt('${inv.id}')" class="p-1.5 rounded-lg text-secondary hover:bg-secondary/10 transition-colors" title="طباعة الإيصال">
               <span class="material-symbols-outlined text-[18px]">print</span>
             </button>
           </td>
@@ -225,35 +435,35 @@ function renderDashboard() {
     }
   }
 
-  // Render Recent Vodafone Cash transactions
   const vodaTbody = document.getElementById('dash-recent-voda');
   if (vodaTbody) {
-    const recentVoda = Store.vodafoneTransactions.slice(0, 5);
+    const recentVoda = Store.vodafoneTransactions.slice(0, 7);
     if (recentVoda.length === 0) {
       vodaTbody.innerHTML = `
         <tr>
           <td colspan="6" class="py-12 text-center text-on-surface-variant">
             <div class="flex flex-col items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-[36px] text-outline-variant">account_balance_wallet</span>
+              <span class="material-symbols-outlined text-[36px] opacity-40">account_balance_wallet</span>
               <p class="font-headline-sm text-headline-sm">لا توجد معاملات كاش مسجلة اليوم</p>
-              <button onclick="window.navigateTo('vodafone-cash-wallets')" class="text-secondary hover:underline font-label-md text-label-md">+ فتح محافظ فودافون كاش</button>
+              <button onclick="window.navigateTo('vodafone-cash-wallets')" class="text-secondary hover:underline font-label-md text-label-md font-bold">+ فتح محافظ فودافون كاش</button>
             </div>
           </td>
         </tr>
       `;
     } else {
       vodaTbody.innerHTML = recentVoda.map(tx => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-lowest/50 transition-colors">
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
           <td class="py-3 px-4 font-label-md font-bold text-on-surface">خط ${tx.lineNum}</td>
           <td class="py-3 px-4">
-            <span class="px-2 py-0.5 rounded-full text-label-sm font-bold ${tx.type === 'deposit' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${tx.type === 'deposit' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'}">
+              <span class="material-symbols-outlined text-[13px]">${tx.type === 'deposit' ? 'add_circle' : 'remove_circle'}</span>
               ${tx.type === 'deposit' ? 'إيداع (+)' : 'سحب (-)'}
             </span>
           </td>
-          <td class="py-3 px-4 font-code-mono font-bold text-on-surface">${formatMoney(tx.amount)} ج.م</td>
-          <td class="py-3 px-4 font-code-mono text-on-tertiary-container">+${formatMoney(tx.commission || 0)} ج.م</td>
-          <td class="py-3 px-4 font-code-mono text-on-surface-variant">${tx.customerPhone || '-'}</td>
-          <td class="py-3 px-4 font-code-mono text-on-surface-variant text-label-sm">${formatTime(tx.timestamp)}</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-on-surface">${formatMoney(tx.amount)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table text-emerald-400 font-bold">+${formatMoney(tx.commission || 0)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant">${tx.customerPhone || '-'}</td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-xs">${formatTime(tx.timestamp)}</td>
         </tr>
       `).join('');
     }
@@ -274,7 +484,6 @@ function renderVodafoneHub() {
     totalTransferredMonth: 0
   };
 
-  // 1. Render the 18 Buttons Grid
   const gridContainer = document.getElementById('wallets-grid');
   if (gridContainer) {
     gridContainer.innerHTML = Store.vodafoneLines.map(l => {
@@ -284,35 +493,33 @@ function renderVodafoneHub() {
       return `
         <button 
           onclick="window.selectVodafoneLine(${l.lineNum})"
-          class="wallet-btn flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 cursor-pointer ${
+          class="wallet-btn flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-150 cursor-pointer ${
             isSelected 
-              ? 'bg-primary-container text-on-primary ring-2 ring-secondary shadow-md scale-105' 
-              : 'bg-surface-container-low hover:bg-surface-container text-on-surface'
+              ? 'bg-primary text-white ring-2 ring-rose-500/50 shadow-lg shadow-rose-950/60 scale-105' 
+              : 'bg-navy-card hover:bg-surface-container text-on-surface border border-slate-800 hover:border-rose-900/40'
           }"
           type="button">
           <div class="flex items-center gap-1">
-            <span class="material-symbols-outlined text-[16px] ${isSelected ? 'text-secondary-fixed' : (hasBalance ? 'text-on-tertiary-container' : 'text-on-surface-variant')}">
+            <span class="material-symbols-outlined text-[16px] ${isSelected ? 'text-white' : (hasBalance ? 'text-emerald-400' : 'text-on-surface-variant')}">
               ${hasBalance ? 'account_balance_wallet' : 'sim_card'}
             </span>
-            <span class="font-headline-sm text-headline-sm font-code-mono">${l.lineNum}</span>
+            <span class="font-headline-sm text-headline-sm font-numeric-table font-bold">${l.lineNum}</span>
           </div>
-          <span class="font-code-mono text-label-sm mt-0.5 ${isSelected ? 'text-on-primary-fixed' : 'text-on-surface-variant'} truncate max-w-[65px]">
+          <span class="font-numeric-table text-xs mt-0.5 ${isSelected ? 'text-white/90' : 'text-on-surface-variant'} truncate max-w-[65px] font-bold">
             ${formatCompactMoney(l.balance || 0)}
           </span>
-          <span class="w-1.5 h-1.5 rounded-full mt-1 ${hasPhone ? 'bg-on-tertiary-container' : 'bg-outline-variant'}"></span>
+          <span class="w-1.5 h-1.5 rounded-full mt-1 ${hasPhone ? 'bg-emerald-400' : 'bg-outline-variant'}"></span>
         </button>
       `;
     }).join('');
   }
 
-  // 2. Render Global Vodafone KPIs
   const totalBalance = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.balance) || 0), 0);
   const totalLimits = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.monthlyLimit) || 100000), 0);
   const totalTransferred = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.totalTransferredMonth) || 0), 0);
   const remainingTotalLimit = Math.max(0, totalLimits - totalTransferred);
   const limitPercent = totalLimits > 0 ? Math.min(100, Math.round((totalTransferred / totalLimits) * 100)) : 0;
 
-  // Today's commissions
   const todayStr = new Date().toISOString().split('T')[0];
   const todayCommissions = Store.vodafoneTransactions
     .filter(t => (t.timestamp || '').startsWith(todayStr))
@@ -323,15 +530,14 @@ function renderVodafoneHub() {
   setElemText('voda-kpi-remaining-limit', formatMoney(remainingTotalLimit));
   setElemText('voda-kpi-limit-percent', `الاستهلاك الكلي: ${limitPercent}%`);
   setElemText('voda-kpi-today-commissions', formatMoney(todayCommissions));
-  setElemText('voda-kpi-today-tx-count', `${todayTxsCount} عمليات`);
+  setElemText('voda-kpi-today-tx-count', `${todayTxsCount} عمليات اليوم`);
 
   const progressBar = document.getElementById('voda-kpi-limit-bar');
   if (progressBar) progressBar.style.width = `${limitPercent}%`;
 
-  // 3. Render Active Line Card & Details
   setElemText('active-line-badge', `خط ${line.lineNum} - نشط`);
-  setElemText('active-line-phone-display', line.phone ? `رقم المحفظة: ${line.phone}` : 'لم يتم تحديد رقم الهاتف');
-  setElemText('active-line-balance-display', formatMoney(line.balance || 0));
+  setElemText('active-line-phone-display', line.phone ? `رقم المحفظة: ${line.phone}` : 'لم يتم تحديد رقم هاتف للخط');
+  setElemText('active-line-balance-display', `${formatMoney(line.balance || 0)} ج.م`);
   
   const lineLimit = parseFloat(line.monthlyLimit) || 100000;
   const lineUsed = parseFloat(line.totalTransferredMonth) || 0;
@@ -344,7 +550,6 @@ function renderVodafoneHub() {
   const activeLineBar = document.getElementById('active-line-limit-bar');
   if (activeLineBar) activeLineBar.style.width = `${lineLimitPercent}%`;
 
-  // 4. Render Active Line Transactions Table
   const lineTxs = Store.vodafoneTransactions.filter(t => t.lineNum === lineNum);
   setElemText('active-line-txs-count', `${lineTxs.length} حركات`);
 
@@ -354,41 +559,37 @@ function renderVodafoneHub() {
       tbody.innerHTML = `
         <tr>
           <td class="py-16 text-center" colspan="8">
-            <div class="flex flex-col items-center justify-center gap-space-sm max-w-sm mx-auto">
-              <div class="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                <span class="material-symbols-outlined text-[32px]">hourglass_empty</span>
-              </div>
-              <div class="flex flex-col gap-1 text-center">
-                <span class="font-headline-sm text-headline-sm text-on-surface">لم يتم تسجيل أي معاملات على الخط (${lineNum}) حتى الآن</span>
-                <span class="font-body-sm text-body-sm text-on-surface-variant">قم ببدء عملية الإيداع أو السحب لتحديث كشف الحساب ورصيد المحفظة تلقائياً.</span>
-              </div>
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+              <span class="material-symbols-outlined text-[40px] opacity-30">hourglass_empty</span>
+              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لم يتم تسجيل أي معاملات على الخط (${lineNum})</span>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">قم بتسجيل عملية إيداع أو سحب لتحديث كشف الحساب والرصيد فورياً.</span>
             </div>
           </td>
         </tr>
       `;
     } else {
       tbody.innerHTML = lineTxs.map((tx, idx) => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-lowest/70 transition-colors">
-          <td class="py-3 px-3 font-code-mono text-secondary font-bold">#${lineTxs.length - idx}</td>
-          <td class="py-3 px-3 font-code-mono text-on-surface-variant text-label-sm">${formatTime(tx.timestamp)}</td>
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
+          <td class="py-3 px-3 font-numeric-table text-secondary font-bold">#${lineTxs.length - idx}</td>
+          <td class="py-3 px-3 font-numeric-table text-on-surface-variant text-xs">${formatTime(tx.timestamp)}</td>
           <td class="py-3 px-3">
-            <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold inline-flex items-center gap-1 ${
-              tx.type === 'deposit' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
+              tx.type === 'deposit' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
             }">
-              <span class="material-symbols-outlined text-[14px]">${tx.type === 'deposit' ? 'add_circle' : 'remove_circle'}</span>
+              <span class="material-symbols-outlined text-[13px]">${tx.type === 'deposit' ? 'add_circle' : 'remove_circle'}</span>
               ${tx.type === 'deposit' ? 'إيداع / استلام' : 'تحويل / سحب'}
             </span>
           </td>
-          <td class="py-3 px-3 font-code-mono font-bold text-on-surface">${formatMoney(tx.amount)} ج.م</td>
-          <td class="py-3 px-3 font-code-mono text-on-surface">${tx.customerPhone || '-'}</td>
-          <td class="py-3 px-3 font-code-mono text-on-tertiary-container font-bold">+${formatMoney(tx.commission || 0)} ج.م</td>
-          <td class="py-3 px-3 font-code-mono text-on-surface-variant">${formatMoney(tx.balanceAfter)} ج.م</td>
+          <td class="py-3 px-3 font-numeric-table font-bold text-on-surface text-base">${formatMoney(tx.amount)} ج.م</td>
+          <td class="py-3 px-3 font-numeric-table text-on-surface">${tx.customerPhone || '-'}</td>
+          <td class="py-3 px-3 font-numeric-table text-emerald-400 font-bold">+${formatMoney(tx.commission || 0)} ج.م</td>
+          <td class="py-3 px-3 font-numeric-table text-on-surface-variant font-bold">${formatMoney(tx.balanceAfter)} ج.م</td>
           <td class="py-3 px-3 text-center">
             <div class="flex items-center justify-center gap-1">
-              <button onclick="window.openEditVodafoneTxModal('${tx.id}')" class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
+              <button onclick="window.openEditVodafoneTxModal('${tx.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
                 <span class="material-symbols-outlined text-[18px]">edit</span>
               </button>
-              <button onclick="window.confirmDeleteVodafoneTx('${tx.id}')" class="p-1 rounded hover:bg-error-container text-on-surface-variant hover:text-error transition-colors" title="حذف">
+              <button onclick="window.confirmDeleteVodafoneTx('${tx.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
                 <span class="material-symbols-outlined text-[18px]">delete</span>
               </button>
             </div>
@@ -400,13 +601,11 @@ function renderVodafoneHub() {
 }
 
 function setupVodafoneEvents() {
-  // Select line helper
   window.selectVodafoneLine = (lineNum) => {
     AppState.activeVodafoneLine = lineNum;
     renderVodafoneHub();
   };
 
-  // Submit Vodafone Transaction Form
   const btnDeposit = document.getElementById('btn-voda-deposit');
   const btnWithdraw = document.getElementById('btn-voda-withdraw');
   const amountInput = document.getElementById('voda-tx-amount');
@@ -436,7 +635,6 @@ function setupVodafoneEvents() {
         notes
       });
 
-      // Clear inputs
       if (amountInput) amountInput.value = '';
       if (phoneInput) phoneInput.value = '';
       if (commInput) commInput.value = '5.00';
@@ -451,7 +649,6 @@ function setupVodafoneEvents() {
   if (btnDeposit) btnDeposit.addEventListener('click', () => handleTx('deposit'));
   if (btnWithdraw) btnWithdraw.addEventListener('click', () => handleTx('withdraw'));
 
-  // Reset Line
   window.confirmResetVodafoneLine = () => {
     const lineNum = AppState.activeVodafoneLine;
     AppState.deleteTarget = {
@@ -463,7 +660,6 @@ function setupVodafoneEvents() {
     openDeleteConfirmModal();
   };
 
-  // Delete Transaction
   window.confirmDeleteVodafoneTx = (txId) => {
     AppState.deleteTarget = {
       type: 'vodafone_tx',
@@ -474,7 +670,6 @@ function setupVodafoneEvents() {
     openDeleteConfirmModal();
   };
 
-  // Line Settings Modal
   window.openLineSettingsModal = () => {
     const line = Store.vodafoneLines.find(l => l.lineNum === AppState.activeVodafoneLine);
     if (!line) return;
@@ -508,7 +703,6 @@ function setupVodafoneEvents() {
     showToast(`تم تحديث إعدادات الخط ${lineNum} بنجاح`, 'check_circle');
   };
 
-  // Edit Vodafone Transaction
   window.openEditVodafoneTxModal = (txId) => {
     const tx = Store.vodafoneTransactions.find(t => t.id === txId);
     if (!tx) return;
@@ -520,8 +714,8 @@ function setupVodafoneEvents() {
     const typeBadge = document.getElementById('edit-voda-type-badge');
     if (typeBadge) {
       typeBadge.innerText = tx.type === 'deposit' ? 'إيداع / استلام (+)' : 'تحويل / سحب (-)';
-      typeBadge.className = `px-2 py-0.5 rounded-full font-code-mono text-label-sm font-bold ${
-        tx.type === 'deposit' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+      typeBadge.className = `px-2.5 py-0.5 rounded-full font-numeric-table text-xs font-bold ${
+        tx.type === 'deposit' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
       }`;
     }
 
@@ -579,7 +773,6 @@ function setupVodafoneEvents() {
 function renderChargersPage() {
   const allChargers = Store.products.filter(p => p.category === 'chargers');
   
-  // Calculate category KPI metrics
   const totalQty = allChargers.reduce((acc, p) => acc + (p.quantity || 0), 0);
   const costVal = allChargers.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
   const retailVal = allChargers.reduce((acc, p) => acc + ((p.sellPrice || 0) * (p.quantity || 0)), 0);
@@ -591,7 +784,6 @@ function renderChargersPage() {
   setElemText('chargers-stat-profit', `أرباح تقديرية: ${formatMoney(retailVal - costVal)} ج.م`);
   setElemText('chargers-stat-low', lowStock);
 
-  // Subcategory filter counts
   const subcounts = {
     complete: allChargers.filter(p => p.subcategory === 'complete').length,
     adapter: allChargers.filter(p => p.subcategory === 'adapter').length,
@@ -606,7 +798,6 @@ function renderChargersPage() {
   setElemText('badge-chargers-pin', subcounts.pin);
   setElemText('badge-chargers-all', allChargers.length);
 
-  // Filter items
   const activeTab = AppState.activeChargerTab;
   const searchInput = (document.getElementById('chargers-search-input')?.value || '').trim().toLowerCase();
   
@@ -621,24 +812,18 @@ function renderChargersPage() {
     );
   }
 
-  // Render Table
   const tbody = document.getElementById('chargers-table-body');
   if (tbody) {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" class="py-16 text-center">
-            <div class="flex flex-col items-center justify-center gap-space-sm max-w-sm mx-auto">
-              <div class="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                <span class="material-symbols-outlined text-[32px]">cable</span>
-              </div>
-              <div class="flex flex-col gap-1 text-center">
-                <span class="font-headline-sm text-headline-sm text-on-surface">لا توجد شواحن أو وصلات مسجلة</span>
-                <span class="font-body-sm text-body-sm text-on-surface-variant">المخزن فارغ حالياً. يمكنك مسح الباركود أو الضغط على الزر أدناه لإضافة أول صنف.</span>
-              </div>
-              <button onclick="window.openAddProductModal('chargers', '${activeTab !== 'all' ? activeTab : 'complete'}')" class="mt-space-xs bg-secondary text-on-secondary px-space-md py-space-xs rounded-lg font-headline-sm text-headline-sm flex items-center gap-space-xs hover:bg-secondary-container transition-all shadow-sm active:scale-95">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                <span>+ إضافة صنف جديد</span>
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+              <span class="material-symbols-outlined text-[40px] opacity-30">cable</span>
+              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لا توجد شواحن أو وصلات مسجلة</span>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">امسح الباركود أو اضغط F1 لإدخال شاحن أو وصلة جديدة.</span>
+              <button onclick="window.openAddProductModal('chargers', '${activeTab !== 'all' ? activeTab : 'complete'}')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl font-headline-sm text-headline-sm shadow-md hover:bg-secondary/90 transition-all cursor-pointer">
+                + إضافة صنف جديد
               </button>
             </div>
           </td>
@@ -646,35 +831,31 @@ function renderChargersPage() {
       `;
     } else {
       tbody.innerHTML = filtered.map(item => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-lowest/70 transition-colors">
-          <td class="py-3 px-4 font-code-mono font-bold text-secondary">
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
+          <td class="py-3.5 px-4 font-numeric-table font-bold text-secondary text-base">
             <span class="cursor-pointer hover:underline" onclick="window.addItemToCartFromBarcode('${item.barcode}')">${item.barcode || 'بدون باركود'}</span>
           </td>
-          <td class="py-3 px-4 font-label-lg font-bold text-on-surface">${item.name}</td>
-          <td class="py-3 px-4">
-            <span class="px-2 py-0.5 rounded-full text-label-sm bg-surface-container text-on-surface-variant">
+          <td class="py-3.5 px-4 font-headline-sm font-bold text-on-surface text-base">${item.name}</td>
+          <td class="py-3.5 px-4">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant border border-outline-variant/30">
               ${getChargerSubcategoryLabel(item.subcategory)}
             </span>
           </td>
-          <td class="py-3 px-4 font-code-mono text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
-          <td class="py-3 px-4 font-code-mono font-bold text-on-tertiary-container">${formatMoney(item.sellPrice)} ج.م</td>
-          <td class="py-3 px-4">
+          <td class="py-3.5 px-4 font-numeric-table text-on-surface text-base">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3.5 px-4 font-numeric-table font-bold text-emerald-400 text-lg">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3.5 px-4">
             <div class="flex items-center gap-2">
-              <span class="font-code-mono font-bold text-headline-sm ${item.quantity <= 2 ? 'text-error' : 'text-on-surface'}">${item.quantity}</span>
-              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface" title="زيادة المخزون +1">
-                +
-              </button>
-              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface" title="إنقاص المخزون -1">
-                -
-              </button>
+              <span class="font-numeric-table font-bold text-lg ${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="زيادة +1">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="إنقاص -1">-</button>
             </div>
           </td>
-          <td class="py-3 px-4 text-center">
-            <div class="flex items-center justify-center gap-1">
-              <button onclick="window.openEditProductModal('${item.id}')" class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
+          <td class="py-3.5 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
                 <span class="material-symbols-outlined text-[18px]">edit</span>
               </button>
-              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1 rounded hover:bg-error-container text-on-surface-variant hover:text-error transition-colors" title="حذف">
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
                 <span class="material-symbols-outlined text-[18px]">delete</span>
               </button>
             </div>
@@ -705,12 +886,9 @@ function renderPhonesPage() {
   const availablePhones = allPhones.filter(p => p.status === 'available');
   const soldPhones = allPhones.filter(p => p.status === 'sold');
 
-  // Today's sold phones
   const todayStr = new Date().toISOString().split('T')[0];
   const soldToday = soldPhones.filter(p => (p.soldAt || p.updatedAt || '').startsWith(todayStr));
   const todayProfit = soldToday.reduce((acc, p) => acc + ((p.sellPrice || 0) - (p.buyPrice || 0)), 0);
-
-  // Valuation
   const stockVal = availablePhones.reduce((acc, p) => acc + (p.buyPrice || 0), 0);
 
   setElemText('metric-stock-count', availablePhones.length);
@@ -718,7 +896,6 @@ function renderPhonesPage() {
   setElemText('metric-sold-today', soldToday.length);
   setElemText('metric-profit', formatMoney(todayProfit));
 
-  // Filter
   const activeBrand = AppState.activePhoneBrand;
   const activeStatus = AppState.activePhoneStatus;
   const search = (document.getElementById('phones-search-input')?.value || '').trim().toLowerCase();
@@ -746,17 +923,12 @@ function renderPhonesPage() {
       tbody.innerHTML = `
         <tr>
           <td colspan="8" class="py-16 text-center">
-            <div class="flex flex-col items-center justify-center gap-space-sm max-w-sm mx-auto">
-              <div class="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                <span class="material-symbols-outlined text-[32px]">smartphone</span>
-              </div>
-              <div class="flex flex-col gap-1 text-center">
-                <span class="font-headline-sm text-headline-sm text-on-surface">لا توجد هواتف مسجلة بالمخزن</span>
-                <span class="font-body-sm text-body-sm text-on-surface-variant">أضف هواتف جديدة مسجلة برقم السيريال أو الـ IMEI وسعر التكلفة والبيع.</span>
-              </div>
-              <button onclick="window.openAddProductModal('phones')" class="mt-space-xs bg-secondary text-on-secondary px-space-md py-space-xs rounded-lg font-headline-sm text-headline-sm flex items-center gap-space-xs hover:bg-secondary-container transition-all shadow-sm active:scale-95">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                <span>+ إضافة هاتف جديد</span>
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+              <span class="material-symbols-outlined text-[40px] opacity-30">smartphone</span>
+              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لا توجد هواتف مسجلة بالمخزن</span>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">أضف هواتف جديدة مسجلة برقم السيريال أو الـ IMEI وسعر التكلفة والبيع.</span>
+              <button onclick="window.openAddProductModal('phones')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl font-headline-sm text-headline-sm shadow-md hover:bg-secondary/90 transition-all cursor-pointer">
+                + إضافة هاتف جديد (IMEI)
               </button>
             </div>
           </td>
@@ -766,40 +938,40 @@ function renderPhonesPage() {
       tbody.innerHTML = filtered.map(phone => {
         const isAvail = phone.status === 'available';
         return `
-          <tr class="border-b border-surface-container-low hover:bg-surface-container-lowest/70 transition-colors">
-            <td class="py-3 px-4 font-code-mono font-bold text-secondary">
+          <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
+            <td class="py-3.5 px-4 font-numeric-table font-bold text-secondary text-base">
               <span class="cursor-pointer hover:underline" onclick="window.addItemToCartFromBarcode('${phone.imei || phone.barcode}')">${phone.imei || phone.barcode || '-'}</span>
             </td>
-            <td class="py-3 px-4 font-headline-sm font-bold text-on-surface">
+            <td class="py-3.5 px-4 font-headline-sm font-bold text-on-surface text-base">
               ${phone.brand || ''} ${phone.model || phone.name}
             </td>
-            <td class="py-3 px-4 font-label-md text-on-surface-variant">
+            <td class="py-3.5 px-4 font-label-md text-on-surface-variant">
               ${phone.storage || '-'} / ${phone.color || '-'}
             </td>
-            <td class="py-3 px-4 font-code-mono text-on-surface">${formatMoney(phone.buyPrice)} ج.م</td>
-            <td class="py-3 px-4 font-code-mono font-bold text-on-tertiary-container">${formatMoney(phone.sellPrice)} ج.م</td>
-            <td class="py-3 px-4">
-              <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold inline-flex items-center gap-1 ${
-                isAvail ? 'bg-emerald-100 text-emerald-800' : 'bg-surface-container text-on-surface-variant'
+            <td class="py-3.5 px-4 font-numeric-table text-on-surface text-base">${formatMoney(phone.buyPrice)} ج.م</td>
+            <td class="py-3.5 px-4 font-numeric-table font-bold text-emerald-400 text-lg">${formatMoney(phone.sellPrice)} ج.م</td>
+            <td class="py-3.5 px-4">
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
+                isAvail ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-surface-container text-on-surface-variant border border-outline-variant/30'
               }">
-                <span class="w-1.5 h-1.5 rounded-full ${isAvail ? 'bg-emerald-600' : 'bg-outline'}"></span>
+                <span class="w-2 h-2 rounded-full ${isAvail ? 'bg-emerald-400 animate-pulse' : 'bg-outline'}"></span>
                 ${isAvail ? 'متوفر بالمحل' : 'تم البيع'}
               </span>
             </td>
-            <td class="py-3 px-4 font-label-sm text-on-surface-variant">
+            <td class="py-3.5 px-4 font-label-sm text-on-surface-variant">
               ${!isAvail && phone.customerName ? `${phone.customerName} (${phone.customerPhone || ''})` : '-'}
             </td>
-            <td class="py-3 px-4 text-center">
-              <div class="flex items-center justify-center gap-1">
+            <td class="py-3.5 px-4 text-center">
+              <div class="flex items-center justify-center gap-1.5">
                 ${isAvail ? `
-                  <button onclick="window.addItemToCartFromBarcode('${phone.imei || phone.barcode}')" class="p-1 rounded bg-secondary/10 hover:bg-secondary text-secondary hover:text-white transition-colors" title="إضافة للفاتورة (بيع)">
+                  <button onclick="window.addItemToCartFromBarcode('${phone.imei || phone.barcode}')" class="p-1.5 rounded-lg bg-secondary/15 hover:bg-secondary text-secondary hover:text-white transition-colors" title="إضافة للفاتورة (بيع)">
                     <span class="material-symbols-outlined text-[18px]">shopping_cart</span>
                   </button>
                 ` : ''}
-                <button onclick="window.openEditProductModal('${phone.id}')" class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
+                <button onclick="window.openEditProductModal('${phone.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
                   <span class="material-symbols-outlined text-[18px]">edit</span>
                 </button>
-                <button onclick="window.confirmDeleteProduct('${phone.id}')" class="p-1 rounded hover:bg-error-container text-on-surface-variant hover:text-error transition-colors" title="حذف">
+                <button onclick="window.confirmDeleteProduct('${phone.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
                   <span class="material-symbols-outlined text-[18px]">delete</span>
                 </button>
               </div>
@@ -817,14 +989,12 @@ function renderPhonesPage() {
 
 function renderHeadphonesPage() {
   const allHeadphones = Store.products.filter(p => p.category === 'headphones');
-  
   const totalCount = allHeadphones.reduce((acc, p) => acc + (p.quantity || 0), 0);
   const totalCost = allHeadphones.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
   
   setElemText('headphones-total-count', totalCount);
   setElemText('headphones-total-cost', formatMoney(totalCost));
 
-  // Category counts
   const subcounts = {
     silicone: allHeadphones.filter(p => p.subcategory === 'silicone').length,
     classic: allHeadphones.filter(p => p.subcategory === 'classic').length,
@@ -855,17 +1025,12 @@ function renderHeadphonesPage() {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" class="py-16 text-center">
-            <div class="flex flex-col items-center justify-center gap-space-sm max-w-sm mx-auto">
-              <div class="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                <span class="material-symbols-outlined text-[32px]">headphones</span>
-              </div>
-              <div class="flex flex-col gap-1 text-center">
-                <span class="font-headline-sm text-headline-sm text-on-surface">لا توجد سماعات مسجلة في هذا القسم</span>
-                <span class="font-body-sm text-body-sm text-on-surface-variant">قم بمسح الباركود أو الضغط على زر الإضافة لتسجيل سماعات جديدة.</span>
-              </div>
-              <button onclick="window.openAddProductModal('headphones', '${activeTab !== 'all' ? activeTab : 'silicone'}')" class="mt-space-xs bg-secondary text-on-secondary px-space-md py-space-xs rounded-lg font-headline-sm text-headline-sm flex items-center gap-space-xs hover:bg-secondary-container transition-all shadow-sm active:scale-95">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                <span>+ إضافة سماعة جديدة</span>
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+              <span class="material-symbols-outlined text-[40px] opacity-30">headphones</span>
+              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لا توجد سماعات مسجلة في هذا القسم</span>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">قم بمسح الباركود أو الضغط على زر الإضافة لتسجيل سماعات جديدة.</span>
+              <button onclick="window.openAddProductModal('headphones', '${activeTab !== 'all' ? activeTab : 'silicone'}')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl font-headline-sm text-headline-sm shadow-md hover:bg-secondary/90 transition-all cursor-pointer">
+                + إضافة سماعة جديدة
               </button>
             </div>
           </td>
@@ -873,35 +1038,31 @@ function renderHeadphonesPage() {
       `;
     } else {
       tbody.innerHTML = filtered.map(item => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-lowest/70 transition-colors">
-          <td class="py-3 px-4 font-code-mono font-bold text-secondary">
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
+          <td class="py-3.5 px-4 font-numeric-table font-bold text-secondary text-base">
             <span class="cursor-pointer hover:underline" onclick="window.addItemToCartFromBarcode('${item.barcode}')">${item.barcode || 'بدون باركود'}</span>
           </td>
-          <td class="py-3 px-4 font-label-lg font-bold text-on-surface">${item.name}</td>
-          <td class="py-3 px-4">
-            <span class="px-2 py-0.5 rounded-full text-label-sm bg-surface-container text-on-surface-variant">
+          <td class="py-3.5 px-4 font-headline-sm font-bold text-on-surface text-base">${item.name}</td>
+          <td class="py-3.5 px-4">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant border border-outline-variant/30">
               ${getHeadphoneSubcategoryLabel(item.subcategory)}
             </span>
           </td>
-          <td class="py-3 px-4 font-code-mono text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
-          <td class="py-3 px-4 font-code-mono font-bold text-on-tertiary-container">${formatMoney(item.sellPrice)} ج.م</td>
-          <td class="py-3 px-4">
+          <td class="py-3.5 px-4 font-numeric-table text-on-surface text-base">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3.5 px-4 font-numeric-table font-bold text-emerald-400 text-lg">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3.5 px-4">
             <div class="flex items-center gap-2">
-              <span class="font-code-mono font-bold text-headline-sm ${item.quantity <= 2 ? 'text-error' : 'text-on-surface'}">${item.quantity}</span>
-              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface" title="زيادة +1">
-                +
-              </button>
-              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface" title="إنقاص -1">
-                -
-              </button>
+              <span class="font-numeric-table font-bold text-lg ${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="زيادة +1">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="إنقاص -1">-</button>
             </div>
           </td>
-          <td class="py-3 px-4 text-center">
-            <div class="flex items-center justify-center gap-1">
-              <button onclick="window.openEditProductModal('${item.id}')" class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
+          <td class="py-3.5 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
                 <span class="material-symbols-outlined text-[18px]">edit</span>
               </button>
-              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1 rounded hover:bg-error-container text-on-surface-variant hover:text-error transition-colors" title="حذف">
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
                 <span class="material-symbols-outlined text-[18px]">delete</span>
               </button>
             </div>
@@ -927,14 +1088,12 @@ function getHeadphoneSubcategoryLabel(sub) {
 
 function renderSpeakersPage() {
   const allSpeakers = Store.products.filter(p => p.category === 'speakers');
-
   const totalCount = allSpeakers.reduce((acc, p) => acc + (p.quantity || 0), 0);
   const totalCost = allSpeakers.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
 
   setElemText('kpiTotalCount', totalCount);
   setElemText('kpiTotalCost', formatMoney(totalCost));
 
-  // Category counts
   const subcounts = {
     small: allSpeakers.filter(p => p.subcategory === 'small').length,
     medium: allSpeakers.filter(p => p.subcategory === 'medium').length,
@@ -965,17 +1124,12 @@ function renderSpeakersPage() {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" class="py-16 text-center">
-            <div class="flex flex-col items-center justify-center gap-space-sm max-w-sm mx-auto">
-              <div class="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                <span class="material-symbols-outlined text-[32px]">speaker</span>
-              </div>
-              <div class="flex flex-col gap-1 text-center">
-                <span class="font-headline-sm text-headline-sm text-on-surface">لا توجد صبات مسجلة في هذا الحجم</span>
-                <span class="font-body-sm text-body-sm text-on-surface-variant">امسح باركود الصب أو اضغط F1 لإضافة صب جديد للمخزن.</span>
-              </div>
-              <button onclick="window.openAddProductModal('speakers', '${activeTab !== 'all' ? activeTab : 'small'}')" class="mt-space-xs bg-secondary text-on-secondary px-space-md py-space-xs rounded-lg font-headline-sm text-headline-sm flex items-center gap-space-xs hover:bg-secondary-container transition-all shadow-sm active:scale-95">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                <span>+ إضافة صب جديد</span>
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+              <span class="material-symbols-outlined text-[40px] opacity-30">speaker</span>
+              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لا توجد صبات مسجلة في هذا الحجم</span>
+              <span class="font-body-sm text-body-sm text-on-surface-variant">امسح باركود الصب أو اضغط F1 لإضافة صب جديد للمخزن.</span>
+              <button onclick="window.openAddProductModal('speakers', '${activeTab !== 'all' ? activeTab : 'small'}')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl font-headline-sm text-headline-sm shadow-md hover:bg-secondary/90 transition-all cursor-pointer">
+                + إضافة صب جديد
               </button>
             </div>
           </td>
@@ -983,35 +1137,31 @@ function renderSpeakersPage() {
       `;
     } else {
       tbody.innerHTML = filtered.map(item => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-lowest/70 transition-colors">
-          <td class="py-3 px-4 font-code-mono font-bold text-secondary">
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
+          <td class="py-3.5 px-4 font-numeric-table font-bold text-secondary text-base">
             <span class="cursor-pointer hover:underline" onclick="window.addItemToCartFromBarcode('${item.barcode}')">${item.barcode || 'بدون باركود'}</span>
           </td>
-          <td class="py-3 px-4 font-label-lg font-bold text-on-surface">${item.name}</td>
-          <td class="py-3 px-4">
-            <span class="px-2 py-0.5 rounded-full text-label-sm bg-surface-container text-on-surface-variant">
+          <td class="py-3.5 px-4 font-headline-sm font-bold text-on-surface text-base">${item.name}</td>
+          <td class="py-3.5 px-4">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant border border-outline-variant/30">
               ${getSpeakerSubcategoryLabel(item.subcategory)}
             </span>
           </td>
-          <td class="py-3 px-4 font-code-mono text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
-          <td class="py-3 px-4 font-code-mono font-bold text-on-tertiary-container">${formatMoney(item.sellPrice)} ج.م</td>
-          <td class="py-3 px-4">
+          <td class="py-3.5 px-4 font-numeric-table text-on-surface text-base">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3.5 px-4 font-numeric-table font-bold text-emerald-400 text-lg">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3.5 px-4">
             <div class="flex items-center gap-2">
-              <span class="font-code-mono font-bold text-headline-sm ${item.quantity <= 2 ? 'text-error' : 'text-on-surface'}">${item.quantity}</span>
-              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface" title="زيادة +1">
-                +
-              </button>
-              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface" title="إنقاص -1">
-                -
-              </button>
+              <span class="font-numeric-table font-bold text-lg ${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="زيادة +1">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="إنقاص -1">-</button>
             </div>
           </td>
-          <td class="py-3 px-4 text-center">
-            <div class="flex items-center justify-center gap-1">
-              <button onclick="window.openEditProductModal('${item.id}')" class="p-1 rounded hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
+          <td class="py-3.5 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
                 <span class="material-symbols-outlined text-[18px]">edit</span>
               </button>
-              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1 rounded hover:bg-error-container text-on-surface-variant hover:text-error transition-colors" title="حذف">
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
                 <span class="material-symbols-outlined text-[18px]">delete</span>
               </button>
             </div>
@@ -1031,17 +1181,16 @@ function getSpeakerSubcategoryLabel(sub) {
   }
 }
 
-// Tab switcher helpers for inventory pages
 window.setChargerTab = (tab) => {
   AppState.activeChargerTab = tab;
   document.querySelectorAll('.charger-tab-btn').forEach(b => {
-    b.classList.remove('bg-primary-container', 'text-on-primary');
+    b.classList.remove('bg-secondary', 'text-white');
     b.classList.add('bg-surface-container-low', 'text-on-surface');
   });
   const activeBtn = document.querySelector(`.charger-tab-btn[data-charger-cat="${tab}"]`);
   if (activeBtn) {
     activeBtn.classList.remove('bg-surface-container-low', 'text-on-surface');
-    activeBtn.classList.add('bg-primary-container', 'text-on-primary');
+    activeBtn.classList.add('bg-secondary', 'text-white');
   }
   renderChargersPage();
 };
@@ -1049,13 +1198,13 @@ window.setChargerTab = (tab) => {
 window.setHeadphoneTab = (tab) => {
   AppState.activeHeadphoneTab = tab;
   document.querySelectorAll('.headphone-tab-btn').forEach(b => {
-    b.classList.remove('bg-primary-container', 'text-on-primary');
+    b.classList.remove('bg-secondary', 'text-white');
     b.classList.add('bg-surface-container-low', 'text-on-surface');
   });
   const activeBtn = document.querySelector(`.headphone-tab-btn[data-headphone-cat="${tab}"]`);
   if (activeBtn) {
     activeBtn.classList.remove('bg-surface-container-low', 'text-on-surface');
-    activeBtn.classList.add('bg-primary-container', 'text-on-primary');
+    activeBtn.classList.add('bg-secondary', 'text-white');
   }
   renderHeadphonesPage();
 };
@@ -1063,13 +1212,13 @@ window.setHeadphoneTab = (tab) => {
 window.setSpeakerTab = (tab) => {
   AppState.activeSpeakerTab = tab;
   document.querySelectorAll('.speaker-tab-btn').forEach(b => {
-    b.classList.remove('bg-primary-container', 'text-on-primary');
+    b.classList.remove('bg-secondary', 'text-white');
     b.classList.add('bg-surface-container-low', 'text-on-surface');
   });
   const activeBtn = document.querySelector(`.speaker-tab-btn[data-speaker-cat="${tab}"]`);
   if (activeBtn) {
     activeBtn.classList.remove('bg-surface-container-low', 'text-on-surface');
-    activeBtn.classList.add('bg-primary-container', 'text-on-primary');
+    activeBtn.classList.add('bg-secondary', 'text-white');
   }
   renderSpeakersPage();
 };
@@ -1098,10 +1247,8 @@ function setupBarcodeScannerListener() {
   let lastKeyTime = Date.now();
 
   window.addEventListener('keydown', (e) => {
-    // Ignore function keys or modifier keys
-    if (['F1', 'F2', 'F3', 'F4', 'Escape'].includes(e.key)) return;
+    if (['F1', 'F2', 'F3', 'F4', 'F7', 'F11', 'Escape'].includes(e.key)) return;
 
-    // Check if user is typing manually into a standard form input or textarea
     const activeElem = document.activeElement;
     const isEditingInput = activeElem && (
       activeElem.tagName === 'INPUT' || 
@@ -1113,10 +1260,8 @@ function setupBarcodeScannerListener() {
     const timeDiff = currentTime - lastKeyTime;
     lastKeyTime = currentTime;
 
-    // Hardware barcode scanners type very rapidly (typically < 40ms per keystroke)
     if (e.key === 'Enter') {
       if (buffer.length >= 3) {
-        // We have a scanned barcode from hardware or entered in quick input!
         const scannedCode = buffer.trim();
         buffer = '';
         e.preventDefault();
@@ -1129,14 +1274,12 @@ function setupBarcodeScannerListener() {
 
     if (e.key.length === 1) {
       if (timeDiff > 120 && !isEditingInput) {
-        // Reset buffer if delay too long between keystrokes outside an input
         buffer = '';
       }
       buffer += e.key;
     }
   });
 
-  // Handle direct barcode inputs in header or inventory search
   const bindEnterToBarcode = (inputId) => {
     const el = document.getElementById(inputId);
     if (el) {
@@ -1163,11 +1306,8 @@ function setupBarcodeScannerListener() {
 
 export function handleScannedBarcode(barcode) {
   console.log(`🔍 Barcode detected: ${barcode}`);
-  
-  // Play subtle audio beep
   playScanBeep();
 
-  // Find product by barcode or IMEI
   const product = Store.products.find(p => 
     (p.barcode && p.barcode.trim() === barcode.trim()) ||
     (p.imei && p.imei.trim() === barcode.trim())
@@ -1176,7 +1316,6 @@ export function handleScannedBarcode(barcode) {
   const isPOSOpen = !document.getElementById('modal-quick-pos')?.classList.contains('hidden');
 
   if (isPOSOpen) {
-    // If POS cart is open, immediately add to cart
     if (product) {
       addItemToCart(product);
       showToast(`تمت إضافة [${product.name}] إلى سلة البيع`, 'shopping_cart');
@@ -1184,15 +1323,11 @@ export function handleScannedBarcode(barcode) {
       showToast(`الباركود [${barcode}] غير مسجل بالمخزن. اضغط F1 لإضافته.`, 'warning');
     }
   } else {
-    // Not in POS modal: check if item exists
     if (product) {
-      // If we are in inventory, highlight or open POS cart directly
-      showToast(`تم العثور على الصنف: ${product.name} (الكمية: ${product.quantity})`, 'check_circle');
-      // Trigger Quick POS and add this item
+      showToast(`تم العثور على الصنف: ${product.name} (المتاح: ${product.quantity})`, 'check_circle');
       window.triggerQuickPOS();
       addItemToCart(product);
     } else {
-      // Product doesn't exist -> Prompt to add it immediately!
       showToast(`باركود جديد [${barcode}]. جاري فتح نافذة الإضافة...`, 'add_circle');
       window.openAddProductModal(getDefaultCategoryForCurrentView(), null, barcode);
     }
@@ -1215,19 +1350,17 @@ function playScanBeep() {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1200, ctx.currentTime);
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    osc.frequency.setValueAtTime(1300, ctx.currentTime);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.08);
-  } catch (e) {
-    // AudioContext might be blocked until user gesture
-  }
+  } catch (e) {}
 }
 
 // ==========================================
-// QUICK POS MODAL & CART (F2)
+// LAPTOP QUICK POS MODAL & SPLIT REGISTER (F2)
 // ==========================================
 
 function setupQuickPOS() {
@@ -1236,11 +1369,11 @@ function setupQuickPOS() {
     if (modal) {
       modal.classList.remove('hidden');
       modal.classList.add('flex');
-      // Auto focus barcode input
       setTimeout(() => {
         document.getElementById('pos-barcode-search')?.focus();
       }, 100);
       renderPOSCart();
+      renderPOSCatalog(AppState.posCatalogCategory, AppState.posCatalogSearch);
     }
   };
 
@@ -1261,15 +1394,14 @@ function setupQuickPOS() {
     }
   };
 
-  // Pos barcode search input handler
   const posSearch = document.getElementById('pos-barcode-search');
   if (posSearch) {
     posSearch.addEventListener('input', (e) => {
-      renderPOSProductDropdown(e.target.value.trim());
+      AppState.posCatalogSearch = e.target.value.trim().toLowerCase();
+      renderPOSCatalog(AppState.posCatalogCategory, AppState.posCatalogSearch);
     });
   }
 
-  // Discount input
   const discountInput = document.getElementById('pos-discount-input');
   if (discountInput) {
     discountInput.addEventListener('input', (e) => {
@@ -1278,7 +1410,6 @@ function setupQuickPOS() {
     });
   }
 
-  // Cash Paid input
   const cashPaidInput = document.getElementById('pos-cash-paid');
   if (cashPaidInput) {
     cashPaidInput.addEventListener('input', () => {
@@ -1286,17 +1417,92 @@ function setupQuickPOS() {
     });
   }
 
-  // Checkout button
   const btnCheckout = document.getElementById('pos-btn-checkout');
   if (btnCheckout) {
     btnCheckout.addEventListener('click', () => {
       executePOSCheckout();
     });
   }
+
+  window.setPOSCatalogCategory = (cat) => {
+    AppState.posCatalogCategory = cat;
+    document.querySelectorAll('.pos-cat-pill').forEach(b => {
+      b.classList.remove('bg-secondary', 'text-white');
+      b.classList.add('bg-surface-container', 'text-on-surface');
+    });
+    const active = document.querySelector(`.pos-cat-pill[data-cat="${cat}"]`);
+    if (active) {
+      active.classList.remove('bg-surface-container', 'text-on-surface');
+      active.classList.add('bg-secondary', 'text-white');
+    }
+    renderPOSCatalog(cat, AppState.posCatalogSearch);
+  };
+}
+
+// Render Widescreen Catalog on Laptop POS Right Panel
+function renderPOSCatalog(category = 'all', searchQuery = '') {
+  const container = document.getElementById('pos-catalog-grid');
+  if (!container) return;
+
+  let items = Store.products;
+  if (category !== 'all') {
+    items = items.filter(p => p.category === category);
+  }
+  if (searchQuery) {
+    items = items.filter(p => 
+      (p.name || '').toLowerCase().includes(searchQuery) ||
+      (p.barcode || '').toLowerCase().includes(searchQuery) ||
+      (p.imei || '').toLowerCase().includes(searchQuery) ||
+      (p.model || '').toLowerCase().includes(searchQuery)
+    );
+  }
+
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full py-16 text-center text-on-surface-variant flex flex-col items-center justify-center gap-2">
+        <span class="material-symbols-outlined text-[40px] opacity-30">inventory_2</span>
+        <span class="font-headline-sm text-headline-sm font-bold">لا توجد منتجات مطابقة في المخزن</span>
+        <span class="font-body-sm text-body-sm">اضغط F1 لإضافة صنف جديد فوراً</span>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = items.map(p => {
+    const isAvail = p.category !== 'phones' ? (p.quantity > 0) : (p.status === 'available');
+    return `
+      <div 
+        onclick="window.posSelectProduct('${p.id}')"
+        class="p-3 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container-high hover:border-secondary cursor-pointer transition-all flex flex-col justify-between group active:scale-98 shadow-sm">
+        <div>
+          <div class="flex items-center justify-between text-xs text-on-surface-variant mb-1 font-numeric-table">
+            <span class="bg-surface-container px-1.5 py-0.5 rounded text-[11px] font-bold">${getCategoryArabicName(p.category)}</span>
+            <span class="${isAvail ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}">
+              ${p.category === 'phones' ? (isAvail ? 'متوفر' : 'مباع') : `متاح: ${p.quantity}`}
+            </span>
+          </div>
+          <h4 class="font-headline-sm font-bold text-on-surface text-sm line-clamp-2">${p.name}</h4>
+        </div>
+        <div class="mt-2.5 pt-2 border-t border-outline-variant/20 flex items-center justify-between">
+          <span class="font-numeric-table text-emerald-400 font-bold text-base">${formatMoney(p.sellPrice)} ج.م</span>
+          <span class="material-symbols-outlined text-secondary opacity-0 group-hover:opacity-100 text-lg transition-opacity">add_shopping_cart</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function getCategoryArabicName(cat) {
+  switch (cat) {
+    case 'chargers': return 'شواحن';
+    case 'phones': return 'هواتف';
+    case 'headphones': return 'سماعات';
+    case 'speakers': return 'صبات';
+    default: return 'صنف';
+  }
 }
 
 function addItemToCart(product) {
-  // Check if phone and already sold
   if (product.category === 'phones' && product.status !== 'available') {
     showToast("عفواً هذا الهاتف تم بيعه بالفعل!", "warning");
     return;
@@ -1304,19 +1510,16 @@ function addItemToCart(product) {
 
   const existingIdx = AppState.cart.findIndex(i => i.id === product.id);
   if (existingIdx !== -1) {
-    // If not a phone, increase quantity
     if (product.category === 'phones') {
       showToast("هذا الهاتف مسجل برقم IMEI فريد وموجود بالفعل بالسلة", "warning");
       return;
     }
-    // Check available stock
     if (AppState.cart[existingIdx].quantity >= product.quantity) {
       showToast(`الكمية المطلوبة تتجاوز المخزون المتوفر (${product.quantity})`, "warning");
       return;
     }
     AppState.cart[existingIdx].quantity += 1;
   } else {
-    // Check stock
     if (product.quantity <= 0 && product.category !== 'phones') {
       showToast("تنبيه: هذا الصنف نفذ من المخزون ولكن تم إضافته بالسلة", "warning");
     }
@@ -1332,10 +1535,12 @@ function addItemToCart(product) {
   }
 
   renderPOSCart();
-  // Clear search
   const posSearch = document.getElementById('pos-barcode-search');
-  if (posSearch) posSearch.value = '';
-  document.getElementById('pos-search-results')?.classList.add('hidden');
+  if (posSearch && posSearch.value) {
+    posSearch.value = '';
+    AppState.posCatalogSearch = '';
+    renderPOSCatalog(AppState.posCatalogCategory, '');
+  }
 }
 
 window.adjustCartQty = (id, delta) => {
@@ -1363,22 +1568,22 @@ window.removeCartItem = (id) => {
 function renderPOSCart() {
   const container = document.getElementById('pos-cart-items');
   const countBadge = document.getElementById('pos-cart-count');
-  if (countBadge) countBadge.innerText = `${AppState.cart.length} أصناف`;
+  if (countBadge) countBadge.innerText = `${AppState.cart.length} أصناف في الفاتورة`;
 
   if (!container) return;
 
   if (AppState.cart.length === 0) {
     container.innerHTML = `
       <div class="h-64 flex flex-col items-center justify-center text-on-surface-variant gap-2 text-center">
-        <span class="material-symbols-outlined text-[48px] text-outline-variant">shopping_cart</span>
-        <span class="font-headline-sm text-headline-sm">سلة البيع فارغة</span>
-        <span class="font-body-sm text-body-sm">امسح باركود الصنف أو ابحث بالاسم لإضافته فوراً</span>
+        <span class="material-symbols-outlined text-[48px] opacity-30">shopping_cart</span>
+        <span class="font-headline-sm text-headline-sm font-bold">فاتورة العميل فارغة</span>
+        <span class="font-body-sm text-body-sm">امسح باركود الصنف أو اختر من القائمة على اليمين</span>
       </div>
     `;
-    setElemText('pos-subtotal', '0.00');
-    setElemText('pos-total', '0.00');
+    setElemText('pos-subtotal', '0.00 ج.م');
+    setElemText('pos-total', '0.00 ج.م');
     setElemValue('pos-cash-paid', '');
-    setElemText('pos-change', '0.00');
+    setElemText('pos-change', '0.00 ج.م');
     return;
   }
 
@@ -1387,24 +1592,24 @@ function renderPOSCart() {
     const itemTotal = item.price * item.quantity;
     subtotal += itemTotal;
     return `
-      <div class="flex items-center justify-between p-3 bg-surface-container-low rounded-xl">
+      <div class="flex items-center justify-between p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
         <div class="flex flex-col flex-1">
-          <span class="font-headline-sm text-headline-sm text-on-surface">${item.name}</span>
-          <div class="flex items-center gap-2 mt-0.5 text-on-surface-variant font-code-mono text-label-sm">
+          <span class="font-headline-sm font-bold text-on-surface text-base">${item.name}</span>
+          <div class="flex items-center gap-2 mt-0.5 text-on-surface-variant font-numeric-table text-xs">
             <span>${formatMoney(item.price)} ج.م</span>
             <span>×</span>
             <span>${item.quantity}</span>
             <span>=</span>
-            <span class="text-secondary font-bold">${formatMoney(itemTotal)} ج.م</span>
+            <span class="text-secondary font-bold text-sm">${formatMoney(itemTotal)} ج.م</span>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <div class="flex items-center bg-surface-container-lowest rounded-lg border border-outline-variant/30">
-            <button onclick="window.adjustCartQty('${item.id}', -1)" class="w-7 h-7 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-r-lg">-</button>
-            <span class="w-8 text-center font-code-mono font-bold">${item.quantity}</span>
-            <button onclick="window.adjustCartQty('${item.id}', 1)" class="w-7 h-7 flex items-center justify-center text-on-surface hover:bg-surface-container rounded-l-lg">+</button>
+          <div class="flex items-center bg-surface-container rounded-lg border border-outline-variant/40">
+            <button onclick="window.adjustCartQty('${item.id}', -1)" class="w-7 h-7 flex items-center justify-center font-bold text-on-surface hover:bg-surface-container-high rounded-r-lg">-</button>
+            <span class="w-8 text-center font-numeric-table font-bold text-sm">${item.quantity}</span>
+            <button onclick="window.adjustCartQty('${item.id}', 1)" class="w-7 h-7 flex items-center justify-center font-bold text-on-surface hover:bg-surface-container-high rounded-l-lg">+</button>
           </div>
-          <button onclick="window.removeCartItem('${item.id}')" class="text-error hover:bg-error-container/20 p-1 rounded-lg">
+          <button onclick="window.removeCartItem('${item.id}')" class="text-rose-400 hover:bg-rose-500/20 p-1.5 rounded-lg transition-colors" title="حذف من الفاتورة">
             <span class="material-symbols-outlined text-[18px]">delete</span>
           </button>
         </div>
@@ -1418,7 +1623,6 @@ function renderPOSCart() {
   setElemText('pos-subtotal', `${formatMoney(subtotal)} ج.م`);
   setElemText('pos-total', `${formatMoney(total)} ج.م`);
 
-  // Default cash paid to total
   const cashInput = document.getElementById('pos-cash-paid');
   if (cashInput && (!cashInput.value || parseFloat(cashInput.value) === 0)) {
     cashInput.value = total > 0 ? total : '';
@@ -1432,48 +1636,6 @@ function calculatePOSChange() {
   const paid = parseFloat(document.getElementById('pos-cash-paid')?.value) || 0;
   const change = Math.max(0, paid - total);
   setElemText('pos-change', `${formatMoney(change)} ج.م`);
-}
-
-function renderPOSProductDropdown(query) {
-  const resultsBox = document.getElementById('pos-search-results');
-  if (!resultsBox) return;
-
-  if (!query || query.length < 2) {
-    resultsBox.classList.add('hidden');
-    return;
-  }
-
-  const matches = Store.products.filter(p => 
-    (p.name || '').toLowerCase().includes(query.toLowerCase()) ||
-    (p.barcode || '').toLowerCase().includes(query.toLowerCase()) ||
-    (p.imei || '').toLowerCase().includes(query.toLowerCase()) ||
-    (p.model || '').toLowerCase().includes(query.toLowerCase())
-  ).slice(0, 8);
-
-  if (matches.length === 0) {
-    resultsBox.innerHTML = `
-      <div class="p-3 text-center text-on-surface-variant font-label-md">
-        لا توجد أصناف مطابقة لهذا البحث
-      </div>
-    `;
-  } else {
-    resultsBox.innerHTML = matches.map(p => `
-      <div 
-        onclick="window.posSelectProduct('${p.id}')"
-        class="p-2.5 hover:bg-surface-container flex items-center justify-between cursor-pointer border-b border-surface-container-low transition-colors">
-        <div class="flex flex-col">
-          <span class="font-headline-sm text-headline-sm text-on-surface">${p.name}</span>
-          <span class="font-code-mono text-label-sm text-on-surface-variant">${p.barcode || p.imei || '-'} (${p.category})</span>
-        </div>
-        <div class="flex flex-col items-end">
-          <span class="font-code-mono font-bold text-secondary">${formatMoney(p.sellPrice)} ج.م</span>
-          <span class="font-label-sm text-on-surface-variant text-[11px]">المتاح: ${p.quantity}</span>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  resultsBox.classList.remove('hidden');
 }
 
 window.posSelectProduct = (id) => {
@@ -1510,7 +1672,6 @@ async function executePOSCheckout() {
       cashier: 'أحمد الكاشير'
     });
 
-    // Reset Cart
     AppState.cart = [];
     AppState.cartDiscount = 0;
     if (document.getElementById('pos-discount-input')) document.getElementById('pos-discount-input').value = '0';
@@ -1520,7 +1681,6 @@ async function executePOSCheckout() {
     window.closeQuickPOS();
     showToast(`تم حفظ الفاتورة بنجاح رقم ${invoice.invoiceNumber} وخصم المخزون`, 'verified');
 
-    // Open Thermal Receipt Print Dialog
     window.printInvoiceReceipt(invoice.id);
 
   } catch (err) {
@@ -1626,18 +1786,15 @@ function setupProductModal() {
     });
   }
 
-  // Barcode generator helper
   window.generateRandomBarcode = () => {
     const randomCode = '622' + Math.floor(100000000 + Math.random() * 900000000);
     setElemValue('prod-barcode', randomCode);
   };
 
-  // Add Product Modal trigger
   window.openAddProductModal = (category = 'chargers', subcategory = null, barcode = '') => {
     AppState.editingProductId = null;
     setElemText('modal-prod-title', '+ إضافة صنف جديد للمخزن');
     
-    // Reset Form
     setElemValue('prod-id', '');
     setElemValue('prod-name', '');
     setElemValue('prod-barcode', barcode || '');
@@ -1662,7 +1819,6 @@ function setupProductModal() {
     }
   };
 
-  // Edit Product Modal trigger
   window.openEditProductModal = (id) => {
     const prod = Store.products.find(p => p.id === id);
     if (!prod) return;
@@ -1681,7 +1837,6 @@ function setupProductModal() {
     updateProductModalFields(prod.category || 'chargers');
     setElemValue('prod-subcategory', prod.subcategory || '');
 
-    // For phones
     setElemValue('prod-phone-brand', prod.brand || '');
     setElemValue('prod-phone-model', prod.model || '');
     setElemValue('prod-phone-imei', prod.imei || '');
@@ -1703,7 +1858,6 @@ function setupProductModal() {
     }
   };
 
-  // Save product (Add or Update)
   window.saveProductForm = async () => {
     const category = document.getElementById('prod-category')?.value || 'chargers';
     const name = document.getElementById('prod-name')?.value || '';
@@ -1752,7 +1906,6 @@ function setupProductModal() {
     }
   };
 
-  // Delete Product
   window.confirmDeleteProduct = (id) => {
     const prod = Store.products.find(p => p.id === id);
     if (!prod) return;
@@ -1934,13 +2087,16 @@ function setupKeyboardShortcuts() {
     } else if (e.key === 'F4') {
       e.preventDefault();
       navigateTo('vodafone-cash-wallets');
+    } else if (e.key === 'F7') {
+      e.preventDefault();
+      window.openThemeModal();
     } else if (e.key === 'Escape') {
-      // Close any open modal
       window.closeQuickPOS();
       window.closeProductModal();
       window.closeDeleteConfirmModal();
       window.closeLineSettingsModal();
       window.closeEditVodafoneTxModal();
+      window.closeThemeModal();
       window.closeThermalReceiptModal();
       window.closeOpeningCashModal();
       window.closeDrawerAdjustModal();
@@ -2009,6 +2165,12 @@ function setElemValue(id, val) {
   if (el) el.value = val;
 }
 
-// Global Export
 window.navigateTo = navigateTo;
 window.formatMoney = formatMoney;
+
+window.onCategoryChange = function() {
+  const cat = document.getElementById('prod-category')?.value;
+  if (cat && typeof updateProductModalFields === 'function') {
+    updateProductModalFields(cat);
+  }
+};
