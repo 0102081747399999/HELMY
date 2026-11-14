@@ -2599,3 +2599,173 @@ window.onCategoryChange = function() {
     updateProductModalFields(cat);
   }
 };
+
+
+// =========================================================================
+// EMBEDDED LIVE CAMERA & PHOTO SNAPSHOT SERVICE ("في قلب السيستم")
+// =========================================================================
+
+let posEmbeddedScannerInstance = null;
+let formEmbeddedScannerInstance = null;
+
+window.triggerPhotoCapture = function(targetField = null) {
+  currentTargetField = targetField;
+  const fileInput = document.getElementById('camera-photo-snapshot-input');
+  if (fileInput) {
+    fileInput.click();
+  }
+};
+
+window.handlePhotoSnapshotSelected = async function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  showToast('جاري فحص وتصوير الباركود من اللقطة...', 'photo_camera');
+
+  try {
+    if (typeof Html5Qrcode === 'undefined') {
+      showToast('مكتبة الكاميرا غير محملة', 'error');
+      return;
+    }
+
+    // Create a temporary scanner instance on a detached or existing container
+    const scannerId = document.getElementById('camera-scanner-viewport') ? "camera-scanner-viewport" : "pos-embedded-camera-viewport";
+    const tempScanner = new Html5Qrcode(scannerId);
+    
+    const decodedText = await tempScanner.scanFile(file, false);
+    console.log(`📸 [Photo Barcode Decoded]: ${decodedText}`);
+    playScanBeep(true);
+    if (navigator.vibrate) navigator.vibrate(120);
+
+    showToast(`تم التقاط الباركود من الصورة: ${decodedText}`, 'check_circle');
+    handleScannedBarcode(decodedText, currentTargetField);
+  } catch (err) {
+    console.error('Photo decode error:', err);
+    playScanBeep(false);
+    showToast('تعذر قراءة الباركود من الصورة: يرجى التقاط صورة أوضح أو تقريب الكاميرا', 'warning');
+  } finally {
+    event.target.value = '';
+  }
+};
+
+window.togglePosEmbeddedCamera = async function() {
+  const container = document.getElementById('pos-camera-viewport-container');
+  const btnText = document.getElementById('pos-camera-btn-text');
+  const toggleBtn = document.getElementById('btn-toggle-pos-camera');
+
+  if (!container) return;
+
+  // If already running -> stop it
+  if (posEmbeddedScannerInstance) {
+    try {
+      await posEmbeddedScannerInstance.stop();
+    } catch (e) {}
+    posEmbeddedScannerInstance = null;
+    container.classList.add('hidden');
+    if (btnText) btnText.innerText = 'تشغيل الكاميرا الحية';
+    if (toggleBtn) toggleBtn.classList.replace('bg-emerald-600', 'bg-gradient-to-r');
+    showToast('تم إيقاف كاميرا الكاشير', 'videocam_off');
+    return;
+  }
+
+  // Start embedded camera
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('جاري تجهيز الكاميرا...', 'info');
+    return;
+  }
+
+  container.classList.remove('hidden');
+  if (btnText) btnText.innerText = 'إيقاف الكاميرا';
+
+  try {
+    posEmbeddedScannerInstance = new Html5Qrcode("pos-embedded-camera-viewport");
+    
+    const config = {
+      fps: 15,
+      qrbox: { width: 240, height: 140 },
+      aspectRatio: 1.333333
+    };
+
+    let cameraConfig = { facingMode: "environment" };
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length > 0) {
+        cameraConfig = devices[0].id;
+      }
+    } catch (e) {}
+
+    await posEmbeddedScannerInstance.start(
+      cameraConfig,
+      config,
+      (decodedText) => {
+        console.log(`🎯 [Embedded POS Scan]: ${decodedText}`);
+        playScanBeep(true);
+        if (navigator.vibrate) navigator.vibrate(100);
+
+        // Flash green ring on container
+        container.classList.add('ring-4', 'ring-emerald-400');
+        setTimeout(() => container.classList.remove('ring-4', 'ring-emerald-400'), 500);
+
+        handleScannedBarcode(decodedText, 'pos');
+      },
+      () => {}
+    );
+
+    showToast('كاميرا الكاشير الحية تعمل الآن! قرّب أي منتج أمام شاشة اللاب توب', 'videocam');
+
+  } catch (err) {
+    console.error('Embedded POS camera error:', err);
+    container.classList.add('hidden');
+    if (btnText) btnText.innerText = 'تشغيل الكاميرا الحية';
+    posEmbeddedScannerInstance = null;
+    showToast(`تعذر فتح الكاميرا: ${err.message || 'تأكد من فتح التطبيق عبر السيرفر المحلي أو السماح بالكاميرا'}`, 'error');
+  }
+};
+
+window.toggleFormEmbeddedCamera = async function() {
+  const container = document.getElementById('form-embedded-camera-container');
+  if (!container) return;
+
+  if (formEmbeddedScannerInstance) {
+    try {
+      await formEmbeddedScannerInstance.stop();
+    } catch (e) {}
+    formEmbeddedScannerInstance = null;
+    container.classList.add('hidden');
+    return;
+  }
+
+  if (typeof Html5Qrcode === 'undefined') return;
+
+  container.classList.remove('hidden');
+
+  try {
+    formEmbeddedScannerInstance = new Html5Qrcode("form-camera-viewport");
+    await formEmbeddedScannerInstance.start(
+      { facingMode: "environment" },
+      { fps: 15, qrbox: { width: 220, height: 130 } },
+      async (decodedText) => {
+        playScanBeep(true);
+        try {
+          await formEmbeddedScannerInstance.stop();
+        } catch (e) {}
+        formEmbeddedScannerInstance = null;
+        container.classList.add('hidden');
+
+        // Fill form
+        const barInput = document.getElementById('prod-barcode');
+        if (barInput) {
+          barInput.value = decodedText;
+          barInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        showToast(`تم تصوير الباركود بنجاح: ${decodedText}`, 'check_circle');
+        document.getElementById('prod-name')?.focus();
+      },
+      () => {}
+    );
+  } catch (err) {
+    container.classList.add('hidden');
+    formEmbeddedScannerInstance = null;
+    showToast('تعذر تشغيل الكاميرا داخل النموذج', 'error');
+  }
+};

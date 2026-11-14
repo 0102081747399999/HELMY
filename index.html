@@ -307,6 +307,37 @@
           </div>
         </div>
 
+        <!-- Embedded Barcode Scanner Strip ("في قلب السيستم") -->
+        <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-600 to-red-600 text-white flex items-center justify-center shadow-md shrink-0">
+              <span class="material-symbols-outlined text-2xl">barcode_scanner</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-headline-sm font-bold text-on-surface text-base">قارئ وتصوير الباركود في قلب النظام</h3>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">مفعل لحظياً 🟢</span>
+              </div>
+              <p class="font-body-sm text-xs text-on-surface-variant mt-0.5">امسح بمسدس الباركود الموصل، أو صوّر بالكاميرا المباشرة لأي شاحن أو وصلة أو صب أو إكسسوار</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <button type="button" onclick="window.openCameraScanner()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer">
+              <span class="material-symbols-outlined text-base">videocam</span>
+              <span>كاميرا الجهاز المباشرة (F3)</span>
+            </button>
+            <button type="button" onclick="window.triggerPhotoCapture()" class="px-3.5 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-bold text-xs border border-slate-700/50 flex items-center gap-1.5 transition-all cursor-pointer" title="التقاط صورة للباركود بالكاميرا">
+              <span class="material-symbols-outlined text-base text-rose-500">photo_camera</span>
+              <span>📸 تصوير لقطة باركود</span>
+            </button>
+            <button type="button" onclick="window.triggerQuickPOS()" class="px-3.5 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-bold text-xs border border-slate-700/50 flex items-center gap-1.5 transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-base text-emerald-400">point_of_sale</span>
+              <span>شاشة البيع (F2)</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Realtime Financial Indicators Grid (4 Key KPI Cards) -->
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           
@@ -992,6 +1023,37 @@
             <button onclick="window.setPOSCatalogCategory('speakers')" data-pos-cat="speakers" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface shrink-0">صبات</button>
           </div>
 
+          <!-- Embedded POS Live Camera Dock -->
+          <div id="pos-live-camera-dock" class="p-3 bg-surface-container rounded-2xl border border-outline-variant/30 flex flex-col gap-2 shrink-0">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-rose-500 text-lg">videocam</span>
+                <span>كاميرا الكاشير الحية المدمجة (Live Scanner)</span>
+              </span>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="window.triggerPhotoCapture('pos')" class="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-container text-rose-400 border border-outline-variant/40 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer" title="تصوير باركود">
+                  <span class="material-symbols-outlined text-sm">photo_camera</span>
+                  <span>تصوير لقطة</span>
+                </button>
+                <button type="button" id="btn-toggle-pos-camera" onclick="window.togglePosEmbeddedCamera()" class="px-3 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all cursor-pointer">
+                  <span class="material-symbols-outlined text-sm">play_circle</span>
+                  <span id="pos-camera-btn-text">تشغيل الكاميرا الحية</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Viewport (shown when activated) -->
+            <div id="pos-camera-viewport-container" class="hidden relative w-full h-44 sm:h-52 bg-black rounded-xl overflow-hidden border border-rose-500/40 shadow-inner">
+              <div id="pos-embedded-camera-viewport" class="w-full h-full"></div>
+              <div class="scanner-laser-line pointer-events-none"></div>
+              <div class="absolute inset-x-8 inset-y-6 border border-dashed border-rose-500/60 rounded-lg pointer-events-none flex items-center justify-center">
+                <span class="text-[10px] text-white/80 bg-black/70 px-2.5 py-0.5 rounded-full font-bold pointer-events-none">
+                  قرّب الباركود من كاميرا اللاب توب
+                </span>
+              </div>
+            </div>
+          </div>
+
           <!-- Catalog Cards Grid -->
           <div id="pos-catalog-grid" class="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-2.5 pr-1">
             <!-- Populated by JS -->
@@ -1146,12 +1208,31 @@
         </div>
 
         <div>
-          <div class="flex items-center justify-between mb-1">
+          <!-- Form Embedded Camera Container -->
+        <div id="form-embedded-camera-container" class="hidden relative w-full h-44 bg-black rounded-2xl overflow-hidden border border-rose-500/40 shadow-inner mb-2">
+          <div id="form-camera-viewport" class="w-full h-full"></div>
+          <div class="scanner-laser-line pointer-events-none"></div>
+          <div class="absolute inset-x-8 inset-y-4 border border-dashed border-rose-500/60 rounded-lg pointer-events-none flex items-center justify-center">
+            <span class="text-[10px] text-white/80 bg-black/70 px-2 py-0.5 rounded-full font-bold pointer-events-none">
+              وجّه الكاميرا نحو الباركود للتعبئة الفورية
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mb-1">
             <label class="text-xs font-bold text-on-surface-variant">الباركود / السيريال (Barcode) *</label>
             <div class="flex items-center gap-2">
               <button type="button" onclick="window.openCameraScanner('prod-barcode')" class="text-xs text-emerald-400 hover:underline font-bold flex items-center gap-0.5 cursor-pointer">
                 <span class="material-symbols-outlined text-xs">photo_camera</span>
-                <span>تصوير بالكاميرا</span>
+                <button type="button" onclick="window.toggleFormEmbeddedCamera()" class="text-xs text-rose-400 hover:underline font-bold flex items-center gap-0.5 cursor-pointer">
+                <span class="material-symbols-outlined text-xs">videocam</span>
+                <span>كاميرا حية</span>
+              </button>
+              <span class="text-outline-variant/40">•</span>
+              <button type="button" onclick="window.triggerPhotoCapture('prod-barcode')" class="text-xs text-emerald-400 hover:underline font-bold flex items-center gap-0.5 cursor-pointer">
+                <span class="material-symbols-outlined text-xs">photo_camera</span>
+                <span>تصوير لقطة</span>
+              </button>
               </button>
               <span class="text-outline-variant/40">•</span>
               <button type="button" onclick="window.generateRandomBarcode()" class="text-xs text-rose-500 hover:underline font-bold cursor-pointer">توليد تلقائي</button>
@@ -4490,6 +4571,1213 @@ window.executePrintReceipt = (format = null) => {
     <body onload="window.focus(); window.print();">
       ${receiptHtml}
     </body>
+    </html>
+  `);
+  doc.close();
+
+  showToast('جاري إرسال الفاتورة إلى الطابعة...', 'print');
+};
+
+
+// ==========================================
+// UNIVERSAL PRODUCT CRUD MODALS
+// ==========================================
+
+function setupProductModal() {
+  const categorySelect = document.getElementById('prod-category');
+  if (categorySelect) {
+    categorySelect.addEventListener('change', (e) => {
+      updateProductModalFields(e.target.value);
+    });
+  }
+
+  window.generateRandomBarcode = () => {
+    const randomCode = '622' + Math.floor(100000000 + Math.random() * 900000000);
+    setElemValue('prod-barcode', randomCode);
+  };
+
+  window.openAddProductModal = (category = 'chargers', subcategory = null, barcode = '') => {
+    AppState.editingProductId = null;
+    setElemText('modal-prod-title', '+ إضافة صنف جديد للمخزن');
+    
+    setElemValue('prod-id', '');
+    setElemValue('prod-name', '');
+    setElemValue('prod-barcode', barcode || '');
+    setElemValue('prod-buy-price', '');
+    setElemValue('prod-sell-price', '');
+    setElemValue('prod-qty', '1');
+    setElemValue('prod-category', category);
+    
+    updateProductModalFields(category);
+    if (subcategory) {
+      setElemValue('prod-subcategory', subcategory);
+    }
+
+    const modal = document.getElementById('modal-product-form');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      setTimeout(() => {
+        if (!barcode) document.getElementById('prod-barcode')?.focus();
+        else document.getElementById('prod-name')?.focus();
+      }, 100);
+    }
+  };
+
+  window.openEditProductModal = (id) => {
+    const prod = Store.products.find(p => p.id === id);
+    if (!prod) return;
+
+    AppState.editingProductId = id;
+    setElemText('modal-prod-title', 'تعديل بيانات الصنف');
+
+    setElemValue('prod-id', prod.id);
+    setElemValue('prod-name', prod.name || '');
+    setElemValue('prod-barcode', prod.barcode || prod.imei || '');
+    setElemValue('prod-buy-price', prod.buyPrice || 0);
+    setElemValue('prod-sell-price', prod.sellPrice || 0);
+    setElemValue('prod-qty', prod.quantity || 0);
+    setElemValue('prod-category', prod.category || 'chargers');
+
+    updateProductModalFields(prod.category || 'chargers');
+    setElemValue('prod-subcategory', prod.subcategory || '');
+
+    setElemValue('prod-phone-brand', prod.brand || '');
+    setElemValue('prod-phone-model', prod.model || '');
+    setElemValue('prod-phone-imei', prod.imei || '');
+    setElemValue('prod-phone-storage', prod.storage || '');
+    setElemValue('prod-phone-color', prod.color || '');
+
+    const modal = document.getElementById('modal-product-form');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  };
+
+  window.closeProductModal = () => {
+    const modal = document.getElementById('modal-product-form');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  };
+
+  window.saveProductForm = async () => {
+    const category = document.getElementById('prod-category')?.value || 'chargers';
+    const name = document.getElementById('prod-name')?.value || '';
+    const barcode = document.getElementById('prod-barcode')?.value || '';
+    const buyPrice = parseFloat(document.getElementById('prod-buy-price')?.value) || 0;
+    const sellPrice = parseFloat(document.getElementById('prod-sell-price')?.value) || 0;
+    const quantity = parseInt(document.getElementById('prod-qty')?.value, 10) || 0;
+    const subcategory = document.getElementById('prod-subcategory')?.value || '';
+
+    if (!name.trim()) {
+      showToast("يرجى إدخال اسم الصنف", "warning");
+      document.getElementById('prod-name')?.focus();
+      return;
+    }
+
+    const productData = {
+      name,
+      barcode,
+      category,
+      subcategory,
+      buyPrice,
+      sellPrice,
+      quantity
+    };
+
+    if (category === 'phones') {
+      productData.brand = document.getElementById('prod-phone-brand')?.value || '';
+      productData.model = document.getElementById('prod-phone-model')?.value || name;
+      productData.imei = document.getElementById('prod-phone-imei')?.value || barcode;
+      productData.storage = document.getElementById('prod-phone-storage')?.value || '';
+      productData.color = document.getElementById('prod-phone-color')?.value || '';
+      productData.status = 'available';
+    }
+
+    try {
+      if (AppState.editingProductId) {
+        await updateProduct(AppState.editingProductId, productData);
+        showToast("تم تحديث بيانات الصنف بنجاح ومزامنتها", "verified");
+      } else {
+        await addProduct(productData);
+        showToast("تمت إضافة الصنف الجديد بنجاح إلى الفيربيز والمخزن", "verified");
+      }
+      closeProductModal();
+    } catch (err) {
+      showToast(`خطأ في الحفظ: ${err.message}`, "error");
+    }
+  };
+
+  window.confirmDeleteProduct = (id) => {
+    const prod = Store.products.find(p => p.id === id);
+    if (!prod) return;
+
+    AppState.deleteTarget = {
+      type: 'product',
+      id: prod.id,
+      title: 'تأكيد حذف الصنف من المخزن',
+      message: `هل أنت متأكد من حذف الصنف [${prod.name}] نهائياً؟`
+    };
+    openDeleteConfirmModal();
+  };
+}
+
+function updateProductModalFields(category) {
+  const subcatSelect = document.getElementById('prod-subcategory');
+  const phoneFields = document.getElementById('prod-phone-specific-fields');
+  const subcatContainer = document.getElementById('prod-subcategory-container');
+
+  if (category === 'phones') {
+    if (phoneFields) phoneFields.classList.remove('hidden');
+    if (subcatContainer) subcatContainer.classList.add('hidden');
+  } else {
+    if (phoneFields) phoneFields.classList.add('hidden');
+    if (subcatContainer) subcatContainer.classList.remove('hidden');
+
+    if (subcatSelect) {
+      if (category === 'chargers') {
+        subcatSelect.innerHTML = `
+          <option value="complete">شاحن كامل (Complete Charger)</option>
+          <option value="adapter">رأس شاحن (Adapter/Head)</option>
+          <option value="typec">وصلة شحن عريضة (Type-C)</option>
+          <option value="microusb">وصلة شحن عادية (Micro-USB)</option>
+          <option value="pin">وصلة شحن رفيعة (Pin/iPhone)</option>
+        `;
+      } else if (category === 'headphones') {
+        subcatSelect.innerHTML = `
+          <option value="silicone">سماعة جلدة (In-Ear)</option>
+          <option value="classic">سماعة عضم (Classic)</option>
+          <option value="bluetooth">سماعة بلوتوث (Bluetooth Wireless)</option>
+        `;
+      } else if (category === 'speakers') {
+        subcatSelect.innerHTML = `
+          <option value="small">صب صغير (Small Speaker)</option>
+          <option value="medium">صب وسط (Medium Speaker)</option>
+          <option value="large">صب كبير (Large Speaker)</option>
+        `;
+      }
+    }
+  }
+}
+
+// ==========================================
+// UNIVERSAL DELETE CONFIRMATION MODAL
+// ==========================================
+
+function openDeleteConfirmModal() {
+  const modal = document.getElementById('modal-delete-confirm');
+  if (!modal || !AppState.deleteTarget) return;
+
+  setElemText('delete-confirm-title', AppState.deleteTarget.title || 'تأكيد الحذف');
+  setElemText('delete-confirm-message', AppState.deleteTarget.message || 'هل أنت متأكد؟');
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+window.closeDeleteConfirmModal = () => {
+  const modal = document.getElementById('modal-delete-confirm');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+  AppState.deleteTarget = null;
+};
+
+window.executeDeleteAction = async () => {
+  if (!AppState.deleteTarget) return;
+  const target = AppState.deleteTarget;
+  closeDeleteConfirmModal();
+
+  try {
+    if (target.type === 'product') {
+      await deleteProduct(target.id);
+      showToast("تم حذف الصنف من المخزن بنجاح", "delete");
+    } else if (target.type === 'vodafone_tx') {
+      await deleteVodafoneTransaction(target.id);
+      showToast("تم حذف المعاملة والتراجع عن أثرها المالي", "delete");
+    } else if (target.type === 'vodafone_reset') {
+      await resetVodafoneLine(target.id);
+      showToast(`تمت إعادة تعيين بيانات خط فودافون كاش (${target.id}) بنجاح`, "refresh");
+    }
+  } catch (err) {
+    showToast(`فشل الحذف: ${err.message}`, "error");
+  }
+};
+
+// ==========================================
+// CASH DRAWER & SHIFT MODALS
+// ==========================================
+
+function setupDrawerEvents() {
+  window.openOpeningCashModal = () => {
+    const modal = document.getElementById('modal-opening-cash');
+    if (modal) {
+      setElemValue('opening-cash-amount', Store.drawer ? (Store.drawer.openingCash || '') : '');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  };
+
+  window.closeOpeningCashModal = () => {
+    const modal = document.getElementById('modal-opening-cash');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  };
+
+  window.saveOpeningCash = async () => {
+    const amount = parseFloat(document.getElementById('opening-cash-amount')?.value) || 0;
+    await recordCashDrawerEntry({
+      type: 'set_opening',
+      amount,
+      reason: 'تحديد رصيد افتتاح الدرج'
+    });
+    closeOpeningCashModal();
+    showToast(`تم اعتماد رصيد الافتتاح: ${formatMoney(amount)} ج.م`, 'check_circle');
+  };
+
+  window.openDrawerAdjustModal = (type = 'in') => {
+    const modal = document.getElementById('modal-drawer-adjust');
+    if (modal) {
+      setElemValue('drawer-adjust-type', type);
+      setElemText('drawer-adjust-title', type === 'in' ? 'إيداع نقدية في درج الكاشير (+)' : 'سحب نقدية من درج الكاشير (-)');
+      setElemValue('drawer-adjust-amount', '');
+      setElemValue('drawer-adjust-reason', '');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  };
+
+  window.closeDrawerAdjustModal = () => {
+    const modal = document.getElementById('modal-drawer-adjust');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  };
+
+  window.saveDrawerAdjustment = async () => {
+    const type = document.getElementById('drawer-adjust-type')?.value || 'in';
+    const amount = parseFloat(document.getElementById('drawer-adjust-amount')?.value) || 0;
+    const reason = document.getElementById('drawer-adjust-reason')?.value || (type === 'in' ? 'إيداع نقدي' : 'سحب نقدي');
+
+    if (amount <= 0) {
+      showToast("يرجى إدخال مبلغ صحيح", "warning");
+      return;
+    }
+
+    await recordCashDrawerEntry({ type, amount, reason });
+    closeDrawerAdjustModal();
+    showToast(`تم تسجيل ${type === 'in' ? 'إيداع' : 'سحب'} ${formatMoney(amount)} ج.م بنجاح`, 'payments');
+  };
+}
+
+// ==========================================
+// KEYBOARD SHORTCUTS
+// ==========================================
+
+function setupKeyboardShortcuts() {
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'F1') {
+      e.preventDefault();
+      window.openAddProductModal(getDefaultCategoryForCurrentView());
+    } else if (e.key === 'F2') {
+      e.preventDefault();
+      window.triggerQuickPOS();
+    } else if (e.key === 'F4') {
+      e.preventDefault();
+      navigateTo('vodafone-cash-wallets');
+    } else if (e.key === 'F7') {
+      e.preventDefault();
+      window.openThemeModal();
+    } else if (e.key === 'Escape') {
+      window.closeQuickPOS();
+      window.closeProductModal();
+      window.closeDeleteConfirmModal();
+      window.closeLineSettingsModal();
+      window.closeEditVodafoneTxModal();
+      window.closeThemeModal();
+      window.closeThermalReceiptModal();
+      window.closeOpeningCashModal();
+      window.closeDrawerAdjustModal();
+    }
+  });
+}
+
+// ==========================================
+// TOAST NOTIFICATIONS
+// ==========================================
+
+export function showToast(msg, icon = 'check_circle') {
+  const toast = document.getElementById('action-toast');
+  const toastMsg = document.getElementById('toast-message');
+  const toastIcon = document.getElementById('toast-icon');
+  if (toast && toastMsg && toastIcon) {
+    toastMsg.innerText = msg;
+    toastIcon.innerText = icon;
+    toast.classList.remove('hidden');
+    toast.classList.add('flex');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+      toast.classList.remove('flex');
+    }, 4000);
+  }
+}
+window.showToast = showToast;
+
+// ==========================================
+// FORMATTING HELPERS
+// ==========================================
+
+function formatMoney(num) {
+  return (parseFloat(num) || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatCompactMoney(num) {
+  const n = parseFloat(num) || 0;
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return n.toFixed(0);
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function setElemText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = val;
+}
+
+function setElemValue(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+window.navigateTo = navigateTo;
+window.formatMoney = formatMoney;
+
+window.onCategoryChange = function() {
+  const cat = document.getElementById('prod-category')?.value;
+  if (cat && typeof updateProductModalFields === 'function') {
+    updateProductModalFields(cat);
+  }
+};
+
+
+// =========================================================================
+// EMBEDDED LIVE CAMERA & PHOTO SNAPSHOT SERVICE ("في قلب السيستم")
+// =========================================================================
+
+let posEmbeddedScannerInstance = null;
+let formEmbeddedScannerInstance = null;
+
+window.triggerPhotoCapture = function(targetField = null) {
+  currentTargetField = targetField;
+  const fileInput = document.getElementById('camera-photo-snapshot-input');
+  if (fileInput) {
+    fileInput.click();
+  }
+};
+
+window.handlePhotoSnapshotSelected = async function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  showToast('جاري فحص وتصوير الباركود من اللقطة...', 'photo_camera');
+
+  try {
+    if (typeof Html5Qrcode === 'undefined') {
+      showToast('مكتبة الكاميرا غير محملة', 'error');
+      return;
+    }
+
+    // Create a temporary scanner instance on a detached or existing container
+    const scannerId = document.getElementById('camera-scanner-viewport') ? "camera-scanner-viewport" : "pos-embedded-camera-viewport";
+    const tempScanner = new Html5Qrcode(scannerId);
+    
+    const decodedText = await tempScanner.scanFile(file, false);
+    console.log(`📸 [Photo Barcode Decoded]: ${decodedText}`);
+    playScanBeep(true);
+    if (navigator.vibrate) navigator.vibrate(120);
+
+    showToast(`تم التقاط الباركود من الصورة: ${decodedText}`, 'check_circle');
+    handleScannedBarcode(decodedText, currentTargetField);
+  } catch (err) {
+    console.error('Photo decode error:', err);
+    playScanBeep(false);
+    showToast('تعذر قراءة الباركود من الصورة: يرجى التقاط صورة أوضح أو تقريب الكاميرا', 'warning');
+  } finally {
+    event.target.value = '';
+  }
+};
+
+window.togglePosEmbeddedCamera = async function() {
+  const container = document.getElementById('pos-camera-viewport-container');
+  const btnText = document.getElementById('pos-camera-btn-text');
+  const toggleBtn = document.getElementById('btn-toggle-pos-camera');
+
+  if (!container) return;
+
+  // If already running -> stop it
+  if (posEmbeddedScannerInstance) {
+    try {
+      await posEmbeddedScannerInstance.stop();
+    } catch (e) {}
+    posEmbeddedScannerInstance = null;
+    container.classList.add('hidden');
+    if (btnText) btnText.innerText = 'تشغيل الكاميرا الحية';
+    if (toggleBtn) toggleBtn.classList.replace('bg-emerald-600', 'bg-gradient-to-r');
+    showToast('تم إيقاف كاميرا الكاشير', 'videocam_off');
+    return;
+  }
+
+  // Start embedded camera
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('جاري تجهيز الكاميرا...', 'info');
+    return;
+  }
+
+  container.classList.remove('hidden');
+  if (btnText) btnText.innerText = 'إيقاف الكاميرا';
+
+  try {
+    posEmbeddedScannerInstance = new Html5Qrcode("pos-embedded-camera-viewport");
+    
+    const config = {
+      fps: 15,
+      qrbox: { width: 240, height: 140 },
+      aspectRatio: 1.333333
+    };
+
+    let cameraConfig = { facingMode: "environment" };
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length > 0) {
+        cameraConfig = devices[0].id;
+      }
+    } catch (e) {}
+
+    await posEmbeddedScannerInstance.start(
+      cameraConfig,
+      config,
+      (decodedText) => {
+        console.log(`🎯 [Embedded POS Scan]: ${decodedText}`);
+        playScanBeep(true);
+        if (navigator.vibrate) navigator.vibrate(100);
+
+        // Flash green ring on container
+        container.classList.add('ring-4', 'ring-emerald-400');
+        setTimeout(() => container.classList.remove('ring-4', 'ring-emerald-400'), 500);
+
+        handleScannedBarcode(decodedText, 'pos');
+      },
+      () => {}
+    );
+
+    showToast('كاميرا الكاشير الحية تعمل الآن! قرّب أي منتج أمام شاشة اللاب توب', 'videocam');
+
+  } catch (err) {
+    console.error('Embedded POS camera error:', err);
+    container.classList.add('hidden');
+    if (btnText) btnText.innerText = 'تشغيل الكاميرا الحية';
+    posEmbeddedScannerInstance = null;
+    showToast(`تعذر فتح الكاميرا: ${err.message || 'تأكد من فتح التطبيق عبر السيرفر المحلي أو السماح بالكاميرا'}`, 'error');
+  }
+};
+
+window.toggleFormEmbeddedCamera = async function() {
+  const container = document.getElementById('form-embedded-camera-container');
+  if (!container) return;
+
+  if (formEmbeddedScannerInstance) {
+    try {
+      await formEmbeddedScannerInstance.stop();
+    } catch (e) {}
+    formEmbeddedScannerInstance = null;
+    container.classList.add('hidden');
+    return;
+  }
+
+  if (typeof Html5Qrcode === 'undefined') return;
+
+  container.classList.remove('hidden');
+
+  try {
+    formEmbeddedScannerInstance = new Html5Qrcode("form-camera-viewport");
+    await formEmbeddedScannerInstance.start(
+      { facingMode: "environment" },
+      { fps: 15, qrbox: { width: 220, height: 130 } },
+      async (decodedText) => {
+        playScanBeep(true);
+        try {
+          await formEmbeddedScannerInstance.stop();
+        } catch (e) {}
+        formEmbeddedScannerInstance = null;
+        container.classList.add('hidden');
+
+        // Fill form
+        const barInput = document.getElementById('prod-barcode');
+        if (barInput) {
+          barInput.value = decodedText;
+          barInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        showToast(`تم تصوير الباركود بنجاح: ${decodedText}`, 'check_circle');
+        document.getElementById('prod-name')?.focus();
+      },
+      () => {}
+    );
+  } catch (err) {
+    container.classList.add('hidden');
+    formEmbeddedScannerInstance = null;
+    showToast('تعذر تشغيل الكاميرا داخل النموذج', 'error');
+  }
+};
+
+
+</script>
+      <style>
+        @page {
+          size: ${useFormat === 'a4' ? 'A4 portrait' : '80mm auto'};
+          margin: ${useFormat === 'a4' ? '12mm' : '2mm'};
+        }
+        * {
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+          background: #ffffff !important;
+          color: #000000 !important;
+          font-family: 'Cairo', 'Readex Pro', sans-serif;
+        }
+      </style>
+    </head>
+    <body onload="window.focus(); window.print();">
+      ${receiptHtml}
+    </body>
+    </html>
+  `);
+  doc.close();
+
+  showToast('جاري إرسال الفاتورة إلى الطابعة...', 'print');
+};
+
+
+// ==========================================
+// UNIVERSAL PRODUCT CRUD MODALS
+// ==========================================
+
+function setupProductModal() {
+  const categorySelect = document.getElementById('prod-category');
+  if (categorySelect) {
+    categorySelect.addEventListener('change', (e) => {
+      updateProductModalFields(e.target.value);
+    });
+  }
+
+  window.generateRandomBarcode = () => {
+    const randomCode = '622' + Math.floor(100000000 + Math.random() * 900000000);
+    setElemValue('prod-barcode', randomCode);
+  };
+
+  window.openAddProductModal = (category = 'chargers', subcategory = null, barcode = '') => {
+    AppState.editingProductId = null;
+    setElemText('modal-prod-title', '+ إضافة صنف جديد للمخزن');
+    
+    setElemValue('prod-id', '');
+    setElemValue('prod-name', '');
+    setElemValue('prod-barcode', barcode || '');
+    setElemValue('prod-buy-price', '');
+    setElemValue('prod-sell-price', '');
+    setElemValue('prod-qty', '1');
+    setElemValue('prod-category', category);
+    
+    updateProductModalFields(category);
+    if (subcategory) {
+      setElemValue('prod-subcategory', subcategory);
+    }
+
+    const modal = document.getElementById('modal-product-form');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      setTimeout(() => {
+        if (!barcode) document.getElementById('prod-barcode')?.focus();
+        else document.getElementById('prod-name')?.focus();
+      }, 100);
+    }
+  };
+
+  window.openEditProductModal = (id) => {
+    const prod = Store.products.find(p => p.id === id);
+    if (!prod) return;
+
+    AppState.editingProductId = id;
+    setElemText('modal-prod-title', 'تعديل بيانات الصنف');
+
+    setElemValue('prod-id', prod.id);
+    setElemValue('prod-name', prod.name || '');
+    setElemValue('prod-barcode', prod.barcode || prod.imei || '');
+    setElemValue('prod-buy-price', prod.buyPrice || 0);
+    setElemValue('prod-sell-price', prod.sellPrice || 0);
+    setElemValue('prod-qty', prod.quantity || 0);
+    setElemValue('prod-category', prod.category || 'chargers');
+
+    updateProductModalFields(prod.category || 'chargers');
+    setElemValue('prod-subcategory', prod.subcategory || '');
+
+    setElemValue('prod-phone-brand', prod.brand || '');
+    setElemValue('prod-phone-model', prod.model || '');
+    setElemValue('prod-phone-imei', prod.imei || '');
+    setElemValue('prod-phone-storage', prod.storage || '');
+    setElemValue('prod-phone-color', prod.color || '');
+
+    const modal = document.getElementById('modal-product-form');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  };
+
+  window.closeProductModal = () => {
+    const modal = document.getElementById('modal-product-form');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  };
+
+  window.saveProductForm = async () => {
+    const category = document.getElementById('prod-category')?.value || 'chargers';
+    const name = document.getElementById('prod-name')?.value || '';
+    const barcode = document.getElementById('prod-barcode')?.value || '';
+    const buyPrice = parseFloat(document.getElementById('prod-buy-price')?.value) || 0;
+    const sellPrice = parseFloat(document.getElementById('prod-sell-price')?.value) || 0;
+    const quantity = parseInt(document.getElementById('prod-qty')?.value, 10) || 0;
+    const subcategory = document.getElementById('prod-subcategory')?.value || '';
+
+    if (!name.trim()) {
+      showToast("يرجى إدخال اسم الصنف", "warning");
+      document.getElementById('prod-name')?.focus();
+      return;
+    }
+
+    const productData = {
+      name,
+      barcode,
+      category,
+      subcategory,
+      buyPrice,
+      sellPrice,
+      quantity
+    };
+
+    if (category === 'phones') {
+      productData.brand = document.getElementById('prod-phone-brand')?.value || '';
+      productData.model = document.getElementById('prod-phone-model')?.value || name;
+      productData.imei = document.getElementById('prod-phone-imei')?.value || barcode;
+      productData.storage = document.getElementById('prod-phone-storage')?.value || '';
+      productData.color = document.getElementById('prod-phone-color')?.value || '';
+      productData.status = 'available';
+    }
+
+    try {
+      if (AppState.editingProductId) {
+        await updateProduct(AppState.editingProductId, productData);
+        showToast("تم تحديث بيانات الصنف بنجاح ومزامنتها", "verified");
+      } else {
+        await addProduct(productData);
+        showToast("تمت إضافة الصنف الجديد بنجاح إلى الفيربيز والمخزن", "verified");
+      }
+      closeProductModal();
+    } catch (err) {
+      showToast(`خطأ في الحفظ: ${err.message}`, "error");
+    }
+  };
+
+  window.confirmDeleteProduct = (id) => {
+    const prod = Store.products.find(p => p.id === id);
+    if (!prod) return;
+
+    AppState.deleteTarget = {
+      type: 'product',
+      id: prod.id,
+      title: 'تأكيد حذف الصنف من المخزن',
+      message: `هل أنت متأكد من حذف الصنف [${prod.name}] نهائياً؟`
+    };
+    openDeleteConfirmModal();
+  };
+}
+
+function updateProductModalFields(category) {
+  const subcatSelect = document.getElementById('prod-subcategory');
+  const phoneFields = document.getElementById('prod-phone-specific-fields');
+  const subcatContainer = document.getElementById('prod-subcategory-container');
+
+  if (category === 'phones') {
+    if (phoneFields) phoneFields.classList.remove('hidden');
+    if (subcatContainer) subcatContainer.classList.add('hidden');
+  } else {
+    if (phoneFields) phoneFields.classList.add('hidden');
+    if (subcatContainer) subcatContainer.classList.remove('hidden');
+
+    if (subcatSelect) {
+      if (category === 'chargers') {
+        subcatSelect.innerHTML = `
+          <option value="complete">شاحن كامل (Complete Charger)</option>
+          <option value="adapter">رأس شاحن (Adapter/Head)</option>
+          <option value="typec">وصلة شحن عريضة (Type-C)</option>
+          <option value="microusb">وصلة شحن عادية (Micro-USB)</option>
+          <option value="pin">وصلة شحن رفيعة (Pin/iPhone)</option>
+        `;
+      } else if (category === 'headphones') {
+        subcatSelect.innerHTML = `
+          <option value="silicone">سماعة جلدة (In-Ear)</option>
+          <option value="classic">سماعة عضم (Classic)</option>
+          <option value="bluetooth">سماعة بلوتوث (Bluetooth Wireless)</option>
+        `;
+      } else if (category === 'speakers') {
+        subcatSelect.innerHTML = `
+          <option value="small">صب صغير (Small Speaker)</option>
+          <option value="medium">صب وسط (Medium Speaker)</option>
+          <option value="large">صب كبير (Large Speaker)</option>
+        `;
+      }
+    }
+  }
+}
+
+// ==========================================
+// UNIVERSAL DELETE CONFIRMATION MODAL
+// ==========================================
+
+function openDeleteConfirmModal() {
+  const modal = document.getElementById('modal-delete-confirm');
+  if (!modal || !AppState.deleteTarget) return;
+
+  setElemText('delete-confirm-title', AppState.deleteTarget.title || 'تأكيد الحذف');
+  setElemText('delete-confirm-message', AppState.deleteTarget.message || 'هل أنت متأكد؟');
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+window.closeDeleteConfirmModal = () => {
+  const modal = document.getElementById('modal-delete-confirm');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+  AppState.deleteTarget = null;
+};
+
+window.executeDeleteAction = async () => {
+  if (!AppState.deleteTarget) return;
+  const target = AppState.deleteTarget;
+  closeDeleteConfirmModal();
+
+  try {
+    if (target.type === 'product') {
+      await deleteProduct(target.id);
+      showToast("تم حذف الصنف من المخزن بنجاح", "delete");
+    } else if (target.type === 'vodafone_tx') {
+      await deleteVodafoneTransaction(target.id);
+      showToast("تم حذف المعاملة والتراجع عن أثرها المالي", "delete");
+    } else if (target.type === 'vodafone_reset') {
+      await resetVodafoneLine(target.id);
+      showToast(`تمت إعادة تعيين بيانات خط فودافون كاش (${target.id}) بنجاح`, "refresh");
+    }
+  } catch (err) {
+    showToast(`فشل الحذف: ${err.message}`, "error");
+  }
+};
+
+// ==========================================
+// CASH DRAWER & SHIFT MODALS
+// ==========================================
+
+function setupDrawerEvents() {
+  window.openOpeningCashModal = () => {
+    const modal = document.getElementById('modal-opening-cash');
+    if (modal) {
+      setElemValue('opening-cash-amount', Store.drawer ? (Store.drawer.openingCash || '') : '');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  };
+
+  window.closeOpeningCashModal = () => {
+    const modal = document.getElementById('modal-opening-cash');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  };
+
+  window.saveOpeningCash = async () => {
+    const amount = parseFloat(document.getElementById('opening-cash-amount')?.value) || 0;
+    await recordCashDrawerEntry({
+      type: 'set_opening',
+      amount,
+      reason: 'تحديد رصيد افتتاح الدرج'
+    });
+    closeOpeningCashModal();
+    showToast(`تم اعتماد رصيد الافتتاح: ${formatMoney(amount)} ج.م`, 'check_circle');
+  };
+
+  window.openDrawerAdjustModal = (type = 'in') => {
+    const modal = document.getElementById('modal-drawer-adjust');
+    if (modal) {
+      setElemValue('drawer-adjust-type', type);
+      setElemText('drawer-adjust-title', type === 'in' ? 'إيداع نقدية في درج الكاشير (+)' : 'سحب نقدية من درج الكاشير (-)');
+      setElemValue('drawer-adjust-amount', '');
+      setElemValue('drawer-adjust-reason', '');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  };
+
+  window.closeDrawerAdjustModal = () => {
+    const modal = document.getElementById('modal-drawer-adjust');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  };
+
+  window.saveDrawerAdjustment = async () => {
+    const type = document.getElementById('drawer-adjust-type')?.value || 'in';
+    const amount = parseFloat(document.getElementById('drawer-adjust-amount')?.value) || 0;
+    const reason = document.getElementById('drawer-adjust-reason')?.value || (type === 'in' ? 'إيداع نقدي' : 'سحب نقدي');
+
+    if (amount <= 0) {
+      showToast("يرجى إدخال مبلغ صحيح", "warning");
+      return;
+    }
+
+    await recordCashDrawerEntry({ type, amount, reason });
+    closeDrawerAdjustModal();
+    showToast(`تم تسجيل ${type === 'in' ? 'إيداع' : 'سحب'} ${formatMoney(amount)} ج.م بنجاح`, 'payments');
+  };
+}
+
+// ==========================================
+// KEYBOARD SHORTCUTS
+// ==========================================
+
+function setupKeyboardShortcuts() {
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'F1') {
+      e.preventDefault();
+      window.openAddProductModal(getDefaultCategoryForCurrentView());
+    } else if (e.key === 'F2') {
+      e.preventDefault();
+      window.triggerQuickPOS();
+    } else if (e.key === 'F4') {
+      e.preventDefault();
+      navigateTo('vodafone-cash-wallets');
+    } else if (e.key === 'F7') {
+      e.preventDefault();
+      window.openThemeModal();
+    } else if (e.key === 'Escape') {
+      window.closeQuickPOS();
+      window.closeProductModal();
+      window.closeDeleteConfirmModal();
+      window.closeLineSettingsModal();
+      window.closeEditVodafoneTxModal();
+      window.closeThemeModal();
+      window.closeThermalReceiptModal();
+      window.closeOpeningCashModal();
+      window.closeDrawerAdjustModal();
+    }
+  });
+}
+
+// ==========================================
+// TOAST NOTIFICATIONS
+// ==========================================
+
+export function showToast(msg, icon = 'check_circle') {
+  const toast = document.getElementById('action-toast');
+  const toastMsg = document.getElementById('toast-message');
+  const toastIcon = document.getElementById('toast-icon');
+  if (toast && toastMsg && toastIcon) {
+    toastMsg.innerText = msg;
+    toastIcon.innerText = icon;
+    toast.classList.remove('hidden');
+    toast.classList.add('flex');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+      toast.classList.remove('flex');
+    }, 4000);
+  }
+}
+window.showToast = showToast;
+
+// ==========================================
+// FORMATTING HELPERS
+// ==========================================
+
+function formatMoney(num) {
+  return (parseFloat(num) || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatCompactMoney(num) {
+  const n = parseFloat(num) || 0;
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return n.toFixed(0);
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function setElemText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = val;
+}
+
+function setElemValue(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+window.navigateTo = navigateTo;
+window.formatMoney = formatMoney;
+
+window.onCategoryChange = function() {
+  const cat = document.getElementById('prod-category')?.value;
+  if (cat && typeof updateProductModalFields === 'function') {
+    updateProductModalFields(cat);
+  }
+};
+
+
+// =========================================================================
+// EMBEDDED LIVE CAMERA & PHOTO SNAPSHOT SERVICE ("في قلب السيستم")
+// =========================================================================
+
+let posEmbeddedScannerInstance = null;
+let formEmbeddedScannerInstance = null;
+
+window.triggerPhotoCapture = function(targetField = null) {
+  currentTargetField = targetField;
+  const fileInput = document.getElementById('camera-photo-snapshot-input');
+  if (fileInput) {
+    fileInput.click();
+  }
+};
+
+window.handlePhotoSnapshotSelected = async function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  showToast('جاري فحص وتصوير الباركود من اللقطة...', 'photo_camera');
+
+  try {
+    if (typeof Html5Qrcode === 'undefined') {
+      showToast('مكتبة الكاميرا غير محملة', 'error');
+      return;
+    }
+
+    // Create a temporary scanner instance on a detached or existing container
+    const scannerId = document.getElementById('camera-scanner-viewport') ? "camera-scanner-viewport" : "pos-embedded-camera-viewport";
+    const tempScanner = new Html5Qrcode(scannerId);
+    
+    const decodedText = await tempScanner.scanFile(file, false);
+    console.log(`📸 [Photo Barcode Decoded]: ${decodedText}`);
+    playScanBeep(true);
+    if (navigator.vibrate) navigator.vibrate(120);
+
+    showToast(`تم التقاط الباركود من الصورة: ${decodedText}`, 'check_circle');
+    handleScannedBarcode(decodedText, currentTargetField);
+  } catch (err) {
+    console.error('Photo decode error:', err);
+    playScanBeep(false);
+    showToast('تعذر قراءة الباركود من الصورة: يرجى التقاط صورة أوضح أو تقريب الكاميرا', 'warning');
+  } finally {
+    event.target.value = '';
+  }
+};
+
+window.togglePosEmbeddedCamera = async function() {
+  const container = document.getElementById('pos-camera-viewport-container');
+  const btnText = document.getElementById('pos-camera-btn-text');
+  const toggleBtn = document.getElementById('btn-toggle-pos-camera');
+
+  if (!container) return;
+
+  // If already running -> stop it
+  if (posEmbeddedScannerInstance) {
+    try {
+      await posEmbeddedScannerInstance.stop();
+    } catch (e) {}
+    posEmbeddedScannerInstance = null;
+    container.classList.add('hidden');
+    if (btnText) btnText.innerText = 'تشغيل الكاميرا الحية';
+    if (toggleBtn) toggleBtn.classList.replace('bg-emerald-600', 'bg-gradient-to-r');
+    showToast('تم إيقاف كاميرا الكاشير', 'videocam_off');
+    return;
+  }
+
+  // Start embedded camera
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('جاري تجهيز الكاميرا...', 'info');
+    return;
+  }
+
+  container.classList.remove('hidden');
+  if (btnText) btnText.innerText = 'إيقاف الكاميرا';
+
+  try {
+    posEmbeddedScannerInstance = new Html5Qrcode("pos-embedded-camera-viewport");
+    
+    const config = {
+      fps: 15,
+      qrbox: { width: 240, height: 140 },
+      aspectRatio: 1.333333
+    };
+
+    let cameraConfig = { facingMode: "environment" };
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length > 0) {
+        cameraConfig = devices[0].id;
+      }
+    } catch (e) {}
+
+    await posEmbeddedScannerInstance.start(
+      cameraConfig,
+      config,
+      (decodedText) => {
+        console.log(`🎯 [Embedded POS Scan]: ${decodedText}`);
+        playScanBeep(true);
+        if (navigator.vibrate) navigator.vibrate(100);
+
+        // Flash green ring on container
+        container.classList.add('ring-4', 'ring-emerald-400');
+        setTimeout(() => container.classList.remove('ring-4', 'ring-emerald-400'), 500);
+
+        handleScannedBarcode(decodedText, 'pos');
+      },
+      () => {}
+    );
+
+    showToast('كاميرا الكاشير الحية تعمل الآن! قرّب أي منتج أمام شاشة اللاب توب', 'videocam');
+
+  } catch (err) {
+    console.error('Embedded POS camera error:', err);
+    container.classList.add('hidden');
+    if (btnText) btnText.innerText = 'تشغيل الكاميرا الحية';
+    posEmbeddedScannerInstance = null;
+    showToast(`تعذر فتح الكاميرا: ${err.message || 'تأكد من فتح التطبيق عبر السيرفر المحلي أو السماح بالكاميرا'}`, 'error');
+  }
+};
+
+window.toggleFormEmbeddedCamera = async function() {
+  const container = document.getElementById('form-embedded-camera-container');
+  if (!container) return;
+
+  if (formEmbeddedScannerInstance) {
+    try {
+      await formEmbeddedScannerInstance.stop();
+    } catch (e) {}
+    formEmbeddedScannerInstance = null;
+    container.classList.add('hidden');
+    return;
+  }
+
+  if (typeof Html5Qrcode === 'undefined') return;
+
+  container.classList.remove('hidden');
+
+  try {
+    formEmbeddedScannerInstance = new Html5Qrcode("form-camera-viewport");
+    await formEmbeddedScannerInstance.start(
+      { facingMode: "environment" },
+      { fps: 15, qrbox: { width: 220, height: 130 } },
+      async (decodedText) => {
+        playScanBeep(true);
+        try {
+          await formEmbeddedScannerInstance.stop();
+        } catch (e) {}
+        formEmbeddedScannerInstance = null;
+        container.classList.add('hidden');
+
+        // Fill form
+        const barInput = document.getElementById('prod-barcode');
+        if (barInput) {
+          barInput.value = decodedText;
+          barInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        showToast(`تم تصوير الباركود بنجاح: ${decodedText}`, 'check_circle');
+        document.getElementById('prod-name')?.focus();
+      },
+      () => {}
+    );
+  } catch (err) {
+    container.classList.add('hidden');
+    formEmbeddedScannerInstance = null;
+    showToast('تعذر تشغيل الكاميرا داخل النموذج', 'error');
+  }
+};
+
+
+</script>
+      <style>
+        @page {
+          size: ${useFormat === 'a4' ? 'A4 portrait' : '80mm auto'};
+          margin: ${useFormat === 'a4' ? '12mm' : '2mm'};
+        }
+        * {
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+          background: #ffffff !important;
+          color: #000000 !important;
+          font-family: 'Cairo', 'Readex Pro', sans-serif;
+        }
+      </style>
+    </head>
+    <body onload="window.focus(); window.print();">
+      ${receiptHtml}
+    <input type="file" id="camera-photo-snapshot-input" accept="image/*" capture="environment" class="hidden" onchange="window.handlePhotoSnapshotSelected(event)"/>
+</body>
     </html>
   `);
   doc.close();
