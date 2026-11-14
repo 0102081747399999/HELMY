@@ -752,3 +752,23 @@ html[data-theme="classic-navy"] .bg-surface-container {
 .accent-border-custom {
   border-color: var(--custom-accent) !important;
 }
+
+/* ==========================================================================
+   Camera Scanner Viewfinder & Laser Animation
+   ========================================================================== */
+@keyframes scanLaser {
+  0% { top: 10%; opacity: 0.8; }
+  50% { top: 90%; opacity: 1; }
+  100% { top: 10%; opacity: 0.8; }
+}
+.scanner-laser-line {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #f43f5e, #ff0055, #f43f5e, transparent);
+  box-shadow: 0 0 12px 2px #f43f5e;
+  animation: scanLaser 2s ease-in-out infinite;
+  border-radius: 9999px;
+  pointer-events: none;
+}
