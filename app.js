@@ -1,4 +1,11 @@
 // app.js - Main Application Logic for Hilmy Telecom POS Hub (Optimized for Laptop / Desktop POS)
+// Fully disabled native print dialogs per user request
+if (typeof window !== 'undefined') {
+  window.print = function() {
+    console.warn('[Print Blocked] تم إلغاء مربع حوار الطباعة نهائياً بناءً على طلبك.');
+  };
+}
+
 import { 
   Store, 
   subscribeToStore, 
@@ -426,8 +433,8 @@ function renderDashboard() {
           <td class="py-3 px-4 font-numeric-table font-bold text-on-surface">${formatMoney(inv.totalAmount)} ج.م</td>
           <td class="py-3 px-4 text-on-surface-variant font-label-sm">${inv.customerName || 'عميل نقدي'}</td>
           <td class="py-3 px-4 text-center">
-            <button onclick="window.printInvoiceReceipt('${inv.id}')" class="p-1.5 rounded-lg text-secondary hover:bg-secondary/10 transition-colors" title="طباعة الإيصال">
-              <span class="material-symbols-outlined text-[18px]">print</span>
+            <button onclick="window.printInvoiceReceipt('${inv.id}')" class="p-1.5 rounded-lg text-secondary hover:bg-secondary/10 transition-colors" title="عرض تفاصيل الفاتورة">
+              <span class="material-symbols-outlined text-[18px]">receipt_long</span>
             </button>
           </td>
         </tr>
@@ -1977,8 +1984,7 @@ async function executePOSCheckout() {
     window.closeQuickPOS();
     showToast(`تم حفظ الفاتورة بنجاح رقم ${invoice.invoiceNumber} وخصم المخزون`, 'verified');
 
-    window.printInvoiceReceipt(invoice.id);
-
+    // تم إيقاف الطباعة التلقائية لمربع الحوار بناء على رغبة المستخدم
   } catch (err) {
     showToast(`فشل إتمام البيع: ${err.message}`, 'error');
   }
@@ -2138,64 +2144,8 @@ window.closeThermalReceiptModal = () => {
 };
 
 window.executePrintReceipt = (format = null) => {
-  const useFormat = format || AppState.activePrintFormat || '80mm';
-  const invoice = Store.salesInvoices.find(inv => inv.id === AppState.activePrintingInvoiceId) || Store.salesInvoices[0];
-  if (!invoice) return;
-
-  const receiptHtml = generateReceiptHTML(invoice, useFormat);
-
-  // Hidden isolated iframe for flawless direct POS printing
-  let iframe = document.getElementById('pos-receipt-print-frame');
-  if (iframe) iframe.remove();
-
-  iframe = document.createElement('iframe');
-  iframe.id = 'pos-receipt-print-frame';
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentWindow.document;
-  doc.open();
-  doc.write(`
-    <!DOCTYPE html>
-    <html dir="rtl" lang="ar">
-    <head>
-      <meta charset="utf-8">
-      <title>فاتورة ${invoice.invoiceNumber || ''}</title>
-      <link rel="preconnect" href="https://fonts.googleapis.com">
-      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Readex+Pro:wght@400;600;700&display=swap" rel="stylesheet">
-      <script src="https://cdn.tailwindcss.com"></script>
-      <style>
-        @page {
-          size: ${useFormat === 'a4' ? 'A4 portrait' : '80mm auto'};
-          margin: ${useFormat === 'a4' ? '12mm' : '2mm'};
-        }
-        * {
-          box-sizing: border-box;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        body {
-          margin: 0;
-          padding: 0;
-          background: #ffffff !important;
-          color: #000000 !important;
-          font-family: 'Cairo', 'Readex Pro', sans-serif;
-        }
-      </style>
-    </head>
-    <body onload="window.focus(); window.print();">
-      ${receiptHtml}
-    </body>
-    </html>
-  `);
-  doc.close();
-
-  showToast('جاري إرسال الفاتورة إلى الطابعة...', 'print');
+  window.closeThermalReceiptModal();
+  showToast('تمت معاينة الفاتورة بنجاح (تم إيقاف أوامر الطباعة نهائياً بناء على طلبك)', 'verified');
 };
 
 

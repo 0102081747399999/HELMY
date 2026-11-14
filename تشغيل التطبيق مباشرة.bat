@@ -1,11 +1,8 @@
 @echo off
 chcp 65001 > nul
 title نظام حلمي سنترال وموبايل (POS)
-cd /d "%~dp0"
 echo ========================================================
-echo     جاري تشغيل نظام حلمي سنترال وموبايل (POS)...
+echo     جاري فتح نظام حلمي سنترال وموبايل في المتصفح...
 echo ========================================================
-start /b "" node server.js > nul 2>&1
-timeout /t 1 /nobreak > nul
-start "" "http://localhost:3000"
+start "" "%~dp0index.html"
 exit
