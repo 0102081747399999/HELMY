@@ -257,6 +257,68 @@ window.toggleSidebar = () => {
 };
 
 // ==========================================
+// BANNER SLIDESHOW CONTROLLER (أشكال متعددة + لوجو حلمي)
+// ==========================================
+let currentBannerIndex = 0;
+const totalBannerSlides = 5;
+let bannerTimer = null;
+
+window.goToBannerSlide = (idx) => {
+  currentBannerIndex = (idx + totalBannerSlides) % totalBannerSlides;
+  const slides = document.querySelectorAll('.banner-slide');
+  const dots = document.querySelectorAll('.banner-dot');
+
+  slides.forEach((slide, i) => {
+    if (i === currentBannerIndex) {
+      slide.classList.remove('opacity-0', 'z-0', 'pointer-events-none');
+      slide.classList.add('opacity-100', 'z-10');
+    } else {
+      slide.classList.remove('opacity-100', 'z-10');
+      slide.classList.add('opacity-0', 'z-0', 'pointer-events-none');
+    }
+  });
+
+  dots.forEach((dot, i) => {
+    if (i === currentBannerIndex) {
+      dot.className = 'banner-dot w-6 h-2 rounded-full bg-rose-500 transition-all cursor-pointer shadow-xs';
+    } else {
+      dot.className = 'banner-dot w-2 h-2 rounded-full bg-slate-600 hover:bg-slate-400 transition-all cursor-pointer';
+    }
+  });
+};
+
+window.nextBannerSlide = () => {
+  window.goToBannerSlide(currentBannerIndex + 1);
+};
+
+window.prevBannerSlide = () => {
+  window.goToBannerSlide(currentBannerIndex - 1);
+};
+
+function startBannerAutoPlay() {
+  if (bannerTimer) clearInterval(bannerTimer);
+  bannerTimer = setInterval(() => {
+    window.nextBannerSlide();
+  }, 4000); // Changes automatically every 4 seconds
+}
+
+function pauseBannerAutoPlay() {
+  if (bannerTimer) {
+    clearInterval(bannerTimer);
+    bannerTimer = null;
+  }
+}
+
+function setupBannerSlider() {
+  const slider = document.getElementById('store-banner-slider');
+  if (slider) {
+    slider.addEventListener('mouseenter', pauseBannerAutoPlay);
+    slider.addEventListener('mouseleave', startBannerAutoPlay);
+    startBannerAutoPlay();
+  }
+}
+
+// ==========================================
 // INITIALIZATION
 // ==========================================
 
@@ -264,6 +326,7 @@ window.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initRealtimeSync();
   startLiveClock();
+  setupBannerSlider();
 
   // Subscribe UI to store events
   subscribeToStore((event, data, store) => {
