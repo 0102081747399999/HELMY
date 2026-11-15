@@ -184,7 +184,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('========================================================');
-  console.log('    نظام سنترال حلمي وموبايل (POS) يعمل بنجاح!         ');
+  console.log('       نظام سنترال حلمي (POS) يعمل بنجاح!              ');
   console.log('========================================================');
   console.log(`- افتح من هذا الجهاز:         http://localhost:${PORT}`);
   

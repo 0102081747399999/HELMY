@@ -24,6 +24,10 @@ import {
   deleteVodafoneTransaction,
   resetVodafoneLine,
   resetAllVodafoneLines,
+  deleteSMS,
+  clearAllSMS,
+  getDeletedSMSBlacklist,
+  getDeletedVodaTxsBlacklist,
   checkoutSale,
   updateSaleInvoice,
   deleteSaleInvoice,
@@ -51,6 +55,10 @@ const AppState = {
   activeAccessoriesTab: 'all',
   activePhoneBrand: 'all',
   activePhoneStatus: 'all',
+  vodafoneMonitorFilterLine: 'all',
+  vodafoneMonitorFilterType: 'all',
+  vodafoneMonitorFilterDate: 'today',
+  vodafoneMonitorSearch: '',
   posCatalogCategory: 'all',
   posCatalogSearch: '',
   sidebarCollapsed: false,
@@ -286,6 +294,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 const ALL_VIEWS = [
   'dashboard-overview',
+  'vodafone-monitor',
   'vodafone-cash-wallets',
   'chargers-inventory',
   'cables-inventory',
@@ -358,6 +367,9 @@ function renderCurrentView() {
   switch (AppState.currentView) {
     case 'dashboard-overview':
       renderDashboard();
+      break;
+    case 'vodafone-monitor':
+      renderVodafoneMonitor();
       break;
     case 'vodafone-cash-wallets':
       renderVodafoneHub();
@@ -616,6 +628,396 @@ function renderDashboard() {
     }
   }
 }
+
+// ==========================================
+// VIEW: VODAFONE MONITOR HUB (متابعة فودافون كاش)
+// ==========================================
+
+function renderVodafoneMonitor() {
+  const allLines = Store.vodafoneLines || [];
+  const allTxs = Store.vodafoneTransactions || [];
+
+  // Today's Date Calculation
+  const todayTxs = allTxs.filter(t => isToday(t.timestamp));
+  const todayDepositsList = todayTxs.filter(t => t.type === 'deposit');
+  const todayWithdrawsList = todayTxs.filter(t => t.type === 'withdraw');
+
+  const todayDepositsTotal = todayDepositsList.reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
+  const todayWithdrawsTotal = todayWithdrawsList.reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
+  const todayCommsTotal = todayTxs.reduce((acc, t) => acc + (parseFloat(t.commission) || 0), 0);
+  const totalWalletsBalance = allLines.reduce((acc, l) => acc + (parseFloat(l.balance) || 0), 0);
+
+  // Set Top KPI displays
+  setElemText('vm-today-deposits-val', `${formatMoney(todayDepositsTotal)} ج.م`);
+  setElemText('vm-today-deposits-count', `${todayDepositsList.length} حركات استلام`);
+
+  setElemText('vm-today-withdraws-val', `${formatMoney(todayWithdrawsTotal)} ج.م`);
+  setElemText('vm-today-withdraws-count', `${todayWithdrawsList.length} حركات تحويل`);
+
+  setElemText('vm-today-profits-val', `+${formatMoney(todayCommsTotal)} ج.م`);
+  setElemText('vm-today-profits-count', `${todayTxs.length} إجمالي حركات اليوم`);
+
+  setElemText('vm-total-balance-val', `${formatMoney(totalWalletsBalance)} ج.م`);
+  setElemText('vm-total-devices-count', `18 هاتف وخط متصل 🟢`);
+
+  // Render 18 Lines & Connected Hardware Devices Cards
+  const linesGrid = document.getElementById('vodafone-monitor-lines-grid');
+  if (linesGrid) {
+    linesGrid.innerHTML = allLines.map(line => {
+      const lineTodayTxs = todayTxs.filter(t => t.lineNum === line.lineNum);
+      const lineTodayIn = lineTodayTxs.filter(t => t.type === 'deposit').reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
+      const lineTodayOut = lineTodayTxs.filter(t => t.type === 'withdraw').reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
+      const hasPhone = Boolean(line.phone && line.phone.trim());
+      const deviceName = line.deviceName || `هاتف خط ${line.lineNum}`;
+
+      return `
+        <div class="bg-surface-container-low p-3.5 rounded-2xl border border-outline-variant/30 hover:border-outline-variant transition-all flex flex-col justify-between gap-2.5 shadow-xs">
+          <!-- Line Header -->
+          <div class="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center font-bold text-xs shrink-0">
+                ${line.lineNum}
+              </div>
+              <div class="flex flex-col min-w-0">
+                <span class="font-bold text-xs text-on-surface truncate">خط ${line.lineNum}</span>
+                <span class="text-[11px] font-numeric-table font-bold ${hasPhone ? 'text-sky-400' : 'text-amber-400'} truncate">
+                  ${hasPhone ? line.phone : 'بدون رقم هاتف'}
+                </span>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>متصل</span>
+            </span>
+          </div>
+
+          <!-- Connected Hardware Device -->
+          <div class="bg-surface-container/60 p-2 rounded-xl border border-outline-variant/20 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="material-symbols-outlined text-sm text-sky-400 shrink-0">smartphone</span>
+              <span class="text-[11px] font-bold text-on-surface truncate" title="${deviceName}">${deviceName}</span>
+            </div>
+            <button onclick="window.openLineDeviceModal(${line.lineNum})" class="text-[10px] text-rose-400 hover:text-rose-300 font-bold px-1.5 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 transition-colors shrink-0 cursor-pointer">
+              تعديل الجهاز
+            </button>
+          </div>
+
+          <!-- Balance & Today Flow -->
+          <div class="space-y-1.5 pt-0.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-on-surface-variant text-[11px]">الرصيد الحالي:</span>
+              <span class="font-numeric-table font-black text-emerald-400 text-sm">${formatMoney(line.balance || 0)} ج.م</span>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5 text-[10px] pt-1 border-t border-outline-variant/15">
+              <div class="flex items-center justify-between bg-surface-container/40 px-2 py-1 rounded-lg">
+                <span class="text-on-surface-variant">مستلم:</span>
+                <span class="font-numeric-table font-bold text-emerald-400">+${formatMoney(lineTodayIn)}</span>
+              </div>
+              <div class="flex items-center justify-between bg-surface-container/40 px-2 py-1 rounded-lg">
+                <span class="text-on-surface-variant">محول:</span>
+                <span class="font-numeric-table font-bold text-rose-400">-${formatMoney(lineTodayOut)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="flex items-center gap-1.5 pt-1">
+            <button onclick="window.quickOpenVodafoneTx(${line.lineNum})" class="flex-1 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all">
+              <span class="material-symbols-outlined text-[15px]">add_circle</span>
+              <span>حركة جديدة</span>
+            </button>
+            <button onclick="window.viewLineConsole(${line.lineNum})" class="px-2.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold transition-all cursor-pointer" title="فتح كونسول الخط">
+              <span class="material-symbols-outlined text-[16px]">visibility</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Filter & Render Transactions Ledger Table
+  const filterLine = AppState.vodafoneMonitorFilterLine;
+  const filterType = AppState.vodafoneMonitorFilterType;
+  const filterDate = AppState.vodafoneMonitorFilterDate;
+  const search = (AppState.vodafoneMonitorSearch || '').trim().toLowerCase();
+
+  let filteredTxs = allTxs;
+
+  if (filterLine !== 'all') {
+    const num = parseInt(filterLine, 10);
+    filteredTxs = filteredTxs.filter(t => t.lineNum === num);
+  }
+
+  if (filterType !== 'all') {
+    filteredTxs = filteredTxs.filter(t => t.type === filterType);
+  }
+
+  if (filterDate === 'today') {
+    filteredTxs = filteredTxs.filter(t => isToday(t.timestamp));
+  } else if (filterDate === 'yesterday') {
+    const yest = new Date();
+    yest.setDate(yest.getDate() - 1);
+    const yestStr = yest.toDateString();
+    filteredTxs = filteredTxs.filter(t => new Date(t.timestamp).toDateString() === yestStr);
+  } else if (filterDate === 'month') {
+    const now = new Date();
+    filteredTxs = filteredTxs.filter(t => {
+      const d = new Date(t.timestamp);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+  }
+
+  if (search) {
+    filteredTxs = filteredTxs.filter(t => 
+      (t.transactionId || '').toLowerCase().includes(search) ||
+      (t.customerPhone || '').toLowerCase().includes(search) ||
+      (t.notes || '').toLowerCase().includes(search) ||
+      String(t.amount || '').includes(search) ||
+      String(t.lineNum || '').includes(search)
+    );
+  }
+
+  const tbody = document.getElementById('vodafone-monitor-tx-tbody');
+  const countBadge = document.getElementById('vodafone-monitor-tx-count-badge');
+  if (countBadge) countBadge.innerText = `${filteredTxs.length} عمليات مسجلة`;
+
+  if (tbody) {
+    if (filteredTxs.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+              <span class="material-symbols-outlined text-[42px] opacity-30">receipt_long</span>
+              <span class="font-headline-sm font-bold text-on-surface">لا توجد عمليات مطابقة للمحددات</span>
+              <span class="text-xs">لم يتم تسجيل أي عمليات بهذه الفلاتر، يمكنك تسجيل حركة كاش جديدة لأي خط الآن.</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = filteredTxs.map(t => {
+        const line = allLines.find(l => l.lineNum === t.lineNum) || { lineNum: t.lineNum };
+        const isDep = t.type === 'deposit';
+        const txRef = t.transactionId || ('#' + (t.id ? t.id.slice(-6) : '-'));
+
+        return `
+          <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+            <td class="py-3 px-3 font-numeric-table font-bold text-on-surface whitespace-nowrap">
+              ${formatDateArabic(t.timestamp)}
+            </td>
+            <td class="py-3 px-3">
+              <div class="flex flex-col">
+                <span class="font-bold text-on-surface flex items-center gap-1">
+                  <span class="material-symbols-outlined text-rose-500 text-sm">sim_card</span>
+                  <span>خط ${t.lineNum}</span>
+                  <span class="font-numeric-table text-sky-400 text-[11px]">${line.phone ? '(' + line.phone + ')' : ''}</span>
+                </span>
+                <span class="text-[10px] text-on-surface-variant truncate">${line.deviceName || 'هاتف الخط'}</span>
+              </div>
+            </td>
+            <td class="py-3 px-3">
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 ${isDep ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'}">
+                <span class="material-symbols-outlined text-[13px]">${isDep ? 'south_west' : 'north_east'}</span>
+                <span>${isDep ? 'إيداع / استلام (+)' : 'سحب / تحويل (-)'}</span>
+              </span>
+            </td>
+            <td class="py-3 px-3 font-numeric-table font-black text-sm ${isDep ? 'text-emerald-400' : 'text-rose-400'}">
+              ${isDep ? '+' : '-'}${formatMoney(t.amount)} ج.م
+            </td>
+            <td class="py-3 px-3 font-numeric-table font-bold text-secondary text-xs">
+              ${txRef}
+            </td>
+            <td class="py-3 px-3 font-numeric-table font-bold text-emerald-400">
+              +${formatMoney(t.commission || 0)} ج.م
+            </td>
+            <td class="py-3 px-3 font-numeric-table font-bold text-on-surface">
+              ${formatMoney(t.balanceAfter || 0)} ج.م
+            </td>
+            <td class="py-3 px-3 text-on-surface-variant text-[11px] max-w-[140px] truncate" title="${t.customerPhone || ''} ${t.notes || ''}">
+              ${t.customerPhone ? '<span class="font-numeric-table font-bold text-on-surface block">' + t.customerPhone + '</span>' : ''}
+              <span>${t.notes || '-'}</span>
+            </td>
+            <td class="py-3 px-3 text-center whitespace-nowrap">
+              <div class="flex items-center justify-center gap-1">
+                <button onclick="window.openEditVodafoneTxModal('${t.id}')" class="px-2 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-sky-400 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors" title="تعديل العملية">
+                  <span class="material-symbols-outlined text-[15px]">edit</span>
+                  <span>تعديل</span>
+                </button>
+                <button onclick="window.confirmDeleteVodafoneTx('${t.id}')" class="px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors" title="حذف نهائي">
+                  <span class="material-symbols-outlined text-[15px]">delete</span>
+                  <span>حذف</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
+window.quickOpenVodafoneTx = (lineNum) => {
+  AppState.activeVodafoneLine = parseInt(lineNum, 10);
+  navigateTo('vodafone-cash-wallets');
+  setTimeout(() => {
+    document.getElementById('voda-tx-amount')?.focus();
+  }, 200);
+};
+
+window.viewLineConsole = (lineNum) => {
+  AppState.activeVodafoneLine = parseInt(lineNum, 10);
+  navigateTo('vodafone-cash-wallets');
+};
+
+window.setVodafoneMonitorFilterLine = (val) => {
+  AppState.vodafoneMonitorFilterLine = val;
+  renderVodafoneMonitor();
+};
+
+window.setVodafoneMonitorFilterType = (val) => {
+  AppState.vodafoneMonitorFilterType = val;
+  renderVodafoneMonitor();
+};
+
+window.setVodafoneMonitorFilterDate = (val) => {
+  AppState.vodafoneMonitorFilterDate = val;
+  renderVodafoneMonitor();
+};
+
+window.setVodafoneMonitorSearch = (val) => {
+  AppState.vodafoneMonitorSearch = val;
+  renderVodafoneMonitor();
+};
+
+window.openLineDeviceModal = (lineNum) => {
+  const line = Store.vodafoneLines.find(l => l.lineNum === lineNum);
+  if (!line) return;
+
+  setElemValue('line-device-edit-linenum', line.lineNum);
+  setElemText('line-device-edit-title', `تخصيص بيانات خط ${line.lineNum} والجهاز المربوط`);
+  setElemValue('line-device-edit-phone', line.phone || '');
+  setElemValue('line-device-edit-name', line.deviceName || `هاتف محمول خط ${line.lineNum}`);
+  setElemValue('line-device-edit-limit', line.monthlyLimit || 100000);
+
+  const modal = document.getElementById('modal-line-device-settings');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    setTimeout(() => document.getElementById('line-device-edit-phone')?.focus(), 100);
+  }
+};
+
+window.closeLineDeviceModal = () => {
+  const modal = document.getElementById('modal-line-device-settings');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.saveLineDeviceSettings = async () => {
+  const lineNum = parseInt(document.getElementById('line-device-edit-linenum')?.value, 10);
+  const phone = (document.getElementById('line-device-edit-phone')?.value || '').trim();
+  const deviceName = (document.getElementById('line-device-edit-name')?.value || '').trim();
+  const monthlyLimit = parseFloat(document.getElementById('line-device-edit-limit')?.value) || 100000;
+
+  if (isNaN(lineNum) || lineNum < 1 || lineNum > 18) return;
+
+  await updateVodafoneLineSettings(lineNum, {
+    phone,
+    deviceName: deviceName || `هاتف محمول خط ${lineNum}`,
+    monthlyLimit
+  });
+
+  closeLineDeviceModal();
+  showToast(`تم حفظ بيانات خط ${lineNum} والجهاز بنجاح!`, 'check_circle');
+  renderVodafoneMonitor();
+  renderVodafoneHub();
+};
+
+window.openEditVodafoneTxModal = (txId) => {
+  const tx = Store.vodafoneTransactions.find(t => t.id === txId);
+  if (!tx) {
+    showToast("لم يتم العثور على المعاملة", "error");
+    return;
+  }
+
+  AppState.editingVodafoneTxId = txId;
+  setElemValue('edit-voda-tx-id', tx.id);
+  setElemText('edit-voda-tx-title', `تعديل حركة فودافون كاش (${tx.type === 'deposit' ? 'إيداع' : 'سحب'}) - خط ${tx.lineNum}`);
+  setElemValue('edit-voda-amount', tx.amount || 0);
+  setElemValue('edit-voda-commission', tx.commission || 0);
+  setElemValue('edit-voda-customer-phone', tx.customerPhone || '');
+  setElemValue('edit-voda-notes', tx.notes || '');
+  setElemValue('edit-voda-ref-id', tx.transactionId || '');
+
+  const modal = document.getElementById('modal-edit-vodafone-tx');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closeEditVodafoneTxModal = () => {
+  AppState.editingVodafoneTxId = null;
+  const modal = document.getElementById('modal-edit-vodafone-tx');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.saveEditedVodafoneTx = async () => {
+  const txId = document.getElementById('edit-voda-tx-id')?.value;
+  const amount = parseFloat(document.getElementById('edit-voda-amount')?.value) || 0;
+  const commission = parseFloat(document.getElementById('edit-voda-commission')?.value) || 0;
+  const customerPhone = (document.getElementById('edit-voda-customer-phone')?.value || '').trim();
+  const notes = (document.getElementById('edit-voda-notes')?.value || '').trim();
+  const transactionId = (document.getElementById('edit-voda-ref-id')?.value || '').trim();
+
+  if (amount <= 0) {
+    showToast("يرجى إدخال مبلغ صحيح", "warning");
+    return;
+  }
+
+  await updateVodafoneTransaction(txId, {
+    amount,
+    commission,
+    customerPhone,
+    notes,
+    transactionId
+  });
+
+  closeEditVodafoneTxModal();
+  showToast("تم تعديل حركة فودافون كاش وتحديث الرصيد والدرج تلقائياً بنجاح", "check_circle");
+  renderVodafoneHub();
+  renderVodafoneMonitor();
+};
+
+window.confirmDeleteVodafoneTx = async (txId) => {
+  const tx = Store.vodafoneTransactions.find(t => t.id === txId);
+  if (!tx) return;
+
+  const typeArabic = tx.type === 'deposit' ? 'إيداع / استلام (+)' : 'سحب / تحويل (-)';
+  const amountStr = formatMoney(tx.amount);
+  const lineNum = tx.lineNum;
+
+  const msg = `هل أنت متأكد تماماً من حذف حركة فودافون كاش هذه نهائياً؟\n\n` +
+    `📌 نوع الحركة: ${typeArabic}\n` +
+    `💰 المبلغ: ${amountStr} ج.م (خط ${lineNum})\n` +
+    `العمولة: ${formatMoney(tx.commission || 0)} ج.م\n\n` +
+    `⚠️ تنبيه هام:\n` +
+    `1. سيتم حذف الحركة نهائياً وتاماً ولن تعود نهائياً عند التحديث.\n` +
+    `2. سيتم استرجاع رصيد خط ${lineNum} تلقائياً.\n` +
+    `3. سيتم ضبط درج النقدية تلقائياً.`;
+
+  if (confirm(msg)) {
+    await deleteVodafoneTransaction(txId);
+    showToast(`تم حذف معاملة فودافون كاش نهائياً واسترجاع رصيد خط ${lineNum} بنجاح`, "delete");
+    renderVodafoneHub();
+    renderVodafoneMonitor();
+  }
+};
 
 // ==========================================
 // VIEW 2: VODAFONE CASH 18 LINES (Zero Balances + SMS)
@@ -1789,32 +2191,55 @@ function startSMSPoller() {
 }
 
 function handleIncomingServerSMSList(smsList) {
-  const processedIds = JSON.parse(localStorage.getItem('hilmy_processed_sms_ids') || '[]');
+  if (!Array.isArray(smsList) || smsList.length === 0) return;
+
+  const processedList = JSON.parse(localStorage.getItem('hilmy_processed_sms_ids_v2') || '[]');
+  const processedSet = new Set(processedList);
+  const deletedBlacklist = getDeletedSMSBlacklist ? getDeletedSMSBlacklist() : new Set();
   let hasNew = false;
 
   smsList.forEach(smsItem => {
-    if (!processedIds.includes(smsItem.id)) {
-      processedIds.push(smsItem.id);
-      hasNew = true;
+    if (!smsItem || !smsItem.id) return;
+    if (deletedBlacklist.has(smsItem.id)) return; // Skipped permanently!
+    if (processedSet.has(smsItem.id)) return; // Already seen/processed!
 
-      processIncomingSMS({
-        sender: smsItem.sender,
-        body: smsItem.message,
-        simPhone: smsItem.sim,
-        slot: smsItem.sim,
-        timestamp: smsItem.timestamp
-      });
-    }
+    processedSet.add(smsItem.id);
+    hasNew = true;
+
+    processIncomingSMS({
+      sender: smsItem.sender,
+      body: smsItem.message,
+      simPhone: smsItem.sim,
+      slot: smsItem.sim,
+      timestamp: smsItem.timestamp
+    });
   });
 
   if (hasNew) {
-    localStorage.setItem('hilmy_processed_sms_ids', JSON.stringify(processedIds.slice(-200)));
+    localStorage.setItem('hilmy_processed_sms_ids_v2', JSON.stringify(Array.from(processedSet).slice(-400)));
     playScanBeep(true);
-    showToast('📩 تم استقبال رسالة كاش جديدة من الهاتف وتحديث المحفظة تلقائياً!', 'mark_email_read');
+    showToast('📩 تم استقبال رسالة كاش جديدة وتحديث المحفظة تلقائياً!', 'mark_email_read');
     renderVodafoneHub();
+    renderVodafoneMonitor();
     renderSmsSyncHub();
   }
 }
+
+window.confirmDeleteSMS = (smsId) => {
+  if (confirm("هل تريد حذف هذه الرسالة نهائياً؟")) {
+    deleteSMS(smsId);
+    showToast("تم حذف الرسالة نهائياً", "delete");
+    renderSmsSyncHub();
+  }
+};
+
+window.confirmClearAllSMS = () => {
+  if (confirm("هل أنت متأكد من تفريغ ومسح سجل رسائل الكاش بالكامل؟")) {
+    clearAllSMS();
+    showToast("تم تفريغ سجل الرسائل بالكامل بنجاح", "delete");
+    renderSmsSyncHub();
+  }
+};
 
 function renderSmsSyncHub() {
   const tbody = document.getElementById('sms-sync-history-tbody');
@@ -1823,7 +2248,7 @@ function renderSmsSyncHub() {
     if (inbox.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" class="py-12 text-center text-on-surface-variant">
+          <td colspan="7" class="py-12 text-center text-on-surface-variant">
             <span class="text-xs">لم يتم استلام أي رسائل كاش من الهاتف حتى الآن. استخدم تطبيق SMS Forwarder على هاتفك أو الصق الرسالة يدوياً.</span>
           </td>
         </tr>
@@ -1846,6 +2271,11 @@ function renderSmsSyncHub() {
               <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${item.isProcessed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}">
                 ${item.isProcessed ? 'تم التسجيل بنجاح' : 'معلق'}
               </span>
+            </td>
+            <td class="py-2.5 px-3 text-center">
+              <button onclick="window.confirmDeleteSMS('${item.id}')" class="p-1 rounded text-on-surface-variant hover:text-rose-400 cursor-pointer" title="حذف الرسالة">
+                <span class="material-symbols-outlined text-[16px]">delete</span>
+              </button>
             </td>
           </tr>
         `;
