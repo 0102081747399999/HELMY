@@ -1,0 +1,293 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 360" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient: Deep Onyx, Cyber Navy & Royal Crimson -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#05070c"/>
+      <stop offset="30%" stop-color="#0b101d"/>
+      <stop offset="65%" stop-color="#180a14"/>
+      <stop offset="100%" stop-color="#080509"/>
+    </linearGradient>
+
+    <!-- Neon Crimson Gradient -->
+    <linearGradient id="crimsonGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff2a55"/>
+      <stop offset="50%" stop-color="#e11d48"/>
+      <stop offset="100%" stop-color="#9f1239"/>
+    </linearGradient>
+
+    <!-- Royal Gold & Bronze Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="35%" stop-color="#facc15"/>
+      <stop offset="70%" stop-color="#ca8a04"/>
+      <stop offset="100%" stop-color="#854d0e"/>
+    </linearGradient>
+
+    <!-- Platinum Chrome Silver Gradient -->
+    <linearGradient id="silverGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#f8fafc"/>
+      <stop offset="70%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+
+    <!-- Dark Burgundy Shield Gradient -->
+    <linearGradient id="darkShieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b0716"/>
+      <stop offset="50%" stop-color="#1c050d"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+
+    <!-- Radial Glows -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e11d48" stop-opacity="0.35"/>
+      <stop offset="60%" stop-color="#be123c" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="cornerGlowGold" cx="90%" cy="20%" r="55%">
+      <stop offset="0%" stop-color="#facc15" stop-opacity="0.22"/>
+      <stop offset="50%" stop-color="#ca8a04" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Glow & Shadow Filters -->
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.75"/>
+    </filter>
+
+    <!-- Cyber Grid Pattern -->
+    <pattern id="cyberGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e11d48" stroke-width="0.75" stroke-opacity="0.07"/>
+      <circle cx="0" cy="0" r="1.5" fill="#f43f5e" fill-opacity="0.15"/>
+    </pattern>
+
+    <!-- Tech Dots Pattern -->
+    <pattern id="dotPattern" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1" fill="#38bdf8" fill-opacity="0.12"/>
+    </pattern>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1600" height="360" fill="url(#bgGrad)"/>
+  <rect width="1600" height="360" fill="url(#cyberGrid)"/>
+  <rect x="0" y="0" width="460" height="360" fill="url(#dotPattern)"/>
+  
+  <!-- Radial Glow Behind Brand & Badge -->
+  <ellipse cx="820" cy="180" rx="520" ry="170" fill="url(#centerGlow)"/>
+  <ellipse cx="1400" cy="90" rx="350" ry="180" fill="url(#cornerGlowGold)"/>
+
+  <!-- Top & Bottom Glowing Cyber Strips -->
+  <rect x="0" y="0" width="1600" height="4" fill="url(#crimsonGrad)"/>
+  <rect x="0" y="356" width="1600" height="4" fill="url(#crimsonGrad)"/>
+
+  <!-- Cyber Speed Angles (Right & Left) -->
+  <g opacity="0.4">
+    <polygon points="1530,0 1570,0 1490,360 1450,360" fill="url(#crimsonGrad)"/>
+    <polygon points="1575,0 1595,0 1515,360 1495,360" fill="#facc15" opacity="0.7"/>
+    <polygon points="1440,0 1455,0 1375,360 1360,360" fill="#e11d48" opacity="0.3"/>
+
+    <polygon points="170,0 130,0 50,360 90,360" fill="url(#crimsonGrad)" opacity="0.2"/>
+    <polygon points="120,0 105,0 25,360 40,360" fill="#38bdf8" opacity="0.15"/>
+  </g>
+
+  <!-- Circuit Tech Lines -->
+  <g stroke="#e11d48" stroke-width="1.5" stroke-opacity="0.25" fill="none">
+    <path d="M 220,50 L 300,50 L 340,90 L 480,90"/>
+    <circle cx="480" cy="90" r="4" fill="#e11d48" fill-opacity="0.6"/>
+    <circle cx="220" cy="50" r="3" fill="#e11d48" fill-opacity="0.6"/>
+
+    <path d="M 1360,310 L 1290,310 L 1250,270 L 1140,270"/>
+    <circle cx="1140" cy="270" r="4" fill="#facc15" fill-opacity="0.7"/>
+    <circle cx="1360" cy="310" r="3" fill="#e11d48" fill-opacity="0.6"/>
+  </g>
+
+  <!-- ==========================================
+       CORNER BADGE: إدارة محمد حلمي (Top Right Corner)
+       ========================================== -->
+  <g id="managerBadge" transform="translate(1330, 24)" filter="url(#softShadow)">
+    <!-- Badge Background Plate -->
+    <rect x="-10" y="0" width="250" height="64" rx="14" 
+          fill="#0c0a14" fill-opacity="0.95" 
+          stroke="url(#goldGrad)" stroke-width="1.75"/>
+    <rect x="-6" y="4" width="242" height="56" rx="11" 
+          fill="none" stroke="#facc15" stroke-width="1" stroke-opacity="0.35"/>
+    
+    <!-- Management Icon / Star Seal -->
+    <g transform="translate(195, 12)">
+      <circle cx="18" cy="20" r="16" fill="url(#goldGrad)" filter="url(#goldGlow)"/>
+      <circle cx="18" cy="20" r="13" fill="#17120a"/>
+      <!-- Star Crown -->
+      <path d="M 18,11 L 20,16 L 25,17 L 21,21 L 22,26 L 18,23 L 14,26 L 15,21 L 11,17 L 16,16 Z" fill="url(#goldGrad)"/>
+    </g>
+
+    <!-- Management Arabic Calligraphy Title -->
+    <text x="185" y="28" text-anchor="end" 
+          fill="url(#goldGrad)" 
+          font-family="system-ui, -apple-system, 'Cairo', 'Readex Pro', 'Segoe UI', Tahoma, sans-serif" 
+          font-size="18" font-weight="900" letter-spacing="0.5">
+      إدارة: محمد حلمي
+    </text>
+
+    <!-- Subtitle: Executive Leadership -->
+    <text x="185" y="48" text-anchor="end" 
+          fill="#fef08a" 
+          font-family="'Readex Pro', -apple-system, sans-serif" 
+          font-size="10" font-weight="700" letter-spacing="1">
+      MOHAMED HILMY • MANAGEMENT
+    </text>
+  </g>
+
+  <!-- ==========================================
+       MAIN CENTER BRANDING: سنترال حلمي (شركة حلمي)
+       ========================================== -->
+  <g id="mainBrand" filter="url(#softShadow)">
+    
+    <!-- Luxury Emblem for HILMY (Center-Right) -->
+    <g transform="translate(1040, 72)">
+      <!-- Outer Hex Shield -->
+      <polygon points="105,10 195,58 195,158 105,206 15,158 15,58" 
+               fill="url(#darkShieldGrad)" stroke="url(#crimsonGrad)" stroke-width="3" filter="url(#neonGlow)"/>
+      
+      <!-- Inner Gold Geometric Ring -->
+      <polygon points="105,24 178,65 178,151 105,192 32,151 32,65" 
+               fill="#070a12" stroke="url(#goldGrad)" stroke-width="1.8" stroke-opacity="0.85"/>
+
+      <!-- Center Monogram "H" & "ح" (Hilmy Telecom Emblem) -->
+      <!-- Left Pillar -->
+      <path d="M 52,65 L 74,65 L 74,151 L 52,151 Z" fill="url(#silverGrad)"/>
+      <!-- Right Pillar -->
+      <path d="M 136,65 L 158,65 L 158,151 L 136,151 Z" fill="url(#silverGrad)"/>
+      <!-- Cross Bridge with Gold Core -->
+      <path d="M 74,98 L 136,98 L 136,118 L 74,118 Z" fill="url(#crimsonGrad)"/>
+      
+      <!-- Crown / Gem Diamond in the Middle -->
+      <polygon points="105,88 116,108 105,128 94,108" fill="url(#goldGrad)" filter="url(#goldGlow)"/>
+      <circle cx="105" cy="108" r="3" fill="#ffffff"/>
+
+      <!-- Golden Corner Studs -->
+      <circle cx="105" cy="10" r="3" fill="#facc15"/>
+      <circle cx="195" cy="58" r="3" fill="#facc15"/>
+      <circle cx="195" cy="158" r="3" fill="#facc15"/>
+      <circle cx="105" cy="206" r="3" fill="#facc15"/>
+      <circle cx="15" cy="158" r="3" fill="#facc15"/>
+      <circle cx="15" cy="58" r="3" fill="#facc15"/>
+    </g>
+
+    <!-- Main Typography: سنترال حلمي -->
+    <g transform="translate(1000, 0)">
+      
+      <!-- Top Tag Badge -->
+      <g transform="translate(0, 80)">
+        <rect x="-440" y="0" width="440" height="28" rx="7" fill="#1b0e1a" stroke="url(#goldGrad)" stroke-width="1.2"/>
+        <circle cx="-16" cy="14" r="5" fill="#facc15" filter="url(#goldGlow)"/>
+        <text x="-34" y="19" text-anchor="end" 
+              fill="#fef08a" font-family="system-ui, -apple-system, 'Cairo', 'Readex Pro', 'Segoe UI', Tahoma, sans-serif" 
+              font-size="13" font-weight="700" letter-spacing="1">
+          شركة حلمي للاتصالات • هواتف ذكية • خدمات كاش • إكسسوارات معتمدة
+        </text>
+      </g>
+
+      <!-- Giant Main Name: سنترال حلمي -->
+      <text x="0" y="180" text-anchor="end" 
+            fill="url(#silverGrad)" 
+            stroke="#ff2a55" stroke-width="2.5" stroke-opacity="0.4"
+            font-family="system-ui, -apple-system, 'Cairo', 'Readex Pro', 'Segoe UI', Tahoma, sans-serif" 
+            font-size="86" font-weight="900" letter-spacing="0">
+        سنترال حلمي
+      </text>
+
+      <!-- English Sub-Brand: HILMY TELECOM -->
+      <g transform="translate(0, 222)">
+        <text x="0" y="0" text-anchor="end" 
+              fill="url(#crimsonGrad)" 
+              font-family="'Readex Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+              font-size="28" font-weight="800" letter-spacing="8">
+          HILMY TELECOM
+        </text>
+        <text x="-375" y="-2" text-anchor="end" 
+              fill="url(#goldGrad)" 
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="14" font-weight="700" letter-spacing="3">
+          SMART POS &amp; MOBILE HUB
+        </text>
+      </g>
+
+      <!-- Bottom Tagline -->
+      <g transform="translate(0, 268)">
+        <text x="0" y="0" text-anchor="end" 
+              fill="#e2e8f0" 
+              font-family="system-ui, -apple-system, 'Cairo', 'Readex Pro', 'Segoe UI', Tahoma, sans-serif" 
+              font-size="16" font-weight="600">
+          بيع وتجارة الهواتف الذكية • شواحن ووصلات أصلية • صبات وسماعات • منظومة الـ 18 خط فودافون كاش
+        </text>
+      </g>
+    </g>
+
+    <!-- ==========================================
+         LEFT FEATURE CARD: نظام سنترال حلمي المركزي
+         ========================================== -->
+    <g transform="translate(100, 88)">
+      <rect x="0" y="0" width="350" height="182" rx="16" 
+            fill="#090d18" fill-opacity="0.9" 
+            stroke="#1e293b" stroke-width="1.5"/>
+      <rect x="0" y="0" width="350" height="182" rx="16" 
+            fill="none" stroke="url(#crimsonGrad)" stroke-width="1.5" stroke-opacity="0.4"/>
+
+      <!-- Header Ribbon -->
+      <rect x="15" y="14" width="320" height="34" rx="8" fill="#141c2e"/>
+      <circle cx="34" cy="31" r="5" fill="#10b981" filter="url(#neonGlow)"/>
+      <text x="48" y="36" fill="#f8fafc" font-family="system-ui, 'Cairo', sans-serif" font-size="13" font-weight="700">
+        منظومة حلمي للإدارة والرقابة
+      </text>
+      <text x="320" y="36" text-anchor="end" fill="url(#goldGrad)" font-family="monospace" font-size="11" font-weight="800">
+        HILMY v3.0
+      </text>
+
+      <!-- Feature Pill 1: Phones & Stock -->
+      <g transform="translate(18, 62)">
+        <rect x="0" y="0" width="148" height="42" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1"/>
+        <text x="14" y="27" font-size="17">📱</text>
+        <text x="40" y="26" fill="#f1f5f9" font-family="system-ui, 'Cairo', sans-serif" font-size="12" font-weight="600">هواتف ومخازن</text>
+      </g>
+
+      <!-- Feature Pill 2: Chargers & Audio -->
+      <g transform="translate(184, 62)">
+        <rect x="0" y="0" width="148" height="42" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1"/>
+        <text x="14" y="27" font-size="17">⚡</text>
+        <text x="40" y="26" fill="#f1f5f9" font-family="system-ui, 'Cairo', sans-serif" font-size="12" font-weight="600">شواحن وصبات</text>
+      </g>
+
+      <!-- Feature Pill 3: Wallets & Cash -->
+      <g transform="translate(18, 116)">
+        <rect x="0" y="0" width="148" height="42" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1"/>
+        <text x="14" y="27" font-size="17">💳</text>
+        <text x="40" y="26" fill="#f1f5f9" font-family="system-ui, 'Cairo', sans-serif" font-size="12" font-weight="600">18 خط كاش</text>
+      </g>
+
+      <!-- Feature Pill 4: Cloud Realtime -->
+      <g transform="translate(184, 116)">
+        <rect x="0" y="0" width="148" height="42" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1"/>
+        <text x="14" y="27" font-size="17">👑</text>
+        <text x="40" y="26" fill="#facc15" font-family="system-ui, 'Cairo', sans-serif" font-size="12" font-weight="700">إدارة معتمدة</text>
+      </g>
+    </g>
+
+  </g>
+</svg>
