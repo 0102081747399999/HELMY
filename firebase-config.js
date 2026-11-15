@@ -1,4 +1,4 @@
-// firebase-config.js - Firebase Initialization & Data Sync Service for Hilmy Telecom POS
+// firebase-config.js - Firebase Initialization & Data Sync Service for Hilmy Telecom POS (سنترال حلمي)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { 
   getFirestore, 
@@ -14,9 +14,7 @@ import {
   query, 
   orderBy, 
   limit,
-  serverTimestamp,
-  enableNetwork,
-  disableNetwork
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Your exact web app's Firebase configuration
@@ -34,13 +32,12 @@ export const firebaseConfig = {
 let app = null;
 let db = null;
 let isOnline = false;
-let listeners = [];
 
 try {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   isOnline = true;
-  console.log("🔥 Firebase initialized successfully for project: mnmn-daadf");
+  console.log("🔥 Firebase initialized successfully for project: mnmn-daadf (سنترال حلمي)");
 } catch (e) {
   console.warn("⚠️ Firebase direct init warning, falling back to local mode:", e);
   isOnline = false;
@@ -53,7 +50,9 @@ const STORAGE_KEYS = {
   VODAFONE_TXS: 'hilmy_pos_voda_txs_v1',
   SALES: 'hilmy_pos_sales_v1',
   DRAWER: 'hilmy_pos_drawer_v1',
-  SETTINGS: 'hilmy_pos_settings_v1'
+  SETTINGS: 'hilmy_pos_settings_v1',
+  SMS_INBOX: 'hilmy_pos_sms_inbox_v1',
+  ZERO_CHECK: 'hilmy_lines_zeroed_v2'
 };
 
 // Helper: Local storage read/write
@@ -81,6 +80,7 @@ export const Store = {
   vodafoneLines: getLocal(STORAGE_KEYS.VODAFONE_LINES, []),
   vodafoneTransactions: getLocal(STORAGE_KEYS.VODAFONE_TXS, []),
   salesInvoices: getLocal(STORAGE_KEYS.SALES, []),
+  smsInbox: getLocal(STORAGE_KEYS.SMS_INBOX, []),
   drawer: getLocal(STORAGE_KEYS.DRAWER, {
     shiftId: '#402',
     openingCash: 0,
@@ -102,17 +102,21 @@ export function notifySubscribers(event, data) {
   });
 }
 
-// Ensure 18 Vodafone Lines exist (Empty default: 0 balance, 0 dummy data)
+// Ensure 18 Vodafone Lines exist (Zero money default per user request: "عايز الخطوط مفيش فيها فلوس")
 export function ensureVodafoneLines() {
-  if (!Store.vodafoneLines || Store.vodafoneLines.length === 0) {
+  const needsZeroReset = !localStorage.getItem(STORAGE_KEYS.ZERO_CHECK);
+  
+  if (!Store.vodafoneLines || Store.vodafoneLines.length === 0 || needsZeroReset) {
+    const existing = Store.vodafoneLines || [];
     const lines = [];
     for (let i = 1; i <= 18; i++) {
+      const prev = existing.find(l => l.lineNum === i) || {};
       lines.push({
         id: `line_${i}`,
         lineNum: i,
-        phone: '',
-        monthlyLimit: 100000,
-        balance: 0.00,
+        phone: prev.phone || '',
+        monthlyLimit: prev.monthlyLimit || 100000,
+        balance: 0.00, // zero money as requested
         totalTransferredMonth: 0.00,
         isActive: true,
         updatedAt: new Date().toISOString()
@@ -120,9 +124,38 @@ export function ensureVodafoneLines() {
     }
     Store.vodafoneLines = lines;
     setLocal(STORAGE_KEYS.VODAFONE_LINES, Store.vodafoneLines);
+    localStorage.setItem(STORAGE_KEYS.ZERO_CHECK, 'true');
   }
 }
 ensureVodafoneLines();
+
+// Reset all 18 lines to 0.00 balance
+export function resetAllVodafoneLines() {
+  const lines = [];
+  for (let i = 1; i <= 18; i++) {
+    const existing = (Store.vodafoneLines || []).find(l => l.lineNum === i) || {};
+    lines.push({
+      id: `line_${i}`,
+      lineNum: i,
+      phone: existing.phone || '',
+      monthlyLimit: existing.monthlyLimit || 100000,
+      balance: 0.00,
+      totalTransferredMonth: 0.00,
+      isActive: true,
+      updatedAt: new Date().toISOString()
+    });
+  }
+  Store.vodafoneLines = lines;
+  setLocal(STORAGE_KEYS.VODAFONE_LINES, Store.vodafoneLines);
+  notifySubscribers("vodafone_lines_updated", Store.vodafoneLines);
+
+  if (db) {
+    for (let i = 1; i <= 18; i++) {
+      setDoc(doc(db, "vodafone_lines", `line_${i}`), lines[i - 1], { merge: true }).catch(console.warn);
+    }
+  }
+  return lines;
+}
 
 // ==========================================
 // FIRESTORE REALTIME SYNC ENGINE
@@ -164,7 +197,6 @@ export async function initRealtimeSync() {
           linesMap[d.lineNum] = { id: docSnap.id, ...d };
         });
 
-        // Merge into 18 lines
         const lines = [];
         for (let i = 1; i <= 18; i++) {
           if (linesMap[i]) {
@@ -175,8 +207,8 @@ export async function initRealtimeSync() {
               lineNum: i,
               phone: '',
               monthlyLimit: 100000,
-              balance: 0,
-              totalTransferredMonth: 0
+              balance: 0.00,
+              totalTransferredMonth: 0.00
             });
           }
         }
@@ -195,7 +227,6 @@ export async function initRealtimeSync() {
       snapshot.forEach(docSnap => {
         txs.push({ id: docSnap.id, ...docSnap.data() });
       });
-      // Sort newest first
       txs.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
       Store.vodafoneTransactions = txs;
       setLocal(STORAGE_KEYS.VODAFONE_TXS, txs);
@@ -266,10 +297,11 @@ function updateConnectionUI(online, message) {
 
 // --- PRODUCTS CRUD ---
 export async function addProduct(productData) {
+  const now = new Date().toISOString();
   const newProduct = {
-    barcode: (productData.barcode || '').trim(),
+    barcode: (productData.barcode || '').trim(), // Serves as code (e.g. "70") or barcode
     name: (productData.name || '').trim(),
-    category: productData.category, // 'chargers' | 'phones' | 'headphones' | 'speakers'
+    category: productData.category || 'chargers', // 'chargers' | 'cables' | 'headphones' | 'speakers' | 'phones' | 'covers' | 'accessories'
     subcategory: productData.subcategory || '',
     buyPrice: parseFloat(productData.buyPrice) || 0,
     sellPrice: parseFloat(productData.sellPrice) || 0,
@@ -282,8 +314,9 @@ export async function addProduct(productData) {
     status: productData.status || 'available',
     customerName: productData.customerName || '',
     customerPhone: productData.customerPhone || '',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    createdAt: productData.createdAt || now,
+    updatedAt: now,
+    lastRestockedAt: productData.lastRestockedAt || productData.createdAt || now
   };
 
   // Local optimistic update
@@ -298,7 +331,6 @@ export async function addProduct(productData) {
     try {
       const docRef = await addDoc(collection(db, "products"), newProduct);
       newProduct.id = docRef.id;
-      // replace temporary id in local array
       const idx = Store.products.findIndex(p => p.id === localId);
       if (idx !== -1) Store.products[idx] = newProduct;
       setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
@@ -333,12 +365,10 @@ export async function updateProduct(id, updateData) {
 }
 
 export async function deleteProduct(id) {
-  // Local delete
   Store.products = Store.products.filter(p => p.id !== id);
   setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
   notifySubscribers("products_updated", Store.products);
 
-  // Firestore delete
   if (db && !id.startsWith('prod_')) {
     try {
       await deleteDoc(doc(db, "products", id));
@@ -355,6 +385,112 @@ export async function adjustProductStock(id, changeQty) {
     const newQty = Math.max(0, (prod.quantity || 0) + changeQty);
     await updateProduct(id, { quantity: newQty });
   }
+}
+
+// Direct Category Sale (Single-item fast sale by Code or Table action)
+export async function recordDirectCategorySale({ productId, barcode, name, category, quantity, sellPrice, buyPrice, customerName, customerPhone, saleDate }) {
+  const numQty = parseInt(quantity, 10) || 1;
+  const numSellPrice = parseFloat(sellPrice) || 0;
+  const numBuyPrice = parseFloat(buyPrice) || 0;
+  const totalAmount = numSellPrice * numQty;
+  const totalProfit = (numSellPrice - numBuyPrice) * numQty;
+  const timestamp = saleDate || new Date().toISOString();
+
+  // 1. Deduct stock from product
+  let prod = Store.products.find(p => p.id === productId || (p.barcode && p.barcode.trim().toLowerCase() === (barcode || '').trim().toLowerCase()));
+  if (prod) {
+    await adjustProductStock(prod.id, -numQty);
+    if (prod.category === 'phones') {
+      await updateProduct(prod.id, {
+        status: 'sold',
+        customerName: customerName || 'عميل نقدي',
+        customerPhone: customerPhone || '',
+        soldAt: timestamp
+      });
+    }
+  }
+
+  // 2. Create Sale Record
+  const invoiceNumber = 'INV-' + (1000 + Store.salesInvoices.length + 1);
+  const saleItem = {
+    productId: prod ? prod.id : (productId || ''),
+    barcode: barcode || (prod ? prod.barcode : ''),
+    name: name || (prod ? prod.name : 'صنف غير محدد'),
+    category: category || (prod ? prod.category : 'general'),
+    price: numSellPrice,
+    buyPrice: numBuyPrice,
+    profit: totalProfit,
+    quantity: numQty,
+    total: totalAmount
+  };
+
+  const invoiceData = {
+    id: 'inv_' + Date.now(),
+    invoiceNumber,
+    items: [saleItem],
+    subtotal: totalAmount,
+    discount: 0,
+    totalAmount,
+    cashPaid: totalAmount,
+    change: 0,
+    customerName: customerName || 'عميل كود نقدي',
+    customerPhone: customerPhone || '',
+    cashier: 'كاشير سنترال حلمي',
+    timestamp
+  };
+
+  Store.salesInvoices.unshift(invoiceData);
+  setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+
+  // 3. Add cash to drawer
+  await recordCashDrawerEntry({
+    type: 'in',
+    amount: totalAmount,
+    reason: `بيع مباشر بالكود (${saleItem.barcode}) - ${saleItem.name}`
+  });
+
+  notifySubscribers("sales_updated", Store.salesInvoices);
+
+  // 4. Firestore sync
+  if (db) {
+    try {
+      const docRef = await addDoc(collection(db, "sales_invoices"), invoiceData);
+      invoiceData.id = docRef.id;
+      const idx = Store.salesInvoices.findIndex(s => s.invoiceNumber === invoiceNumber);
+      if (idx !== -1) Store.salesInvoices[idx] = invoiceData;
+      setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+    } catch (err) {
+      console.warn("Failed to sync sale to Firestore:", err);
+    }
+  }
+
+  return invoiceData;
+}
+
+// Direct Category Restock (Fast stock intake by Code or Table action)
+export async function recordDirectCategoryRestock({ productId, deltaQty, newBuyPrice, newSellPrice, restockDate }) {
+  const prod = Store.products.find(p => p.id === productId);
+  if (!prod) return;
+
+  const currentQty = parseInt(prod.quantity, 10) || 0;
+  const addQty = parseInt(deltaQty, 10) || 0;
+  const newQty = Math.max(0, currentQty + addQty);
+
+  const updates = {
+    quantity: newQty,
+    lastRestockedAt: restockDate || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  if (newBuyPrice !== undefined && newBuyPrice !== '' && !isNaN(parseFloat(newBuyPrice))) {
+    updates.buyPrice = parseFloat(newBuyPrice);
+  }
+  if (newSellPrice !== undefined && newSellPrice !== '' && !isNaN(parseFloat(newSellPrice))) {
+    updates.sellPrice = parseFloat(newSellPrice);
+  }
+
+  await updateProduct(productId, updates);
+  return updates;
 }
 
 // --- VODAFONE CASH OPERATIONS ---
@@ -393,17 +529,11 @@ export async function recordVodafoneTransaction({ lineNum, type, amount, commiss
   let newBalance = currentBalance;
 
   if (type === 'deposit') {
-    // إيداع كاش في المحفظة: المحفظة يزيد رصيدها
     newBalance += numAmount;
   } else if (type === 'withdraw') {
-    // سحب / تحويل من المحفظة: المحفظة ينقص رصيدها
-    if (currentBalance < numAmount) {
-      console.warn("تحذير: رصيد المحفظة أقل من المبلغ المطلوب");
-    }
     newBalance -= numAmount;
   }
 
-  // Update line balance
   line.balance = newBalance;
   line.totalTransferredMonth = (line.totalTransferredMonth || 0) + numAmount;
   line.updatedAt = new Date().toISOString();
@@ -411,7 +541,7 @@ export async function recordVodafoneTransaction({ lineNum, type, amount, commiss
 
   const txData = {
     lineNum,
-    type, // 'deposit' or 'withdraw'
+    type,
     amount: numAmount,
     commission: numCommission,
     customerPhone: customerPhone || '',
@@ -425,9 +555,6 @@ export async function recordVodafoneTransaction({ lineNum, type, amount, commiss
   Store.vodafoneTransactions.unshift(txData);
   setLocal(STORAGE_KEYS.VODAFONE_TXS, Store.vodafoneTransactions);
 
-  // Update cash drawer with commission and cash flow
-  // Deposit: Customer pays cash + commission -> Cash drawer increases by (amount + commission)
-  // Withdraw: Customer takes cash, pays commission -> Cash drawer decreases by amount, adds commission -> Net change = (-amount + commission)
   const cashDelta = (type === 'deposit') ? (numAmount + numCommission) : (-numAmount + numCommission);
   await recordCashDrawerEntry({
     type: (cashDelta >= 0) ? 'in' : 'out',
@@ -438,7 +565,6 @@ export async function recordVodafoneTransaction({ lineNum, type, amount, commiss
   notifySubscribers("vodafone_lines_updated", Store.vodafoneLines);
   notifySubscribers("vodafone_txs_updated", Store.vodafoneTransactions);
 
-  // Firestore sync
   if (db) {
     try {
       await setDoc(doc(db, "vodafone_lines", `line_${lineNum}`), line, { merge: true });
@@ -465,7 +591,6 @@ export async function updateVodafoneTransaction(txId, { amount, commission, cust
   const amountDelta = newAmount - oldTx.amount;
   const commDelta = newCommission - (oldTx.commission || 0);
 
-  // Adjust line balance
   const lineIdx = Store.vodafoneLines.findIndex(l => l.lineNum === oldTx.lineNum);
   if (lineIdx !== -1) {
     const line = Store.vodafoneLines[lineIdx];
@@ -481,7 +606,6 @@ export async function updateVodafoneTransaction(txId, { amount, commission, cust
     }
   }
 
-  // Update transaction record
   const updatedTx = {
     ...oldTx,
     amount: newAmount,
@@ -494,7 +618,6 @@ export async function updateVodafoneTransaction(txId, { amount, commission, cust
   Store.vodafoneTransactions[txIdx] = updatedTx;
   setLocal(STORAGE_KEYS.VODAFONE_TXS, Store.vodafoneTransactions);
 
-  // Adjust drawer for commission delta
   if (commDelta !== 0) {
     await recordCashDrawerEntry({
       type: commDelta > 0 ? 'in' : 'out',
@@ -525,7 +648,6 @@ export async function deleteVodafoneTransaction(txId) {
   const tx = Store.vodafoneTransactions.find(t => t.id === txId);
   if (!tx) return;
 
-  // Reverse line balance
   const lineIdx = Store.vodafoneLines.findIndex(l => l.lineNum === tx.lineNum);
   if (lineIdx !== -1) {
     const line = Store.vodafoneLines[lineIdx];
@@ -563,7 +685,6 @@ export async function resetVodafoneLine(lineNum) {
     Store.vodafoneLines[lineIdx].updatedAt = new Date().toISOString();
     setLocal(STORAGE_KEYS.VODAFONE_LINES, Store.vodafoneLines);
 
-    // Also delete or mark transactions for this line
     const remainingTxs = Store.vodafoneTransactions.filter(t => t.lineNum !== lineNum);
     Store.vodafoneTransactions = remainingTxs;
     setLocal(STORAGE_KEYS.VODAFONE_TXS, Store.vodafoneTransactions);
@@ -589,6 +710,7 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
       name: item.name,
       category: item.category || '',
       price: item.price,
+      buyPrice: item.buyPrice || 0,
       quantity: item.quantity,
       total: item.price * item.quantity
     })),
@@ -599,15 +721,13 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
     change: parseFloat(change) || 0,
     customerName: customerName || 'عميل نقدي',
     customerPhone: customerPhone || '',
-    cashier: cashier || 'أحمد الكاشير',
+    cashier: cashier || 'كاشير سنترال حلمي',
     timestamp: new Date().toISOString()
   };
 
-  // Deduct stock for each item
   for (const item of items) {
     if (item.id) {
       await adjustProductStock(item.id, -item.quantity);
-      // If it's a mobile phone, mark status as sold
       const prod = Store.products.find(p => p.id === item.id);
       if (prod && prod.category === 'phones') {
         await updateProduct(item.id, {
@@ -620,13 +740,11 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
     }
   }
 
-  // Add to sales invoices
   const localId = 'inv_' + Date.now();
   invoiceData.id = localId;
   Store.salesInvoices.unshift(invoiceData);
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
 
-  // Add cash to drawer
   await recordCashDrawerEntry({
     type: 'in',
     amount: invoiceData.totalAmount,
@@ -635,7 +753,6 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
 
   notifySubscribers("sales_updated", Store.salesInvoices);
 
-  // Firestore sync
   if (db) {
     try {
       const docRef = await addDoc(collection(db, "sales_invoices"), invoiceData);
@@ -694,4 +811,149 @@ export async function recordCashDrawerEntry({ type, amount, reason }) {
       console.warn("Error updating cash drawer in Firestore:", err);
     }
   }
+}
+
+// ==========================================
+// EGYPTIAN TELECOM CASH SMS REGEX PARSER & SYNC
+// ==========================================
+
+export function parseCashSMS(smsText, sender = '') {
+  if (!smsText || typeof smsText !== 'string') return null;
+  const text = smsText.trim();
+  const lower = text.toLowerCase();
+  const senderLower = (sender || '').toLowerCase();
+
+  const isVodafone = senderLower.includes('voda') || senderLower.includes('vf') || text.includes('فودافون كاش') || text.includes('Vodafone Cash') || text.includes('010');
+  const isInstapay = senderLower.includes('insta') || text.includes('انستاباي') || text.includes('InstaPay');
+  const isOrange = senderLower.includes('orange') || text.includes('أورنج') || text.includes('Orange Cash');
+  const isEtisalat = senderLower.includes('etisalat') || text.includes('اتصالات') || text.includes('Etisalat Cash');
+  const isWe = senderLower.includes('we') || text.includes('وي باي') || text.includes('WE Pay');
+
+  let provider = 'unknown';
+  if (isVodafone) provider = 'vodafone';
+  else if (isInstapay) provider = 'instapay';
+  else if (isOrange) provider = 'orange';
+  else if (isEtisalat) provider = 'etisalat';
+  else if (isWe) provider = 'we';
+
+  // Determine type: deposit (استلام/إيداع) vs withdraw (تحويل/سحب)
+  let type = 'deposit';
+  const isWithdraw = text.includes('تم تحويل') || text.includes('تم سحب') || text.includes('سحبت') || lower.includes('transferred') || lower.includes('debited') || lower.includes('withdrawn');
+  const isDeposit = text.includes('تم استلام') || text.includes('تم إيداع') || text.includes('استلمت') || text.includes('إيداع') || lower.includes('received') || lower.includes('credited');
+  
+  if (isWithdraw) type = 'withdraw';
+  else if (isDeposit) type = 'deposit';
+
+  // Extract Amount:
+  let amount = 0;
+  const amountMatch = text.match(/(?:مبلغ|قيمة|مبلغ وقدره|استلام|تحويل|سحب|بمبلغ|EGP|LE|جنيه)\s*:?\s*([\d]+(?:[\.,]\d{1,2})?)/i) ||
+                      text.match(/([\d]+(?:[\.,]\d{1,2})?)\s*(?:جنيه|ج\.م|EGP|LE)/i);
+  if (amountMatch) {
+    amount = parseFloat(amountMatch[1].replace(',', '.'));
+  }
+
+  // Extract Phone Number (from or to):
+  let customerPhone = '';
+  const phoneMatch = text.match(/(?:من رقم|إلى رقم|من|إلى|لـ|from|to)\s*:?\s*(01[0125]\d{8})/i) ||
+                     text.match(/(01[0125]\d{8})/);
+  if (phoneMatch) {
+    customerPhone = phoneMatch[1];
+  }
+
+  // Extract Balance After:
+  let balanceAfter = null;
+  const balanceMatch = text.match(/(?:رصيدك الحالي هو|رصيدك الجديد|رصيدك الحالي|رصيدك|your current balance is|balance is)\s*:?\s*([\d]+(?:[\.,]\d{1,2})?)/i);
+  if (balanceMatch) {
+    balanceAfter = parseFloat(balanceMatch[1].replace(',', '.'));
+  }
+
+  // Extract Transaction ID / Reference:
+  let transactionId = '';
+  const txMatch = text.match(/(?:رقم العملية|مرجع|المرجع|كود العملية|Trans ID|Ref ID|Ref No|Reference)\s*:?\s*([a-zA-Z0-9_-]+)/i);
+  if (txMatch) {
+    transactionId = txMatch[1];
+  }
+
+  // Extract Service Fee / Commission:
+  let commission = 0;
+  const feeMatch = text.match(/(?:مصاريف الخدمة|الرسوم|العمولة|fee)\s*:?\s*([\d]+(?:[\.,]\d{1,2})?)/i);
+  if (feeMatch) {
+    commission = parseFloat(feeMatch[1].replace(',', '.'));
+  }
+
+  const isCashSMS = (amount > 0) && (isVodafone || isInstapay || isOrange || isEtisalat || isWe || text.includes('جنيه') || text.includes('رصيدك') || text.includes('EGP'));
+
+  return {
+    isCashSMS,
+    provider,
+    type,
+    amount,
+    customerPhone,
+    balanceAfter,
+    transactionId,
+    commission,
+    rawText: text,
+    timestamp: new Date().toISOString()
+  };
+}
+
+export async function processIncomingSMS({ sender, body, simPhone, slot, timestamp }) {
+  const parsed = parseCashSMS(body, sender);
+  if (!parsed || !parsed.isCashSMS) return null;
+
+  // Match line:
+  let matchedLine = null;
+  if (simPhone) {
+    const cleanSim = simPhone.replace(/\D/g, '').slice(-11);
+    matchedLine = Store.vodafoneLines.find(l => l.phone && l.phone.replace(/\D/g, '').slice(-11) === cleanSim);
+  }
+  if (!matchedLine && slot) {
+    const slotNum = parseInt(slot, 10);
+    if (!isNaN(slotNum) && slotNum >= 1 && slotNum <= 18) {
+      matchedLine = Store.vodafoneLines.find(l => l.lineNum === slotNum);
+    }
+  }
+
+  const smsRecord = {
+    id: 'sms_' + Date.now(),
+    sender: sender || 'شبكة المحمول',
+    body,
+    parsed,
+    matchedLineNum: matchedLine ? matchedLine.lineNum : null,
+    isProcessed: false,
+    timestamp: timestamp || new Date().toISOString()
+  };
+
+  if (!Store.smsInbox) Store.smsInbox = [];
+  Store.smsInbox.unshift(smsRecord);
+  setLocal(STORAGE_KEYS.SMS_INBOX, Store.smsInbox);
+
+  // If matched to a specific line, record transaction automatically!
+  if (matchedLine) {
+    await recordVodafoneTransaction({
+      lineNum: matchedLine.lineNum,
+      type: parsed.type,
+      amount: parsed.amount,
+      commission: parsed.commission || 0,
+      customerPhone: parsed.customerPhone || '',
+      notes: `رسالة تلقائية من الهاتف (${parsed.transactionId ? 'عملية #' + parsed.transactionId : 'SMS'})`
+    });
+
+    if (parsed.balanceAfter !== null && !isNaN(parsed.balanceAfter)) {
+      const lineIdx = Store.vodafoneLines.findIndex(l => l.lineNum === matchedLine.lineNum);
+      if (lineIdx !== -1) {
+        Store.vodafoneLines[lineIdx].balance = parsed.balanceAfter;
+        setLocal(STORAGE_KEYS.VODAFONE_LINES, Store.vodafoneLines);
+        notifySubscribers("vodafone_lines_updated", Store.vodafoneLines);
+        if (db) {
+          setDoc(doc(db, "vodafone_lines", `line_${matchedLine.lineNum}`), { balance: parsed.balanceAfter }, { merge: true }).catch(console.warn);
+        }
+      }
+    }
+    smsRecord.isProcessed = true;
+    setLocal(STORAGE_KEYS.SMS_INBOX, Store.smsInbox);
+  }
+
+  notifySubscribers("sms_received", smsRecord);
+  return smsRecord;
 }

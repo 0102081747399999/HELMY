@@ -16,8 +16,153 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon'
 };
 
+// In-memory SMS queue for real-time mobile sync
+let receivedSmsQueue = [];
+const SMS_LOG_FILE = path.join(__dirname, 'sms_inbox_log.json');
+
+// Load existing SMS log if present
+try {
+  if (fs.existsSync(SMS_LOG_FILE)) {
+    const raw = fs.readFileSync(SMS_LOG_FILE, 'utf8');
+    receivedSmsQueue = JSON.parse(raw);
+  }
+} catch (e) {
+  receivedSmsQueue = [];
+}
+
+function saveSmsLog() {
+  try {
+    fs.writeFileSync(SMS_LOG_FILE, JSON.stringify(receivedSmsQueue.slice(0, 100), null, 2), 'utf8');
+  } catch (e) {
+    console.error('Failed to write SMS log:', e);
+  }
+}
+
+function getLanIPs() {
+  const interfaces = os.networkInterfaces();
+  const ips = [];
+  for (const name in interfaces) {
+    for (const net of interfaces[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        ips.push(net.address);
+      }
+    }
+  }
+  return ips;
+}
+
 const server = http.createServer((req, res) => {
-  let reqPath = decodeURI(req.url.split('?')[0]);
+  // CORS Headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  const urlObj = new URL(req.url, `http://localhost:${PORT}`);
+  const pathname = decodeURI(urlObj.pathname);
+
+  // ==========================================
+  // API ENDPOINT: SMS Webhook (Android Forwarder)
+  // ==========================================
+  if (pathname === '/api/sms-webhook' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      try {
+        let payload = {};
+        if (body.startsWith('{')) {
+          payload = JSON.parse(body);
+        } else {
+          // urlencoded or plain text
+          try {
+            const params = new URLSearchParams(body);
+            params.forEach((v, k) => { payload[k] = v; });
+          } catch(err) {
+            payload = { message: body };
+          }
+        }
+
+        const sender = payload.from || payload.sender || payload.phone_number || payload.address || 'VF-Cash';
+        const message = payload.message || payload.body || payload.text || payload.content || body;
+        const sim = payload.sim || payload.slot || payload.sim_slot || payload.sim_number || '';
+        const timestamp = payload.timestamp || new Date().toISOString();
+
+        const smsItem = {
+          id: 'sms_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          sender,
+          message,
+          sim,
+          receivedAt: new Date().toISOString(),
+          timestamp
+        };
+
+        receivedSmsQueue.unshift(smsItem);
+        if (receivedSmsQueue.length > 200) receivedSmsQueue.pop();
+        saveSmsLog();
+
+        console.log(`\n📩 [SMS وارد جديد] من: ${sender} | الشريحة: ${sim}`);
+        console.log(`   نص الرسالة: ${message}\n`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: true, received: true, id: smsItem.id }));
+      } catch (err) {
+        console.error('Error handling SMS webhook:', err);
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // ==========================================
+  // API ENDPOINT: Get Recent SMS Messages
+  // ==========================================
+  if (pathname === '/api/recent-sms' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      success: true,
+      shop: 'سنترال حلمي',
+      sms: receivedSmsQueue.slice(0, 50)
+    }));
+    return;
+  }
+
+  // ==========================================
+  // API ENDPOINT: Clear SMS Log
+  // ==========================================
+  if (pathname === '/api/clear-sms' && req.method === 'POST') {
+    receivedSmsQueue = [];
+    saveSmsLog();
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ success: true, message: 'SMS log cleared' }));
+    return;
+  }
+
+  // ==========================================
+  // API ENDPOINT: Network Info (IPs for Mobile)
+  // ==========================================
+  if (pathname === '/api/network-info' && req.method === 'GET') {
+    const ips = getLanIPs();
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      success: true,
+      shop: 'سنترال حلمي',
+      port: PORT,
+      ips,
+      urls: ips.map(ip => `http://${ip}:${PORT}`)
+    }));
+    return;
+  }
+
+  // ==========================================
+  // STATIC FILE SERVING
+  // ==========================================
+  let reqPath = pathname;
   if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
 
   const fullPath = path.join(__dirname, reqPath);
@@ -32,28 +177,21 @@ const server = http.createServer((req, res) => {
     const ext = path.extname(fullPath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-    res.writeHead(200, {
-      'Content-Type': contentType,
-      'Access-Control-Allow-Origin': '*'
-    });
+    res.writeHead(200, { 'Content-Type': contentType });
     fs.createReadStream(fullPath).pipe(res);
   });
 });
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('========================================================');
-  console.log('    نظام حلمي سنترال وموبايل (POS) يعمل بنجاح!          ');
+  console.log('    نظام سنترال حلمي وموبايل (POS) يعمل بنجاح!         ');
   console.log('========================================================');
-  console.log(`- افتح من هذا الجهاز:   http://localhost:${PORT}`);
+  console.log(`- افتح من هذا الجهاز:         http://localhost:${PORT}`);
   
-  // Display LAN IPs for other cashier devices in shop
-  const interfaces = os.networkInterfaces();
-  for (const name in interfaces) {
-    for (const net of interfaces[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
-        console.log(`- افتح من أي جهاز بالشبكة (واي فاي): http://${net.address}:${PORT}`);
-      }
-    }
-  }
+  const ips = getLanIPs();
+  ips.forEach(ip => {
+    console.log(`- افتح من الموبايل أو أي جهاز: http://${ip}:${PORT}`);
+  });
+  console.log(`- رابط استلام رسائل الكاش:   http://${ips[0] || 'localhost'}:${PORT}/api/sms-webhook`);
   console.log('========================================================');
 });

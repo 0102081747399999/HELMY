@@ -1,4 +1,4 @@
-// app.js - Main Application Logic for Hilmy Telecom POS Hub (Optimized for Laptop / Desktop POS)
+// app.js - Main Application Logic for سنترال حلمي (Central Hilmy POS & Telecom Hub)
 // Fully disabled native print dialogs per user request
 if (typeof window !== 'undefined') {
   window.print = function() {
@@ -14,11 +14,16 @@ import {
   updateProduct,
   deleteProduct,
   adjustProductStock,
+  recordDirectCategorySale,
+  recordDirectCategoryRestock,
+  parseCashSMS,
+  processIncomingSMS,
   updateVodafoneLineSettings,
   recordVodafoneTransaction,
   updateVodafoneTransaction,
   deleteVodafoneTransaction,
   resetVodafoneLine,
+  resetAllVodafoneLines,
   checkoutSale,
   recordCashDrawerEntry
 } from './firebase-config.js';
@@ -27,9 +32,21 @@ import {
 const AppState = {
   currentView: 'dashboard-overview',
   activeVodafoneLine: 1,
+  categoryViewTab: {
+    headphones: 'inventory',
+    chargers: 'inventory',
+    cables: 'inventory',
+    speakers: 'inventory',
+    phones: 'inventory',
+    covers: 'inventory',
+    accessories: 'inventory'
+  },
   activeChargerTab: 'all',
+  activeCablesTab: 'all',
   activeHeadphoneTab: 'all',
   activeSpeakerTab: 'all',
+  activeCoversTab: 'all',
+  activeAccessoriesTab: 'all',
   activePhoneBrand: 'all',
   activePhoneStatus: 'all',
   posCatalogCategory: 'all',
@@ -37,9 +54,10 @@ const AppState = {
   sidebarCollapsed: false,
   cart: [],
   cartDiscount: 0,
-  deleteTarget: null, // { type: 'product'|'vodafone_tx'|'vodafone_reset', id: string, extra: any }
+  deleteTarget: null,
   editingProductId: null,
-  editingVodafoneTxId: null
+  editingVodafoneTxId: null,
+  currentSmartProduct: null
 };
 
 // ==========================================
@@ -49,15 +67,15 @@ const THEME_OPTIONS = {
   'dark-onyx': {
     id: 'dark-onyx',
     name: 'الأسود الداكن الفاخر (Dark Slate / Onyx)',
-    desc: 'تصميم داكن فخم عالي التباين بلمسات تيتانيوم وسماوي مثلج (مريح جداً للعين)',
+    desc: 'تصميم داكن فخم عالي التباين بلمسات تيتانيوم وسماوي مثلج',
     badge: 'داكن فاخر',
     previewHex: ['#090d16', '#162032', '#38bdf8']
   },
   'red-magic': {
     id: 'red-magic',
     name: 'ريد ماجيك القرمزي (Red Magic Crimson)',
-    desc: 'طابع رياضي فخم باللون القرمزي والأسود الملكي',
-    badge: 'الخيار الافتراضي (هوية الموقع) ★',
+    desc: 'طابع رياضي فخم باللون القرمزي والأسود الملكي (سنترال حلمي)',
+    badge: 'الخيار الافتراضي ★',
     previewHex: ['#0d090d', '#20131d', '#f43f5e']
   },
   'emerald': {
@@ -121,7 +139,6 @@ window.selectTheme = (themeId) => {
   if (!THEME_OPTIONS[themeId]) return;
   document.documentElement.setAttribute('data-theme', themeId);
   localStorage.setItem('pos_color_theme', themeId);
-  // Remove custom accent to revert to theme default
   localStorage.removeItem('pos_accent_color');
   document.documentElement.style.removeProperty('--accent-color');
   document.documentElement.style.removeProperty('--accent-hover');
@@ -148,53 +165,44 @@ function adjustColorBrightness(hex, percent) {
   let num = parseInt(hex.replace('#',''), 16),
       amt = Math.round(2.55 * percent),
       R = (num >> 16) + amt,
-      B = (num >> 8 & 0x00FF) + amt,
-      G = (num & 0x0000FF) + amt;
-  return '#' + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (B<255?B<1?0:B:255)*0x100 + (G<255?G<1?0:G:255)).toString(16).slice(1);
+      G = (num >> 8 & 0x00FF) + amt,
+      B = (num & 0x0000FF) + amt;
+  return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
 }
 
 function renderThemeModalOptions() {
   const container = document.getElementById('theme-options-container');
   if (!container) return;
-  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark-onyx';
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'red-magic';
 
-  container.innerHTML = Object.keys(THEME_OPTIONS).map(key => {
-    const t = THEME_OPTIONS[key];
+  container.innerHTML = Object.values(THEME_OPTIONS).map(t => {
     const isSelected = t.id === currentTheme;
-    const dots = t.previewHex.map(hex => `<span class="w-4 h-4 rounded-full border border-white/20 shadow-sm" style="background-color: ${hex}"></span>`).join('');
     return `
       <div 
         onclick="window.selectTheme('${t.id}')"
-        class="flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+        class="p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2 ${
           isSelected 
-            ? 'border-secondary bg-secondary/10 shadow-md ring-2 ring-secondary/30' 
-            : 'border-outline-variant/30 hover:border-secondary/50 hover:bg-surface-container-low'
-        }">
-        <div class="flex items-center gap-3.5">
-          <div class="flex items-center -space-x-1.5 space-x-reverse p-1.5 bg-black/20 rounded-lg shrink-0">
-            ${dots}
+            ? 'bg-primary/10 border-primary ring-2 ring-primary/40 shadow-lg' 
+            : 'bg-surface-container-low border-outline-variant/30 hover:border-outline-variant hover:bg-surface-container'
+        }"
+      >
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-xs text-on-surface">${t.name}</span>
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface-container text-on-surface-variant border border-outline-variant/30">${t.badge}</span>
           </div>
-          <div class="flex flex-col">
-            <div class="flex items-center gap-2">
-              <span class="font-headline-sm font-bold text-on-surface text-base">${t.name}</span>
-              ${t.badge ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-secondary text-white' : 'bg-surface-container text-on-surface-variant'}">${t.badge}</span>` : ''}
-            </div>
-            <p class="font-body-sm text-on-surface-variant text-xs mt-0.5">${t.desc}</p>
-          </div>
+          ${isSelected ? '<span class="material-symbols-outlined text-primary text-base">check_circle</span>' : ''}
         </div>
-        <div class="shrink-0 mr-2">
-          <span class="w-6 h-6 rounded-full flex items-center justify-center border ${
-            isSelected ? 'bg-secondary text-white border-secondary' : 'border-outline-variant/50 text-transparent'
-          }">
-            <span class="material-symbols-outlined text-sm font-bold">${isSelected ? 'check' : ''}</span>
-          </span>
+        <p class="text-[11px] text-on-surface-variant leading-relaxed">${t.desc}</p>
+        <div class="flex items-center gap-1.5 pt-1">
+          ${t.previewHex.map(c => `<span class="w-5 h-5 rounded-full border border-black/20 shadow-xs" style="background-color: ${c}"></span>`).join('')}
         </div>
       </div>
     `;
   }).join('');
 }
 
-// Live Clock & Date for Laptop Header
+// Live Clock for Cashier
 function startLiveClock() {
   const clockEl = document.getElementById('header-live-clock');
   const dateEl = document.getElementById('header-live-date');
@@ -212,7 +220,7 @@ function startLiveClock() {
   setInterval(update, 1000);
 }
 
-// Fullscreen Toggle for Laptop Cashier
+// Fullscreen Toggle
 window.toggleFullscreen = () => {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(err => {
@@ -225,25 +233,16 @@ window.toggleFullscreen = () => {
   }
 };
 
-// Sidebar Collapse / Expand Toggle for Laptops
+// Sidebar Toggle (Mobile Drawer & Laptop Collapse)
 window.toggleSidebar = () => {
-  AppState.sidebarCollapsed = !AppState.sidebarCollapsed;
   const sidebar = document.getElementById('app-sidebar');
-  const mainWrapper = document.getElementById('main-content-wrapper');
-  const header = document.getElementById('app-header');
-
-  if (AppState.sidebarCollapsed) {
-    sidebar?.classList.add('sidebar-collapsed');
-    mainWrapper?.classList.remove('pr-72');
-    mainWrapper?.classList.add('pr-20');
-    header?.classList.remove('right-72');
-    header?.classList.add('right-20');
-  } else {
-    sidebar?.classList.remove('sidebar-collapsed');
-    mainWrapper?.classList.remove('pr-20');
-    mainWrapper?.classList.add('pr-72');
-    header?.classList.remove('right-20');
-    header?.classList.add('right-72');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (sidebar) {
+    sidebar.classList.toggle('sidebar-open');
+    sidebar.classList.toggle('sidebar-closed');
+  }
+  if (backdrop) {
+    backdrop.classList.toggle('hidden');
   }
 };
 
@@ -252,18 +251,12 @@ window.toggleSidebar = () => {
 // ==========================================
 
 window.addEventListener('DOMContentLoaded', () => {
-  // Initialize Theme Engine
   initTheme();
-
-  // Initialize Realtime Firebase Synchronization
   initRealtimeSync();
-
-  // Start Header Live Clock
   startLiveClock();
 
-  // Subscribe UI to data store updates
+  // Subscribe UI to store events
   subscribeToStore((event, data, store) => {
-    console.log(`Store event: ${event}`);
     renderCurrentView();
     updateGlobalHeaderBadges();
     if (!document.getElementById('modal-quick-pos')?.classList.contains('hidden')) {
@@ -271,28 +264,16 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Setup navigation handlers
   setupNavigation();
-
-  // Setup Keyboard Shortcuts (F1, F2, F4, F7, ESC)
   setupKeyboardShortcuts();
-
-  // Setup Global Hardware Barcode Scanner Listener
   setupBarcodeScannerListener();
-
-  // Setup Quick POS Cart event handlers
   setupQuickPOS();
-
-  // Setup Product CRUD Modals
   setupProductModal();
-
-  // Setup Vodafone Controls
   setupVodafoneEvents();
-
-  // Setup Cash Drawer Modals
   setupDrawerEvents();
+  setupSmartCodeEvents();
+  startSMSPoller();
 
-  // Initial Render
   renderCurrentView();
   updateGlobalHeaderBadges();
 });
@@ -301,46 +282,62 @@ window.addEventListener('DOMContentLoaded', () => {
 // ROUTING & VIEW NAVIGATION
 // ==========================================
 
-function setupNavigation() {
-  const navLinks = document.querySelectorAll('nav a[data-path]');
-  navLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      const path = link.getAttribute('data-path');
-      navigateTo(path);
-    });
-  });
+const ALL_VIEWS = [
+  'dashboard-overview',
+  'vodafone-cash-wallets',
+  'chargers-inventory',
+  'cables-inventory',
+  'headphones-audio',
+  'speakers-sound',
+  'phones-sales-inventory',
+  'covers-inventory',
+  'accessories-inventory',
+  'sms-sync-hub'
+];
 
-  // Catch in-page link navigation
+function setupNavigation() {
   document.addEventListener('click', (e) => {
-    const targetLink = e.target.closest('a[data-path]');
+    const targetLink = e.target.closest('[data-path]');
     if (targetLink) {
       e.preventDefault();
       const path = targetLink.getAttribute('data-path');
       navigateTo(path);
+      // Close sidebar if on mobile
+      if (window.innerWidth < 1024) {
+        const sidebar = document.getElementById('app-sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        sidebar?.classList.remove('sidebar-open');
+        sidebar?.classList.add('sidebar-closed');
+        backdrop?.classList.add('hidden');
+      }
     }
   });
 }
 
 export function navigateTo(path) {
+  // Alias redirects
+  if (path === 'chargers-cables') path = 'chargers-inventory';
+
   AppState.currentView = path;
 
-  // Update sidebar active classes
-  const navLinks = document.querySelectorAll('nav a[data-path]');
+  // Update navigation styling
+  const navLinks = document.querySelectorAll('[data-path]');
   navLinks.forEach(link => {
-    const isCurrent = link.getAttribute('data-path') === path;
+    const linkPath = link.getAttribute('data-path');
+    const isCurrent = linkPath === path || (linkPath === 'chargers-cables' && path === 'chargers-inventory');
     if (isCurrent) {
       link.setAttribute('aria-current', 'page');
-      link.className = "flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary text-on-primary font-title-md shadow-md ring-1 ring-sky-accent/40";
+      link.classList.add('bg-primary', 'text-white', 'shadow-md', 'ring-1', 'ring-rose-500/40');
+      link.classList.remove('text-slate-300', 'hover:bg-navy-card');
     } else {
       link.removeAttribute('aria-current');
-      link.className = "flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-navy-card hover:text-sky-accent transition-colors";
+      link.classList.remove('bg-primary', 'text-white', 'shadow-md', 'ring-1', 'ring-rose-500/40');
+      link.classList.add('text-slate-300', 'hover:bg-navy-card');
     }
   });
 
   // Show/Hide View Sections
-  const views = ['dashboard-overview', 'vodafone-cash-wallets', 'chargers-cables', 'phones-sales-inventory', 'headphones-audio', 'speakers-sound'];
-  views.forEach(v => {
+  ALL_VIEWS.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) {
       if (v === path) {
@@ -352,6 +349,7 @@ export function navigateTo(path) {
   });
 
   renderCurrentView();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function renderCurrentView() {
@@ -362,11 +360,11 @@ function renderCurrentView() {
     case 'vodafone-cash-wallets':
       renderVodafoneHub();
       break;
-    case 'chargers-cables':
+    case 'chargers-inventory':
       renderChargersPage();
       break;
-    case 'phones-sales-inventory':
-      renderPhonesPage();
+    case 'cables-inventory':
+      renderCablesPage();
       break;
     case 'headphones-audio':
       renderHeadphonesPage();
@@ -374,32 +372,150 @@ function renderCurrentView() {
     case 'speakers-sound':
       renderSpeakersPage();
       break;
+    case 'phones-sales-inventory':
+      renderPhonesPage();
+      break;
+    case 'covers-inventory':
+      renderCoversPage();
+      break;
+    case 'accessories-inventory':
+      renderAccessoriesPage();
+      break;
+    case 'sms-sync-hub':
+      renderSmsSyncHub();
+      break;
+    default:
+      renderDashboard();
   }
 }
 
-// ==========================================
-// GLOBAL HEADER & KPI BADGES
-// ==========================================
-
+// Global Header & Sidebar Badges
 function updateGlobalHeaderBadges() {
-  const drawerBal = Store.drawer ? (Store.drawer.currentCash || 0) : 0;
-  const headerCash = document.getElementById('header-cash-balance');
-  const sidebarDrawerVal = document.getElementById('sidebar-drawer-val');
-  if (headerCash) headerCash.innerText = `${formatMoney(drawerBal)} ج.م`;
-  if (sidebarDrawerVal) sidebarDrawerVal.innerText = formatMoney(drawerBal);
+  const drawerCash = Store.drawer ? (parseFloat(Store.drawer.currentCash) || 0) : 0;
+  setElemText('header-cash-balance', `${formatMoney(drawerCash)} ج.م`);
+  setElemText('sidebar-drawer-val', `${formatMoney(drawerCash)} ج.م`);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todaySales = Store.salesInvoices.filter(inv => (inv.timestamp || '').startsWith(todayStr));
-  const totalSalesVal = todaySales.reduce((acc, inv) => acc + (inv.totalAmount || 0), 0);
+  // Calculate totals
+  const totalProds = Store.products.reduce((acc, p) => acc + (p.quantity || 0), 0);
+  const totalSalesVal = Store.salesInvoices.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+  const lowStockCount = Store.products.filter(p => (p.quantity || 0) <= 2 && p.category !== 'phones').length;
 
-  const totalVodaBalance = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.balance) || 0), 0);
-  const lowStockCount = Store.products.filter(p => (p.category !== 'phones' && (p.quantity || 0) <= 2) || (p.category === 'phones' && p.status === 'available')).length;
-
-  setElemText('stat-dash-drawer', formatMoney(drawerBal));
-  setElemText('stat-dash-voda', formatMoney(totalVodaBalance));
+  setElemText('stat-dash-stock-total', totalProds);
   setElemText('stat-dash-sales', formatMoney(totalSalesVal));
-  setElemText('stat-dash-sales-count', `${todaySales.length} عمليات بيع مكتملة`);
+  setElemText('stat-dash-sales-count', `${Store.salesInvoices.length} عمليات بيع`);
   setElemText('stat-dash-low-stock', lowStockCount);
+}
+
+// ==========================================
+// CATEGORY DUAL-TAB SWITCHER (مخزون VS مبيعات)
+// ==========================================
+
+window.switchCategoryTab = function(category, tab) {
+  AppState.categoryViewTab[category] = tab;
+
+  // Toggle button styling
+  document.querySelectorAll(`[data-cat-tab-for="${category}"]`).forEach(btn => {
+    const btnTab = btn.getAttribute('data-cat-tab');
+    if (btnTab === tab) {
+      btn.className = "px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 flex items-center gap-1.5 cursor-pointer";
+    } else {
+      btn.className = "px-4 py-2 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-1.5 cursor-pointer";
+    }
+  });
+
+  // Toggle containers
+  const invCont = document.getElementById(`${category}-inventory-container`);
+  const salesCont = document.getElementById(`${category}-sales-container`);
+  if (invCont && salesCont) {
+    if (tab === 'inventory') {
+      invCont.classList.remove('hidden');
+      salesCont.classList.add('hidden');
+    } else {
+      invCont.classList.add('hidden');
+      salesCont.classList.remove('hidden');
+    }
+  }
+
+  renderCurrentView();
+};
+
+// Helper: Extract sales for a given category
+function getCategorySales(cat) {
+  const sales = [];
+  (Store.salesInvoices || []).forEach(inv => {
+    (inv.items || []).forEach(item => {
+      const itemCat = item.category || '';
+      let matches = (itemCat === cat);
+      if (!matches && cat === 'chargers' && (itemCat === 'chargers' || itemCat === 'chargers-cables')) matches = true;
+      if (!matches && cat === 'cables' && (itemCat === 'cables' || itemCat === 'chargers-cables')) matches = true;
+
+      if (matches) {
+        sales.push({
+          invoiceNumber: inv.invoiceNumber,
+          timestamp: inv.timestamp,
+          customerName: inv.customerName || 'عميل نقدي',
+          customerPhone: inv.customerPhone || '',
+          ...item
+        });
+      }
+    });
+  });
+  sales.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+  return sales;
+}
+
+// Helper: Render category sales table rows
+function renderSalesTableHTML(salesList, categoryArabicName) {
+  if (salesList.length === 0) {
+    return `
+      <tr>
+        <td colspan="8" class="py-14 text-center">
+          <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+            <span class="material-symbols-outlined text-[38px] opacity-30">receipt_long</span>
+            <span class="font-headline-sm font-bold text-on-surface">لا توجد عمليات بيع مسجلة لهذا القسم حتى الآن</span>
+            <span class="text-xs">اكتب كود أي صنف في شريط الكود الذكي بالأعلى واضغط "بيع" لتنزيله هنا تلقائياً مع التاريخ والربح.</span>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  return salesList.map(sale => {
+    const buyPrice = sale.buyPrice || 0;
+    const sellPrice = sale.price || 0;
+    const qty = sale.quantity || 1;
+    const total = sellPrice * qty;
+    const profit = (sellPrice - buyPrice) * qty;
+
+    return `
+      <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+        <td class="py-3 px-4 font-numeric-table font-bold text-on-surface">
+          ${formatDateArabic(sale.timestamp)}
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-bold text-secondary">
+          ${sale.barcode || '-'}
+        </td>
+        <td class="py-3 px-4 font-bold text-on-surface">
+          ${sale.name}
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-bold text-on-surface">
+          ${qty} حبة
+        </td>
+        <td class="py-3 px-4 font-numeric-table text-on-surface">
+          ${formatMoney(sellPrice)} ج.م
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">
+          ${formatMoney(total)} ج.م
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+          +${formatMoney(profit)} ج.م
+        </td>
+        <td class="py-3 px-4 text-on-surface-variant">
+          ${sale.customerName || 'عميل نقدي'} (${sale.invoiceNumber})
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // ==========================================
@@ -418,8 +534,8 @@ function renderDashboard() {
           <td colspan="6" class="py-12 text-center text-on-surface-variant">
             <div class="flex flex-col items-center justify-center gap-2">
               <span class="material-symbols-outlined text-[36px] opacity-40">receipt_long</span>
-              <p class="font-headline-sm text-headline-sm">لا توجد مبيعات مسجلة حتى الآن</p>
-              <button onclick="window.triggerQuickPOS()" class="text-secondary hover:underline font-label-md text-label-md font-bold">+ بدء بيع سريع (F2)</button>
+              <p class="font-headline-sm">لا توجد مبيعات مسجلة حتى الآن</p>
+              <button onclick="window.triggerQuickPOS()" class="text-secondary hover:underline font-bold text-xs">+ بدء بيع سريع (F2)</button>
             </div>
           </td>
         </tr>
@@ -429,9 +545,9 @@ function renderDashboard() {
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
           <td class="py-3 px-4 font-numeric-table text-secondary font-bold">${inv.invoiceNumber}</td>
           <td class="py-3 px-4 font-numeric-table text-on-surface-variant">${formatTime(inv.timestamp)}</td>
-          <td class="py-3 px-4 font-label-md font-bold">${inv.items ? inv.items.map(i => `${i.name} (×${i.quantity})`).join(', ') : '-'}</td>
+          <td class="py-3 px-4 font-bold text-xs">${inv.items ? inv.items.map(i => `${i.name} (×${i.quantity})`).join(', ') : '-'}</td>
           <td class="py-3 px-4 font-numeric-table font-bold text-on-surface">${formatMoney(inv.totalAmount)} ج.م</td>
-          <td class="py-3 px-4 text-on-surface-variant font-label-sm">${inv.customerName || 'عميل نقدي'}</td>
+          <td class="py-3 px-4 text-on-surface-variant text-xs">${inv.customerName || 'عميل نقدي'}</td>
           <td class="py-3 px-4 text-center">
             <button onclick="window.printInvoiceReceipt('${inv.id}')" class="p-1.5 rounded-lg text-secondary hover:bg-secondary/10 transition-colors" title="عرض تفاصيل الفاتورة">
               <span class="material-symbols-outlined text-[18px]">receipt_long</span>
@@ -451,8 +567,8 @@ function renderDashboard() {
           <td colspan="6" class="py-12 text-center text-on-surface-variant">
             <div class="flex flex-col items-center justify-center gap-2">
               <span class="material-symbols-outlined text-[36px] opacity-40">account_balance_wallet</span>
-              <p class="font-headline-sm text-headline-sm">لا توجد معاملات كاش مسجلة اليوم</p>
-              <button onclick="window.navigateTo('vodafone-cash-wallets')" class="text-secondary hover:underline font-label-md text-label-md font-bold">+ فتح محافظ فودافون كاش</button>
+              <p class="font-headline-sm">لا توجد معاملات كاش مسجلة اليوم</p>
+              <button onclick="window.navigateTo('vodafone-cash-wallets')" class="text-secondary hover:underline font-bold text-xs">+ فتح محافظ فودافون كاش</button>
             </div>
           </td>
         </tr>
@@ -460,7 +576,7 @@ function renderDashboard() {
     } else {
       vodaTbody.innerHTML = recentVoda.map(tx => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
-          <td class="py-3 px-4 font-label-md font-bold text-on-surface">خط ${tx.lineNum}</td>
+          <td class="py-3 px-4 font-bold text-on-surface">خط ${tx.lineNum}</td>
           <td class="py-3 px-4">
             <span class="px-2.5 py-0.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${tx.type === 'deposit' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'}">
               <span class="material-symbols-outlined text-[13px]">${tx.type === 'deposit' ? 'add_circle' : 'remove_circle'}</span>
@@ -478,7 +594,7 @@ function renderDashboard() {
 }
 
 // ==========================================
-// VIEW 2: VODAFONE CASH 18 LINES MANAGEMENT
+// VIEW 2: VODAFONE CASH 18 LINES (Zero Balances + SMS)
 // ==========================================
 
 function renderVodafoneHub() {
@@ -487,8 +603,8 @@ function renderVodafoneHub() {
     lineNum,
     phone: '',
     monthlyLimit: 100000,
-    balance: 0,
-    totalTransferredMonth: 0
+    balance: 0.00,
+    totalTransferredMonth: 0.00
   };
 
   const gridContainer = document.getElementById('wallets-grid');
@@ -496,109 +612,86 @@ function renderVodafoneHub() {
     gridContainer.innerHTML = Store.vodafoneLines.map(l => {
       const isSelected = l.lineNum === lineNum;
       const hasPhone = Boolean(l.phone && l.phone.trim());
-      const hasBalance = (l.balance || 0) > 0;
+      const hasBalance = (parseFloat(l.balance) || 0) > 0;
       return `
         <button 
           onclick="window.selectVodafoneLine(${l.lineNum})"
-          class="wallet-btn flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-150 cursor-pointer ${
+          class="p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer relative ${
             isSelected 
-              ? 'bg-primary text-white ring-2 ring-rose-500/50 shadow-lg shadow-rose-950/60 scale-105' 
-              : 'bg-navy-card hover:bg-surface-container text-on-surface border border-slate-800 hover:border-rose-900/40'
+              ? 'bg-primary text-white border-primary shadow-md ring-2 ring-rose-500/40' 
+              : 'bg-surface-container-low hover:bg-surface-container text-on-surface border-outline-variant/30'
           }"
-          type="button">
+        >
           <div class="flex items-center gap-1">
-            <span class="material-symbols-outlined text-[16px] ${isSelected ? 'text-white' : (hasBalance ? 'text-emerald-400' : 'text-on-surface-variant')}">
-              ${hasBalance ? 'account_balance_wallet' : 'sim_card'}
-            </span>
-            <span class="font-headline-sm text-headline-sm font-numeric-table font-bold">${l.lineNum}</span>
+            <span class="text-xs font-bold">خط ${l.lineNum}</span>
+            <span class="w-2 h-2 rounded-full ${hasBalance ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
           </div>
-          <span class="font-numeric-table text-xs mt-0.5 ${isSelected ? 'text-white/90' : 'text-on-surface-variant'} truncate max-w-[65px] font-bold">
-            ${formatCompactMoney(l.balance || 0)}
+          <span class="font-numeric-table font-bold text-[11px] ${isSelected ? 'text-white' : 'text-emerald-400'}">
+            ${formatMoney(l.balance || 0)}
           </span>
-          <span class="w-1.5 h-1.5 rounded-full mt-1 ${hasPhone ? 'bg-emerald-400' : 'bg-outline-variant'}"></span>
+          <span class="text-[9px] truncate max-w-[80px] ${isSelected ? 'text-rose-200' : 'text-on-surface-variant'}">
+            ${hasPhone ? l.phone : 'بدون رقم'}
+          </span>
         </button>
       `;
     }).join('');
   }
 
-  const totalBalance = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.balance) || 0), 0);
-  const totalLimits = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.monthlyLimit) || 100000), 0);
-  const totalTransferred = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.totalTransferredMonth) || 0), 0);
-  const remainingTotalLimit = Math.max(0, totalLimits - totalTransferred);
-  const limitPercent = totalLimits > 0 ? Math.min(100, Math.round((totalTransferred / totalLimits) * 100)) : 0;
-
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayCommissions = Store.vodafoneTransactions
-    .filter(t => (t.timestamp || '').startsWith(todayStr))
-    .reduce((acc, t) => acc + (parseFloat(t.commission) || 0), 0);
-  const todayTxsCount = Store.vodafoneTransactions.filter(t => (t.timestamp || '').startsWith(todayStr)).length;
-
-  setElemText('voda-kpi-total-balance', formatMoney(totalBalance));
-  setElemText('voda-kpi-remaining-limit', formatMoney(remainingTotalLimit));
-  setElemText('voda-kpi-limit-percent', `الاستهلاك الكلي: ${limitPercent}%`);
-  setElemText('voda-kpi-today-commissions', formatMoney(todayCommissions));
-  setElemText('voda-kpi-today-tx-count', `${todayTxsCount} عمليات اليوم`);
-
-  const progressBar = document.getElementById('voda-kpi-limit-bar');
-  if (progressBar) progressBar.style.width = `${limitPercent}%`;
-
+  // Active Line Details
   setElemText('active-line-badge', `خط ${line.lineNum} - نشط`);
-  setElemText('active-line-phone-display', line.phone ? `رقم المحفظة: ${line.phone}` : 'لم يتم تحديد رقم هاتف للخط');
-  setElemText('active-line-balance-display', `${formatMoney(line.balance || 0)} ج.م`);
+  setElemText('active-line-phone-display', line.phone || 'لم يتم تعيين رقم هاتف للخط');
+  setElemText('active-line-balance-big', `${formatMoney(line.balance || 0)} ج.م`);
+  setElemText('active-line-month-transferred', `${formatMoney(line.totalTransferredMonth || 0)} ج.م`);
   
-  const lineLimit = parseFloat(line.monthlyLimit) || 100000;
-  const lineUsed = parseFloat(line.totalTransferredMonth) || 0;
-  const lineRemaining = Math.max(0, lineLimit - lineUsed);
-  const lineLimitPercent = lineLimit > 0 ? Math.min(100, Math.round((lineUsed / lineLimit) * 100)) : 0;
+  const remaining = Math.max(0, (line.monthlyLimit || 100000) - (line.totalTransferredMonth || 0));
+  setElemText('active-line-remaining-limit', `${formatMoney(remaining)} ج.م`);
 
-  setElemText('active-line-limit-display', `${formatMoney(lineRemaining)} ج.م`);
-  setElemText('active-line-limit-sub', `السقف الشهري: ${formatMoney(lineLimit)} ج.م (المستخدم ${lineLimitPercent}%)`);
-  
-  const activeLineBar = document.getElementById('active-line-limit-bar');
-  if (activeLineBar) activeLineBar.style.width = `${lineLimitPercent}%`;
+  // Overall KPIs
+  const totalBalance = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.balance) || 0), 0);
+  const totalLimit = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.monthlyLimit) || 100000), 0);
+  const totalUsed = Store.vodafoneLines.reduce((acc, l) => acc + (parseFloat(l.totalTransferredMonth) || 0), 0);
+  const todayTxs = Store.vodafoneTransactions.filter(t => isToday(t.timestamp));
+  const todayComms = todayTxs.reduce((acc, t) => acc + (parseFloat(t.commission) || 0), 0);
 
+  setElemText('voda-kpi-total-balance', `${formatMoney(totalBalance)} ج.م`);
+  setElemText('voda-kpi-remaining-limit', `${formatMoney(Math.max(0, totalLimit - totalUsed))} ج.م`);
+  setElemText('voda-kpi-today-commissions', `+${formatMoney(todayComms)} ج.م`);
+  setElemText('voda-kpi-today-tx-count', `${todayTxs.length} عمليات اليوم`);
+
+  const percentUsed = totalLimit > 0 ? Math.min(100, Math.round((totalUsed / totalLimit) * 100)) : 0;
+  setElemText('voda-kpi-limit-percent', `الاستهلاك الكلي: ${percentUsed}%`);
+  const limitBar = document.getElementById('voda-kpi-limit-bar');
+  if (limitBar) limitBar.style.width = `${percentUsed}%`;
+
+  // Render transactions table for this line
   const lineTxs = Store.vodafoneTransactions.filter(t => t.lineNum === lineNum);
-  setElemText('active-line-txs-count', `${lineTxs.length} حركات`);
-
-  const tbody = document.getElementById('transactions-body');
-  if (tbody) {
+  const txTbody = document.getElementById('voda-transactions-tbody');
+  if (txTbody) {
     if (lineTxs.length === 0) {
-      tbody.innerHTML = `
+      txTbody.innerHTML = `
         <tr>
-          <td class="py-16 text-center" colspan="8">
-            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-              <span class="material-symbols-outlined text-[40px] opacity-30">hourglass_empty</span>
-              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لم يتم تسجيل أي معاملات على الخط (${lineNum})</span>
-              <span class="font-body-sm text-body-sm text-on-surface-variant">قم بتسجيل عملية إيداع أو سحب لتحديث كشف الحساب والرصيد فورياً.</span>
-            </div>
+          <td colspan="7" class="py-12 text-center text-on-surface-variant">
+            <span class="text-xs">لا توجد حركات مسجلة لهذا الخط حتى الآن. استخدم نموذج الإيداع / السحب لتسجيل أول حركة.</span>
           </td>
         </tr>
       `;
     } else {
-      tbody.innerHTML = lineTxs.map((tx, idx) => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
-          <td class="py-3 px-3 font-numeric-table text-secondary font-bold">#${lineTxs.length - idx}</td>
-          <td class="py-3 px-3 font-numeric-table text-on-surface-variant text-xs">${formatTime(tx.timestamp)}</td>
-          <td class="py-3 px-3">
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
-              tx.type === 'deposit' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-            }">
-              <span class="material-symbols-outlined text-[13px]">${tx.type === 'deposit' ? 'add_circle' : 'remove_circle'}</span>
-              ${tx.type === 'deposit' ? 'إيداع / استلام' : 'تحويل / سحب'}
+      txTbody.innerHTML = lineTxs.map(t => `
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-2.5 px-3 font-numeric-table font-bold text-on-surface">${formatDateArabic(t.timestamp)}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold inline-flex items-center gap-1 ${t.type === 'deposit' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}">
+              ${t.type === 'deposit' ? 'إيداع (+)' : 'سحب (-)'}
             </span>
           </td>
-          <td class="py-3 px-3 font-numeric-table font-bold text-on-surface text-base">${formatMoney(tx.amount)} ج.م</td>
-          <td class="py-3 px-3 font-numeric-table text-on-surface">${tx.customerPhone || '-'}</td>
-          <td class="py-3 px-3 font-numeric-table text-emerald-400 font-bold">+${formatMoney(tx.commission || 0)} ج.م</td>
-          <td class="py-3 px-3 font-numeric-table text-on-surface-variant font-bold">${formatMoney(tx.balanceAfter)} ج.م</td>
-          <td class="py-3 px-3 text-center">
+          <td class="py-2.5 px-3 font-numeric-table font-bold text-on-surface">${formatMoney(t.amount)} ج.م</td>
+          <td class="py-2.5 px-3 font-numeric-table text-emerald-400 font-bold">+${formatMoney(t.commission || 0)} ج.م</td>
+          <td class="py-2.5 px-3 font-numeric-table font-bold text-on-surface">${formatMoney(t.balanceAfter || 0)} ج.م</td>
+          <td class="py-2.5 px-3 text-on-surface-variant">${t.customerPhone || t.notes || '-'}</td>
+          <td class="py-2.5 px-3 text-center">
             <div class="flex items-center justify-center gap-1">
-              <button onclick="window.openEditVodafoneTxModal('${tx.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
-                <span class="material-symbols-outlined text-[18px]">edit</span>
-              </button>
-              <button onclick="window.confirmDeleteVodafoneTx('${tx.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
-                <span class="material-symbols-outlined text-[18px]">delete</span>
-              </button>
+              <button onclick="window.openEditVodafoneTxModal('${t.id}')" class="p-1 rounded text-on-surface-variant hover:text-secondary" title="تعديل"><span class="material-symbols-outlined text-[16px]">edit</span></button>
+              <button onclick="window.confirmDeleteVodafoneTx('${t.id}')" class="p-1 rounded text-on-surface-variant hover:text-rose-400" title="حذف"><span class="material-symbols-outlined text-[16px]">delete</span></button>
             </div>
           </td>
         </tr>
@@ -607,269 +700,103 @@ function renderVodafoneHub() {
   }
 }
 
-function setupVodafoneEvents() {
-  window.selectVodafoneLine = (lineNum) => {
-    AppState.activeVodafoneLine = lineNum;
+window.selectVodafoneLine = (num) => {
+  AppState.activeVodafoneLine = parseInt(num, 10);
+  renderVodafoneHub();
+};
+
+window.confirmResetAllLines = () => {
+  if (confirm("هل أنت متأكد تماماً من تصفير أرصدة جميع الخطوط الـ 18 إلى 0.00 ج.م؟ (سيتم تصفير الرصيد لجميع الخطوط)")) {
+    resetAllVodafoneLines();
     renderVodafoneHub();
-  };
-
-  const btnDeposit = document.getElementById('btn-voda-deposit');
-  const btnWithdraw = document.getElementById('btn-voda-withdraw');
-  const amountInput = document.getElementById('voda-tx-amount');
-  const phoneInput = document.getElementById('voda-tx-phone');
-  const commInput = document.getElementById('voda-tx-commission');
-  const notesInput = document.getElementById('voda-tx-notes');
-
-  const handleTx = async (type) => {
-    const amount = parseFloat(amountInput?.value) || 0;
-    if (amount <= 0) {
-      showToast("يرجى إدخال مبلغ صحيح للعملية", "warning");
-      amountInput?.focus();
-      return;
-    }
-
-    const commission = parseFloat(commInput?.value) || 0;
-    const customerPhone = phoneInput?.value || '';
-    const notes = notesInput?.value || '';
-
-    try {
-      await recordVodafoneTransaction({
-        lineNum: AppState.activeVodafoneLine,
-        type,
-        amount,
-        commission,
-        customerPhone,
-        notes
-      });
-
-      if (amountInput) amountInput.value = '';
-      if (phoneInput) phoneInput.value = '';
-      if (commInput) commInput.value = '5.00';
-      if (notesInput) notesInput.value = '';
-
-      showToast(`تم تسجيل حركة ${type === 'deposit' ? 'إيداع' : 'سحب'} بنجاح على خط ${AppState.activeVodafoneLine}`, 'verified');
-    } catch (err) {
-      showToast(`حدث خطأ: ${err.message}`, 'error');
-    }
-  };
-
-  if (btnDeposit) btnDeposit.addEventListener('click', () => handleTx('deposit'));
-  if (btnWithdraw) btnWithdraw.addEventListener('click', () => handleTx('withdraw'));
-
-  window.confirmResetVodafoneLine = () => {
-    const lineNum = AppState.activeVodafoneLine;
-    AppState.deleteTarget = {
-      type: 'vodafone_reset',
-      id: lineNum,
-      title: `إعادة تعيين خط فودافون كاش (${lineNum})`,
-      message: `هل أنت متأكد من تصفير رصيد الخط (${lineNum}) وحذف سجل عملياته؟ لا يمكن التراجع عن هذا الإجراء.`
-    };
-    openDeleteConfirmModal();
-  };
-
-  window.confirmDeleteVodafoneTx = (txId) => {
-    AppState.deleteTarget = {
-      type: 'vodafone_tx',
-      id: txId,
-      title: 'حذف معاملة فودافون كاش',
-      message: 'هل أنت متأكد من حذف هذه المعاملة؟ سيتم التراجع عن أثرها المالي على رصيد المحفظة والدرج.'
-    };
-    openDeleteConfirmModal();
-  };
-
-  window.openLineSettingsModal = () => {
-    const line = Store.vodafoneLines.find(l => l.lineNum === AppState.activeVodafoneLine);
-    if (!line) return;
-
-    setElemValue('settings-line-num', line.lineNum);
-    setElemValue('settings-line-phone', line.phone || '');
-    setElemValue('settings-line-limit', line.monthlyLimit || 100000);
-
-    const modal = document.getElementById('modal-line-settings');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-  };
-
-  window.closeLineSettingsModal = () => {
-    const modal = document.getElementById('modal-line-settings');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-  };
-
-  window.saveLineSettings = async () => {
-    const lineNum = AppState.activeVodafoneLine;
-    const phone = document.getElementById('settings-line-phone')?.value || '';
-    const monthlyLimit = parseFloat(document.getElementById('settings-line-limit')?.value) || 100000;
-
-    await updateVodafoneLineSettings(lineNum, { phone, monthlyLimit });
-    closeLineSettingsModal();
-    showToast(`تم تحديث إعدادات الخط ${lineNum} بنجاح`, 'check_circle');
-  };
-
-  window.openEditVodafoneTxModal = (txId) => {
-    const tx = Store.vodafoneTransactions.find(t => t.id === txId);
-    if (!tx) return;
-
-    AppState.editingVodafoneTxId = txId;
-    setElemValue('edit-voda-tx-id', tx.id);
-    setElemText('edit-voda-line-title', `خط فودافون كاش: رقم ${tx.lineNum}`);
-    
-    const typeBadge = document.getElementById('edit-voda-type-badge');
-    if (typeBadge) {
-      typeBadge.innerText = tx.type === 'deposit' ? 'إيداع / استلام (+)' : 'تحويل / سحب (-)';
-      typeBadge.className = `px-2.5 py-0.5 rounded-full font-numeric-table text-xs font-bold ${
-        tx.type === 'deposit' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-      }`;
-    }
-
-    setElemValue('edit-voda-amount', tx.amount);
-    setElemValue('edit-voda-commission', tx.commission || 0);
-    setElemValue('edit-voda-phone', tx.customerPhone || '');
-    setElemValue('edit-voda-notes', tx.notes || '');
-
-    const modal = document.getElementById('modal-edit-voda-tx');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-  };
-
-  window.closeEditVodafoneTxModal = () => {
-    const modal = document.getElementById('modal-edit-voda-tx');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-    AppState.editingVodafoneTxId = null;
-  };
-
-  window.saveEditedVodafoneTx = async () => {
-    const txId = AppState.editingVodafoneTxId;
-    if (!txId) return;
-
-    const amount = parseFloat(document.getElementById('edit-voda-amount')?.value) || 0;
-    const commission = parseFloat(document.getElementById('edit-voda-commission')?.value) || 0;
-    const customerPhone = document.getElementById('edit-voda-phone')?.value || '';
-    const notes = document.getElementById('edit-voda-notes')?.value || '';
-
-    if (amount <= 0) {
-      showToast("يرجى إدخال مبلغ صحيح", "warning");
-      return;
-    }
-
-    await updateVodafoneTransaction(txId, {
-      amount,
-      commission,
-      customerPhone,
-      notes
-    });
-
-    closeEditVodafoneTxModal();
-    showToast("تم تحديث المعاملة وتعديل الرصيد تلقائياً", "verified");
-  };
-}
+    showToast("تم تصفير جميع خطوط فودافون كاش بنجاح (الرصيد: 0.00 ج.م)", "refresh");
+  }
+};
 
 // ==========================================
-// VIEW 3: CHARGERS & CABLES PAGE
+// VIEW 3: CHARGERS INVENTORY & SALES
 // ==========================================
 
 function renderChargersPage() {
   const allChargers = Store.products.filter(p => p.category === 'chargers');
-  
+  const sales = getCategorySales('chargers');
+
+  // KPIs
   const totalQty = allChargers.reduce((acc, p) => acc + (p.quantity || 0), 0);
   const costVal = allChargers.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
   const retailVal = allChargers.reduce((acc, p) => acc + ((p.sellPrice || 0) * (p.quantity || 0)), 0);
-  const lowStock = allChargers.filter(p => (p.quantity || 0) <= 2).length;
+  const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
 
   setElemText('chargers-stat-qty', totalQty);
   setElemText('chargers-stat-cost', formatMoney(costVal));
   setElemText('chargers-stat-retail', formatMoney(retailVal));
   setElemText('chargers-stat-profit', `أرباح تقديرية: ${formatMoney(retailVal - costVal)} ج.م`);
-  setElemText('chargers-stat-low', lowStock);
+  setElemText('chargers-count-badge', `${allChargers.length} أصناف`);
 
-  const subcounts = {
-    complete: allChargers.filter(p => p.subcategory === 'complete').length,
-    adapter: allChargers.filter(p => p.subcategory === 'adapter').length,
-    typec: allChargers.filter(p => p.subcategory === 'typec').length,
-    microusb: allChargers.filter(p => p.subcategory === 'microusb').length,
-    pin: allChargers.filter(p => p.subcategory === 'pin').length
-  };
-  setElemText('badge-chargers-complete', subcounts.complete);
-  setElemText('badge-chargers-adapter', subcounts.adapter);
-  setElemText('badge-chargers-typec', subcounts.typec);
-  setElemText('badge-chargers-microusb', subcounts.microusb);
-  setElemText('badge-chargers-pin', subcounts.pin);
-  setElemText('badge-chargers-all', allChargers.length);
+  // Sales KPIs
+  setElemText('chargers-sales-total-val', formatMoney(totalSalesVal));
+  setElemText('chargers-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('chargers-sales-count-badge', `${sales.length} مبيعات`);
 
+  // Subcategory filter & search
   const activeTab = AppState.activeChargerTab;
-  const searchInput = (document.getElementById('chargers-search-input')?.value || '').trim().toLowerCase();
-  
-  let filtered = allChargers;
-  if (activeTab !== 'all') {
-    filtered = filtered.filter(p => p.subcategory === activeTab);
-  }
-  if (searchInput) {
-    filtered = filtered.filter(p => 
-      (p.name || '').toLowerCase().includes(searchInput) || 
-      (p.barcode || '').toLowerCase().includes(searchInput)
-    );
-  }
+  const search = (document.getElementById('chargers-search-input')?.value || '').trim().toLowerCase();
 
+  let filtered = allChargers;
+  if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
+  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+
+  // Render Inventory Table
   const tbody = document.getElementById('chargers-table-body');
   if (tbody) {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" class="py-16 text-center">
-            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-              <span class="material-symbols-outlined text-[40px] opacity-30">cable</span>
-              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لا توجد شواحن أو وصلات مسجلة</span>
-              <span class="font-body-sm text-body-sm text-on-surface-variant">امسح الباركود أو اضغط F1 لإدخال شاحن أو وصلة جديدة.</span>
-              <button onclick="window.openAddProductModal('chargers', '${activeTab !== 'all' ? activeTab : 'complete'}')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl font-headline-sm text-headline-sm shadow-md hover:bg-secondary/90 transition-all cursor-pointer">
-                + إضافة صنف جديد
-              </button>
+          <td colspan="8" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+              <span class="material-symbols-outlined text-[40px] opacity-30">power</span>
+              <span class="font-headline-sm font-bold text-on-surface">لا توجد شواحن مسجلة</span>
+              <button onclick="window.openAddProductModal('chargers')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl text-xs font-bold">+ إضافة شاحن جديد</button>
             </div>
           </td>
         </tr>
       `;
     } else {
       tbody.innerHTML = filtered.map(item => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
-          <td class="py-3.5 px-4 font-numeric-table font-bold text-secondary text-base">
-            <span class="cursor-pointer hover:underline" onclick="window.addItemToCartFromBarcode('${item.barcode}')">${item.barcode || 'بدون باركود'}</span>
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
           </td>
-          <td class="py-3.5 px-4 font-headline-sm font-bold text-on-surface text-base">${item.name}</td>
-          <td class="py-3.5 px-4">
-            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant border border-outline-variant/30">
-              ${getChargerSubcategoryLabel(item.subcategory)}
-            </span>
-          </td>
-          <td class="py-3.5 px-4 font-numeric-table text-on-surface text-base">${formatMoney(item.buyPrice)} ج.م</td>
-          <td class="py-3.5 px-4 font-numeric-table font-bold text-emerald-400 text-lg">${formatMoney(item.sellPrice)} ج.م</td>
-          <td class="py-3.5 px-4">
-            <div class="flex items-center gap-2">
-              <span class="font-numeric-table font-bold text-lg ${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
-              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="زيادة +1">+</button>
-              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="إنقاص -1">-</button>
+          <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getChargerSubcategoryLabel(item.subcategory)}</span></td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
+              <span class="${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">-</button>
             </div>
           </td>
-          <td class="py-3.5 px-4 text-center">
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
+          <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
-                <span class="material-symbols-outlined text-[18px]">edit</span>
-              </button>
-              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
-                <span class="material-symbols-outlined text-[18px]">delete</span>
-              </button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors" title="بيع فوري">💰 بيع</button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors" title="توريد مخزون">+ توريد</button>
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
           </td>
         </tr>
       `).join('');
     }
+  }
+
+  // Render Sales Table
+  const salesTbody = document.getElementById('chargers-sales-table-body');
+  if (salesTbody) {
+    salesTbody.innerHTML = renderSalesTableHTML(sales, 'الشواحن');
   }
 }
 
@@ -877,206 +804,201 @@ function getChargerSubcategoryLabel(sub) {
   switch (sub) {
     case 'complete': return 'شاحن كامل';
     case 'adapter': return 'رأس شاحن';
-    case 'typec': return 'وصلة شحن عريضة (Type-C)';
-    case 'microusb': return 'وصلة شحن عادية (Micro)';
-    case 'pin': return 'وصلة شحن رفيعة (Pin/iPhone)';
-    default: return 'شاحن / كابل';
+    case 'fast': return 'شاحن سريع (Fast/PD)';
+    case 'wireless': return 'شاحن لاسلكي';
+    default: return 'شاحن';
   }
 }
 
+window.setChargerTab = (tab) => {
+  AppState.activeChargerTab = tab;
+  document.querySelectorAll('[data-charger-tab]').forEach(btn => {
+    btn.className = btn.getAttribute('data-charger-tab') === tab 
+      ? 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderChargersPage();
+};
+
 // ==========================================
-// VIEW 4: MOBILE PHONES (IMEI) PAGE
+// VIEW 4: CABLES INVENTORY & SALES (الوصلات)
 // ==========================================
 
-function renderPhonesPage() {
-  const allPhones = Store.products.filter(p => p.category === 'phones');
-  const availablePhones = allPhones.filter(p => p.status === 'available');
-  const soldPhones = allPhones.filter(p => p.status === 'sold');
+function renderCablesPage() {
+  const allCables = Store.products.filter(p => p.category === 'cables');
+  const sales = getCategorySales('cables');
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const soldToday = soldPhones.filter(p => (p.soldAt || p.updatedAt || '').startsWith(todayStr));
-  const todayProfit = soldToday.reduce((acc, p) => acc + ((p.sellPrice || 0) - (p.buyPrice || 0)), 0);
-  const stockVal = availablePhones.reduce((acc, p) => acc + (p.buyPrice || 0), 0);
+  const totalQty = allCables.reduce((acc, p) => acc + (p.quantity || 0), 0);
+  const costVal = allCables.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
+  const retailVal = allCables.reduce((acc, p) => acc + ((p.sellPrice || 0) * (p.quantity || 0)), 0);
+  const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
 
-  setElemText('metric-stock-count', availablePhones.length);
-  setElemText('metric-stock-value', formatMoney(stockVal));
-  setElemText('metric-sold-today', soldToday.length);
-  setElemText('metric-profit', formatMoney(todayProfit));
+  setElemText('cables-stat-qty', totalQty);
+  setElemText('cables-stat-cost', formatMoney(costVal));
+  setElemText('cables-stat-retail', formatMoney(retailVal));
+  setElemText('cables-count-badge', `${allCables.length} أصناف`);
 
-  const activeBrand = AppState.activePhoneBrand;
-  const activeStatus = AppState.activePhoneStatus;
-  const search = (document.getElementById('phones-search-input')?.value || '').trim().toLowerCase();
+  setElemText('cables-sales-total-val', formatMoney(totalSalesVal));
+  setElemText('cables-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('cables-sales-count-badge', `${sales.length} مبيعات`);
 
-  let filtered = allPhones;
-  if (activeBrand !== 'all') {
-    filtered = filtered.filter(p => (p.brand || '').toLowerCase() === activeBrand.toLowerCase());
-  }
-  if (activeStatus !== 'all') {
-    filtered = filtered.filter(p => p.status === activeStatus);
-  }
-  if (search) {
-    filtered = filtered.filter(p => 
-      (p.imei || '').toLowerCase().includes(search) ||
-      (p.barcode || '').toLowerCase().includes(search) ||
-      (p.name || '').toLowerCase().includes(search) ||
-      (p.model || '').toLowerCase().includes(search) ||
-      (p.brand || '').toLowerCase().includes(search)
-    );
-  }
+  const activeTab = AppState.activeCablesTab;
+  const search = (document.getElementById('cables-search-input')?.value || '').trim().toLowerCase();
 
-  const tbody = document.getElementById('phones-table-body');
+  let filtered = allCables;
+  if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
+  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+
+  const tbody = document.getElementById('cables-table-body');
   if (tbody) {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" class="py-16 text-center">
-            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-              <span class="material-symbols-outlined text-[40px] opacity-30">smartphone</span>
-              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لا توجد هواتف مسجلة بالمخزن</span>
-              <span class="font-body-sm text-body-sm text-on-surface-variant">أضف هواتف جديدة مسجلة برقم السيريال أو الـ IMEI وسعر التكلفة والبيع.</span>
-              <button onclick="window.openAddProductModal('phones')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl font-headline-sm text-headline-sm shadow-md hover:bg-secondary/90 transition-all cursor-pointer">
-                + إضافة هاتف جديد (IMEI)
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    } else {
-      tbody.innerHTML = filtered.map(phone => {
-        const isAvail = phone.status === 'available';
-        return `
-          <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
-            <td class="py-3.5 px-4 font-numeric-table font-bold text-secondary text-base">
-              <span class="cursor-pointer hover:underline" onclick="window.addItemToCartFromBarcode('${phone.imei || phone.barcode}')">${phone.imei || phone.barcode || '-'}</span>
-            </td>
-            <td class="py-3.5 px-4 font-headline-sm font-bold text-on-surface text-base">
-              ${phone.brand || ''} ${phone.model || phone.name}
-            </td>
-            <td class="py-3.5 px-4 font-label-md text-on-surface-variant">
-              ${phone.storage || '-'} / ${phone.color || '-'}
-            </td>
-            <td class="py-3.5 px-4 font-numeric-table text-on-surface text-base">${formatMoney(phone.buyPrice)} ج.م</td>
-            <td class="py-3.5 px-4 font-numeric-table font-bold text-emerald-400 text-lg">${formatMoney(phone.sellPrice)} ج.م</td>
-            <td class="py-3.5 px-4">
-              <span class="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
-                isAvail ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-surface-container text-on-surface-variant border border-outline-variant/30'
-              }">
-                <span class="w-2 h-2 rounded-full ${isAvail ? 'bg-emerald-400 animate-pulse' : 'bg-outline'}"></span>
-                ${isAvail ? 'متوفر بالمحل' : 'تم البيع'}
-              </span>
-            </td>
-            <td class="py-3.5 px-4 font-label-sm text-on-surface-variant">
-              ${!isAvail && phone.customerName ? `${phone.customerName} (${phone.customerPhone || ''})` : '-'}
-            </td>
-            <td class="py-3.5 px-4 text-center">
-              <div class="flex items-center justify-center gap-1.5">
-                ${isAvail ? `
-                  <button onclick="window.addItemToCartFromBarcode('${phone.imei || phone.barcode}')" class="p-1.5 rounded-lg bg-secondary/15 hover:bg-secondary text-secondary hover:text-white transition-colors" title="إضافة للفاتورة (بيع)">
-                    <span class="material-symbols-outlined text-[18px]">shopping_cart</span>
-                  </button>
-                ` : ''}
-                <button onclick="window.openEditProductModal('${phone.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
-                  <span class="material-symbols-outlined text-[18px]">edit</span>
-                </button>
-                <button onclick="window.confirmDeleteProduct('${phone.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
-                  <span class="material-symbols-outlined text-[18px]">delete</span>
-                </button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-  }
-}
-
-// ==========================================
-// VIEW 5: HEADPHONES & AUDIO PAGE
-// ==========================================
-
-function renderHeadphonesPage() {
-  const allHeadphones = Store.products.filter(p => p.category === 'headphones');
-  const totalCount = allHeadphones.reduce((acc, p) => acc + (p.quantity || 0), 0);
-  const totalCost = allHeadphones.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
-  
-  setElemText('headphones-total-count', totalCount);
-  setElemText('headphones-total-cost', formatMoney(totalCost));
-
-  const subcounts = {
-    silicone: allHeadphones.filter(p => p.subcategory === 'silicone').length,
-    classic: allHeadphones.filter(p => p.subcategory === 'classic').length,
-    bluetooth: allHeadphones.filter(p => p.subcategory === 'bluetooth').length
-  };
-  setElemText('badge-headphones-silicone', subcounts.silicone);
-  setElemText('badge-headphones-classic', subcounts.classic);
-  setElemText('badge-headphones-bluetooth', subcounts.bluetooth);
-  setElemText('badge-headphones-all', allHeadphones.length);
-
-  const activeTab = AppState.activeHeadphoneTab;
-  const search = (document.getElementById('headphones-search-input')?.value || '').trim().toLowerCase();
-
-  let filtered = allHeadphones;
-  if (activeTab !== 'all') {
-    filtered = filtered.filter(p => p.subcategory === activeTab);
-  }
-  if (search) {
-    filtered = filtered.filter(p => 
-      (p.name || '').toLowerCase().includes(search) || 
-      (p.barcode || '').toLowerCase().includes(search)
-    );
-  }
-
-  const tbody = document.getElementById('headphones-table-body');
-  if (tbody) {
-    if (filtered.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" class="py-16 text-center">
-            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-              <span class="material-symbols-outlined text-[40px] opacity-30">headphones</span>
-              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لا توجد سماعات مسجلة في هذا القسم</span>
-              <span class="font-body-sm text-body-sm text-on-surface-variant">قم بمسح الباركود أو الضغط على زر الإضافة لتسجيل سماعات جديدة.</span>
-              <button onclick="window.openAddProductModal('headphones', '${activeTab !== 'all' ? activeTab : 'silicone'}')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl font-headline-sm text-headline-sm shadow-md hover:bg-secondary/90 transition-all cursor-pointer">
-                + إضافة سماعة جديدة
-              </button>
+          <td colspan="8" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+              <span class="material-symbols-outlined text-[40px] opacity-30">cable</span>
+              <span class="font-headline-sm font-bold text-on-surface">لا توجد وصلات مسجلة</span>
+              <button onclick="window.openAddProductModal('cables')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl text-xs font-bold">+ إضافة وصلة جديدة</button>
             </div>
           </td>
         </tr>
       `;
     } else {
       tbody.innerHTML = filtered.map(item => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
-          <td class="py-3.5 px-4 font-numeric-table font-bold text-secondary text-base">
-            <span class="cursor-pointer hover:underline" onclick="window.addItemToCartFromBarcode('${item.barcode}')">${item.barcode || 'بدون باركود'}</span>
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
           </td>
-          <td class="py-3.5 px-4 font-headline-sm font-bold text-on-surface text-base">${item.name}</td>
-          <td class="py-3.5 px-4">
-            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant border border-outline-variant/30">
-              ${getHeadphoneSubcategoryLabel(item.subcategory)}
-            </span>
-          </td>
-          <td class="py-3.5 px-4 font-numeric-table text-on-surface text-base">${formatMoney(item.buyPrice)} ج.م</td>
-          <td class="py-3.5 px-4 font-numeric-table font-bold text-emerald-400 text-lg">${formatMoney(item.sellPrice)} ج.م</td>
-          <td class="py-3.5 px-4">
-            <div class="flex items-center gap-2">
-              <span class="font-numeric-table font-bold text-lg ${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
-              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="زيادة +1">+</button>
-              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="إنقاص -1">-</button>
+          <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getCableSubcategoryLabel(item.subcategory)}</span></td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
+              <span class="${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">-</button>
             </div>
           </td>
-          <td class="py-3.5 px-4 text-center">
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
+          <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
-                <span class="material-symbols-outlined text-[18px]">edit</span>
-              </button>
-              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
-                <span class="material-symbols-outlined text-[18px]">delete</span>
-              </button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
           </td>
         </tr>
       `).join('');
     }
+  }
+
+  const salesTbody = document.getElementById('cables-sales-table-body');
+  if (salesTbody) {
+    salesTbody.innerHTML = renderSalesTableHTML(sales, 'الوصلات');
+  }
+}
+
+function getCableSubcategoryLabel(sub) {
+  switch (sub) {
+    case 'typec': return 'Type-C عريضة';
+    case 'microusb': return 'Micro عادية';
+    case 'pin': return 'Lightning / Pin آيفون';
+    case 'aux': return 'وصلة صوت AUX';
+    case 'otg': return 'وصلة OTG';
+    default: return 'كابل / وصلة';
+  }
+}
+
+window.setCablesTab = (tab) => {
+  AppState.activeCablesTab = tab;
+  document.querySelectorAll('[data-cables-tab]').forEach(btn => {
+    btn.className = btn.getAttribute('data-cables-tab') === tab 
+      ? 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderCablesPage();
+};
+
+// ==========================================
+// VIEW 5: HEADPHONES INVENTORY & SALES (السماعات)
+// ==========================================
+
+function renderHeadphonesPage() {
+  const allHeadphones = Store.products.filter(p => p.category === 'headphones');
+  const sales = getCategorySales('headphones');
+
+  const totalCount = allHeadphones.reduce((acc, p) => acc + (p.quantity || 0), 0);
+  const totalCost = allHeadphones.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
+  const totalRetail = allHeadphones.reduce((acc, p) => acc + ((p.sellPrice || 0) * (p.quantity || 0)), 0);
+  const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
+
+  setElemText('headphones-total-count', totalCount);
+  setElemText('headphones-total-cost', formatMoney(totalCost));
+  setElemText('headphones-count-badge', `${allHeadphones.length} أصناف`);
+
+  setElemText('headphones-sales-total-val', formatMoney(totalSalesVal));
+  setElemText('headphones-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('headphones-sales-count-badge', `${sales.length} مبيعات`);
+
+  const activeTab = AppState.activeHeadphoneTab;
+  const search = (document.getElementById('headphones-search-input')?.value || '').trim().toLowerCase();
+
+  let filtered = allHeadphones;
+  if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
+  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+
+  const tbody = document.getElementById('headphones-table-body');
+  if (tbody) {
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+              <span class="material-symbols-outlined text-[40px] opacity-30">headphones</span>
+              <span class="font-headline-sm font-bold text-on-surface">لا توجد سماعات مسجلة</span>
+              <button onclick="window.openAddProductModal('headphones')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl text-xs font-bold">+ إضافة سماعة جديدة</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = filtered.map(item => `
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+          </td>
+          <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getHeadphoneSubcategoryLabel(item.subcategory)}</span></td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
+              <span class="${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">-</button>
+            </div>
+          </td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
+          <td class="py-3 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  const salesTbody = document.getElementById('headphones-sales-table-body');
+  if (salesTbody) {
+    salesTbody.innerHTML = renderSalesTableHTML(sales, 'السماعات');
   }
 }
 
@@ -1089,149 +1011,200 @@ function getHeadphoneSubcategoryLabel(sub) {
   }
 }
 
+window.setHeadphoneTab = (tab) => {
+  AppState.activeHeadphoneTab = tab;
+  document.querySelectorAll('[data-headphone-tab]').forEach(btn => {
+    btn.className = btn.getAttribute('data-headphone-tab') === tab 
+      ? 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderHeadphonesPage();
+};
+
 // ==========================================
-// VIEW 6: SPEAKERS & SOUND PAGE
+// VIEW 6: SPEAKERS INVENTORY & SALES (الصبات)
 // ==========================================
 
 function renderSpeakersPage() {
   const allSpeakers = Store.products.filter(p => p.category === 'speakers');
+  const sales = getCategorySales('speakers');
+
   const totalCount = allSpeakers.reduce((acc, p) => acc + (p.quantity || 0), 0);
   const totalCost = allSpeakers.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
+  const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
 
   setElemText('kpiTotalCount', totalCount);
   setElemText('kpiTotalCost', formatMoney(totalCost));
+  setElemText('speakers-count-badge', `${allSpeakers.length} صبات`);
 
-  const subcounts = {
-    small: allSpeakers.filter(p => p.subcategory === 'small').length,
-    medium: allSpeakers.filter(p => p.subcategory === 'medium').length,
-    large: allSpeakers.filter(p => p.subcategory === 'large').length
-  };
-  setElemText('badgeSmallCount', subcounts.small);
-  setElemText('badgeMediumCount', subcounts.medium);
-  setElemText('badgeLargeCount', subcounts.large);
-  setElemText('badgeAllSpeakersCount', allSpeakers.length);
+  setElemText('speakers-sales-total-val', formatMoney(totalSalesVal));
+  setElemText('speakers-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('speakers-sales-count-badge', `${sales.length} مبيعات`);
 
   const activeTab = AppState.activeSpeakerTab;
-  const search = (document.getElementById('barcodeScannerInput')?.value || '').trim().toLowerCase();
+  const search = (document.getElementById('speakers-search-input')?.value || '').trim().toLowerCase();
 
   let filtered = allSpeakers;
-  if (activeTab !== 'all') {
-    filtered = filtered.filter(p => p.subcategory === activeTab);
-  }
-  if (search) {
-    filtered = filtered.filter(p => 
-      (p.name || '').toLowerCase().includes(search) || 
-      (p.barcode || '').toLowerCase().includes(search)
-    );
-  }
+  if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
+  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
 
   const tbody = document.getElementById('speakersTableBody');
   if (tbody) {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" class="py-16 text-center">
-            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+          <td colspan="8" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
               <span class="material-symbols-outlined text-[40px] opacity-30">speaker</span>
-              <span class="font-headline-sm text-headline-sm font-bold text-on-surface">لا توجد صبات مسجلة في هذا الحجم</span>
-              <span class="font-body-sm text-body-sm text-on-surface-variant">امسح باركود الصب أو اضغط F1 لإضافة صب جديد للمخزن.</span>
-              <button onclick="window.openAddProductModal('speakers', '${activeTab !== 'all' ? activeTab : 'small'}')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl font-headline-sm text-headline-sm shadow-md hover:bg-secondary/90 transition-all cursor-pointer">
-                + إضافة صب جديد
-              </button>
+              <span class="font-headline-sm font-bold text-on-surface">لا توجد صبات مسجلة</span>
+              <button onclick="window.openAddProductModal('speakers')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl text-xs font-bold">+ إضافة صب جديد</button>
             </div>
           </td>
         </tr>
       `;
     } else {
       tbody.innerHTML = filtered.map(item => `
-        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors">
-          <td class="py-3.5 px-4 font-numeric-table font-bold text-secondary text-base">
-            <span class="cursor-pointer hover:underline" onclick="window.addItemToCartFromBarcode('${item.barcode}')">${item.barcode || 'بدون باركود'}</span>
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
           </td>
-          <td class="py-3.5 px-4 font-headline-sm font-bold text-on-surface text-base">${item.name}</td>
-          <td class="py-3.5 px-4">
-            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant border border-outline-variant/30">
-              ${getSpeakerSubcategoryLabel(item.subcategory)}
-            </span>
-          </td>
-          <td class="py-3.5 px-4 font-numeric-table text-on-surface text-base">${formatMoney(item.buyPrice)} ج.م</td>
-          <td class="py-3.5 px-4 font-numeric-table font-bold text-emerald-400 text-lg">${formatMoney(item.sellPrice)} ج.م</td>
-          <td class="py-3.5 px-4">
-            <div class="flex items-center gap-2">
-              <span class="font-numeric-table font-bold text-lg ${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
-              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="زيادة +1">+</button>
-              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center font-bold text-on-surface border border-outline-variant/30" title="إنقاص -1">-</button>
+          <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.subcategory || 'صب'}</span></td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
+              <span class="${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">-</button>
             </div>
           </td>
-          <td class="py-3.5 px-4 text-center">
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
+          <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-secondary transition-colors" title="تعديل">
-                <span class="material-symbols-outlined text-[18px]">edit</span>
-              </button>
-              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400 transition-colors" title="حذف">
-                <span class="material-symbols-outlined text-[18px]">delete</span>
-              </button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
           </td>
         </tr>
       `).join('');
     }
   }
-}
 
-function getSpeakerSubcategoryLabel(sub) {
-  switch (sub) {
-    case 'small': return 'صب صغير';
-    case 'medium': return 'صب وسط';
-    case 'large': return 'صب كبير';
-    default: return 'صب';
+  const salesTbody = document.getElementById('speakers-sales-table-body');
+  if (salesTbody) {
+    salesTbody.innerHTML = renderSalesTableHTML(sales, 'الصبات');
   }
 }
-
-window.setChargerTab = (tab) => {
-  AppState.activeChargerTab = tab;
-  document.querySelectorAll('.charger-tab-btn').forEach(b => {
-    b.classList.remove('bg-secondary', 'text-white');
-    b.classList.add('bg-surface-container-low', 'text-on-surface');
-  });
-  const activeBtn = document.querySelector(`.charger-tab-btn[data-charger-cat="${tab}"]`);
-  if (activeBtn) {
-    activeBtn.classList.remove('bg-surface-container-low', 'text-on-surface');
-    activeBtn.classList.add('bg-secondary', 'text-white');
-  }
-  renderChargersPage();
-};
-
-window.setHeadphoneTab = (tab) => {
-  AppState.activeHeadphoneTab = tab;
-  document.querySelectorAll('.headphone-tab-btn').forEach(b => {
-    b.classList.remove('bg-secondary', 'text-white');
-    b.classList.add('bg-surface-container-low', 'text-on-surface');
-  });
-  const activeBtn = document.querySelector(`.headphone-tab-btn[data-headphone-cat="${tab}"]`);
-  if (activeBtn) {
-    activeBtn.classList.remove('bg-surface-container-low', 'text-on-surface');
-    activeBtn.classList.add('bg-secondary', 'text-white');
-  }
-  renderHeadphonesPage();
-};
 
 window.setSpeakerTab = (tab) => {
   AppState.activeSpeakerTab = tab;
-  document.querySelectorAll('.speaker-tab-btn').forEach(b => {
-    b.classList.remove('bg-secondary', 'text-white');
-    b.classList.add('bg-surface-container-low', 'text-on-surface');
+  document.querySelectorAll('[data-speaker-tab]').forEach(btn => {
+    btn.className = btn.getAttribute('data-speaker-tab') === tab 
+      ? 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
   });
-  const activeBtn = document.querySelector(`.speaker-tab-btn[data-speaker-cat="${tab}"]`);
-  if (activeBtn) {
-    activeBtn.classList.remove('bg-surface-container-low', 'text-on-surface');
-    activeBtn.classList.add('bg-secondary', 'text-white');
-  }
   renderSpeakersPage();
 };
 
+// ==========================================
+// VIEW 7: PHONES INVENTORY & SALES (الهواتف الذكية)
+// ==========================================
+
+function renderPhonesPage() {
+  const allPhones = Store.products.filter(p => p.category === 'phones');
+  const sales = getCategorySales('phones');
+
+  const availablePhones = allPhones.filter(p => p.status === 'available');
+  const soldPhones = allPhones.filter(p => p.status === 'sold');
+  const totalCost = availablePhones.reduce((acc, p) => acc + (p.buyPrice || 0), 0);
+  const totalRetail = availablePhones.reduce((acc, p) => acc + (p.sellPrice || 0), 0);
+  const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
+
+  setElemText('phones-count-badge', `${availablePhones.length} متاح بالمحل`);
+  setElemText('phones-stat-cost', formatMoney(totalCost));
+  setElemText('phones-stat-retail', formatMoney(totalRetail));
+
+  setElemText('phones-sales-total-val', formatMoney(totalSalesVal));
+  setElemText('phones-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('phones-sales-count-badge', `${sales.length} هواتف مباعة`);
+
+  const activeBrand = AppState.activePhoneBrand;
+  const activeStatus = AppState.activePhoneStatus;
+  const search = (document.getElementById('phones-search-input')?.value || '').trim().toLowerCase();
+
+  let filtered = allPhones;
+  if (activeBrand !== 'all') filtered = filtered.filter(p => (p.brand || '').toLowerCase() === activeBrand.toLowerCase());
+  if (activeStatus !== 'all') filtered = filtered.filter(p => p.status === activeStatus);
+  if (search) {
+    filtered = filtered.filter(p => 
+      (p.name || '').toLowerCase().includes(search) || 
+      (p.imei || '').toLowerCase().includes(search) ||
+      (p.barcode || '').toLowerCase().includes(search)
+    );
+  }
+
+  const tbody = document.getElementById('phones-table-body');
+  if (tbody) {
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+              <span class="material-symbols-outlined text-[40px] opacity-30">smartphone</span>
+              <span class="font-headline-sm font-bold text-on-surface">لا توجد هواتف مسجلة</span>
+              <button onclick="window.openAddProductModal('phones')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl text-xs font-bold">+ إضافة هاتف جديد (IMEI)</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = filtered.map(item => `
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.imei || item.barcode}')">${item.imei || item.barcode || 'بدون كود'}</span>
+          </td>
+          <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name} (${item.brand || ''})</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.storage || ''} ${item.color ? '- ' + item.color : ''}</span></td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${item.status === 'available' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'}">
+              ${item.status === 'available' ? 'متوفر بالمحل' : 'تم البيع'}
+            </span>
+          </td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.createdAt)}</td>
+          <td class="py-3 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              ${item.status === 'available' ? `
+                <button onclick="window.openSmartCodeActionModal('${item.imei || item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
+              ` : ''}
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  const salesTbody = document.getElementById('phones-sales-table-body');
+  if (salesTbody) {
+    salesTbody.innerHTML = renderSalesTableHTML(sales, 'الهواتف');
+  }
+}
+
 window.setPhoneBrandFilter = (brand) => {
   AppState.activePhoneBrand = brand;
+  document.querySelectorAll('[data-phone-brand]').forEach(btn => {
+    btn.className = btn.getAttribute('data-phone-brand') === brand 
+      ? 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
   renderPhonesPage();
 };
 
@@ -1240,157 +1213,465 @@ window.setPhoneStatusFilter = (status) => {
   renderPhonesPage();
 };
 
-window.quickAdjustStock = async (id, delta) => {
-  await adjustProductStock(id, delta);
-  showToast(`تم تحديث رصيد الصنف (${delta > 0 ? '+1' : '-1'})`, 'inventory_2');
-};
-
 // ==========================================
-// BARCODE SCANNER GLOBAL ENGINE
+// VIEW 8: COVERS INVENTORY & SALES (صفحة الجرابات الجديدة)
 // ==========================================
 
+function renderCoversPage() {
+  const allCovers = Store.products.filter(p => p.category === 'covers');
+  const sales = getCategorySales('covers');
 
-// =========================================================================
-// HARDWARE GUN & CAMERA BARCODE SCANNER SERVICE
-// =========================================================================
+  const totalQty = allCovers.reduce((acc, p) => acc + (p.quantity || 0), 0);
+  const costVal = allCovers.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
+  const retailVal = allCovers.reduce((acc, p) => acc + ((p.sellPrice || 0) * (p.quantity || 0)), 0);
+  const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
 
-let html5QrScannerInstance = null;
-let currentTargetField = null;
-let isTorchEnabled = false;
-let scannerSoundEnabled = true;
-let currentQuickIntakeProduct = null;
+  setElemText('covers-stat-qty', totalQty);
+  setElemText('covers-stat-cost', formatMoney(costVal));
+  setElemText('covers-stat-retail', formatMoney(retailVal));
+  setElemText('covers-count-badge', `${allCovers.length} جرابات`);
 
-function playScanBeep(isSuccess = true) {
-  if (!scannerSoundEnabled) return;
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    if (isSuccess) {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1400, ctx.currentTime);
-      osc.frequency.setValueAtTime(1900, ctx.currentTime + 0.07);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.16);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.16);
+  setElemText('covers-sales-total-val', formatMoney(totalSalesVal));
+  setElemText('covers-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('covers-sales-count-badge', `${sales.length} مبيعات`);
+
+  const activeTab = AppState.activeCoversTab;
+  const search = (document.getElementById('covers-search-input')?.value || '').trim().toLowerCase();
+
+  let filtered = allCovers;
+  if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
+  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+
+  const tbody = document.getElementById('covers-table-body');
+  if (tbody) {
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+              <span class="material-symbols-outlined text-[40px] opacity-30">shield</span>
+              <span class="font-headline-sm font-bold text-on-surface">لا توجد جرابات مسجلة بالمخزن</span>
+              <p class="text-xs">امسح الباركود أو اكتب الكود يدوي لإدخال جراب جديد في هذا القسم.</p>
+              <button onclick="window.openAddProductModal('covers')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl text-xs font-bold">+ إضافة جراب جديد</button>
+            </div>
+          </td>
+        </tr>
+      `;
     } else {
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(320, ctx.currentTime);
-      gain.gain.setValueAtTime(0.4, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.25);
-    }
-  } catch (e) {}
-}
-
-window.toggleScannerSound = function() {
-  scannerSoundEnabled = !scannerSoundEnabled;
-  const btn = document.getElementById('btn-camera-sound');
-  if (btn) {
-    if (scannerSoundEnabled) {
-      btn.className = "p-2 rounded-lg bg-surface-container text-emerald-400 hover:text-emerald-300 border border-outline-variant/30 text-xs flex items-center gap-1";
-    } else {
-      btn.className = "p-2 rounded-lg bg-surface-container text-slate-500 hover:text-slate-400 border border-outline-variant/30 text-xs flex items-center gap-1";
+      tbody.innerHTML = filtered.map(item => `
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+          </td>
+          <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getCoverSubcategoryLabel(item.subcategory)}</span></td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
+              <span class="${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">-</button>
+            </div>
+          </td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
+          <td class="py-3 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
     }
   }
-  showToast(scannerSoundEnabled ? 'تم تفعيل صوت المسح 🔔' : 'تم كتم صوت المسح 🔕', 'volume_up');
+
+  const salesTbody = document.getElementById('covers-sales-table-body');
+  if (salesTbody) {
+    salesTbody.innerHTML = renderSalesTableHTML(sales, 'الجرابات');
+  }
+}
+
+function getCoverSubcategoryLabel(sub) {
+  switch (sub) {
+    case 'clear': return 'جراب شفاف';
+    case 'silicone': return 'جراب سيليكون';
+    case 'armor': return 'جراب حماية ضد الصدمات';
+    case 'leather': return 'جراب جلد فاخر';
+    case 'magsafe': return 'جراب ماج سيف (MagSafe)';
+    case 'wallet': return 'جراب محفظة';
+    default: return 'جراب هاتف';
+  }
+}
+
+window.setCoversTab = (tab) => {
+  AppState.activeCoversTab = tab;
+  document.querySelectorAll('[data-covers-tab]').forEach(btn => {
+    btn.className = btn.getAttribute('data-covers-tab') === tab 
+      ? 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderCoversPage();
 };
 
+// ==========================================
+// VIEW 9: ACCESSORIES INVENTORY & SALES (الإكسسوارات)
+// ==========================================
+
+function renderAccessoriesPage() {
+  const allAcc = Store.products.filter(p => p.category === 'accessories');
+  const sales = getCategorySales('accessories');
+
+  const totalQty = allAcc.reduce((acc, p) => acc + (p.quantity || 0), 0);
+  const costVal = allAcc.reduce((acc, p) => acc + ((p.buyPrice || 0) * (p.quantity || 0)), 0);
+  const retailVal = allAcc.reduce((acc, p) => acc + ((p.sellPrice || 0) * (p.quantity || 0)), 0);
+  const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
+
+  setElemText('accessories-stat-qty', totalQty);
+  setElemText('accessories-stat-cost', formatMoney(costVal));
+  setElemText('accessories-stat-retail', formatMoney(retailVal));
+  setElemText('accessories-count-badge', `${allAcc.length} إكسسوارات`);
+
+  setElemText('accessories-sales-total-val', formatMoney(totalSalesVal));
+  setElemText('accessories-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('accessories-sales-count-badge', `${sales.length} مبيعات`);
+
+  const activeTab = AppState.activeAccessoriesTab;
+  const search = (document.getElementById('accessories-search-input')?.value || '').trim().toLowerCase();
+
+  let filtered = allAcc;
+  if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
+  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+
+  const tbody = document.getElementById('accessories-table-body');
+  if (tbody) {
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+              <span class="material-symbols-outlined text-[40px] opacity-30">devices_other</span>
+              <span class="font-headline-sm font-bold text-on-surface">لا توجد إكسسوارات مسجلة</span>
+              <button onclick="window.openAddProductModal('accessories')" class="mt-2 bg-secondary text-white px-5 py-2 rounded-xl text-xs font-bold">+ إضافة إكسسوار جديد</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = filtered.map(item => `
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+          </td>
+          <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.subcategory || 'إكسسوار'}</span></td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
+              <span class="${item.quantity <= 2 ? 'text-rose-400' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">-</button>
+            </div>
+          </td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
+          <td class="py-3 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  const salesTbody = document.getElementById('accessories-sales-table-body');
+  if (salesTbody) {
+    salesTbody.innerHTML = renderSalesTableHTML(sales, 'الإكسسوارات');
+  }
+}
+
+window.setAccessoriesTab = (tab) => {
+  AppState.activeAccessoriesTab = tab;
+  document.querySelectorAll('[data-accessories-tab]').forEach(btn => {
+    btn.className = btn.getAttribute('data-accessories-tab') === tab 
+      ? 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderAccessoriesPage();
+};
+
+// =========================================================================
+// SMART QUICK CODE SYSTEM ("اكتب الكود يطلب مني بيع أو تسجيل")
+// =========================================================================
+
+function setupSmartCodeEvents() {
+  const codeInput = document.getElementById('quickCodeManualInput');
+  if (codeInput) {
+    codeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        window.triggerManualCodeSearch();
+      }
+    });
+  }
+}
+
+window.triggerManualCodeSearch = function() {
+  const codeInput = document.getElementById('quickCodeManualInput');
+  if (!codeInput) return;
+  const val = codeInput.value.trim();
+  if (!val) {
+    showToast("يرجى كتابة رقم الكود أو الباركود أولاً", "warning");
+    return;
+  }
+  handleScannedBarcode(val);
+  codeInput.value = '';
+};
+
+window.openSmartCodeActionModal = function(code, defaultAction = 'choose') {
+  if (!code) return;
+  const cleanCode = code.trim();
+
+  // Find product by barcode, code, or IMEI
+  const prod = Store.products.find(p => 
+    (p.barcode && p.barcode.trim().toLowerCase() === cleanCode.toLowerCase()) ||
+    (p.imei && p.imei.trim().toLowerCase() === cleanCode.toLowerCase())
+  );
+
+  if (!prod) {
+    playScanBeep(false);
+    showToast(`الكود [${cleanCode}] غير مسجل بعد! جاري فتح نموذج تسجيل صنف جديد...`, 'warning');
+    window.openAddProductModal(getDefaultCategoryForCurrentView(), null, cleanCode);
+    return;
+  }
+
+  AppState.currentSmartProduct = prod;
+
+  // Populate Modal Fields
+  setElemText('smart-modal-code-badge', `كود: ${prod.barcode || prod.imei || cleanCode}`);
+  setElemText('smart-modal-category-badge', getCategoryArabicName(prod.category));
+  setElemText('smart-modal-prod-name', prod.name);
+  setElemText('smart-modal-stock', `${prod.quantity || 0} قطع بالمخزن`);
+  setElemText('smart-modal-sell-price', `${formatMoney(prod.sellPrice)} ج.م`);
+  setElemText('smart-modal-buy-price', `${formatMoney(prod.buyPrice)} ج.م`);
+  setElemText('smart-modal-last-date', formatDateArabic(prod.lastRestockedAt || prod.createdAt));
+
+  // Initialize sale inputs
+  setElemValue('smart-sale-qty', '1');
+  setElemValue('smart-sale-price', prod.sellPrice || 0);
+  setElemValue('smart-sale-customer', 'عميل نقدي');
+  setElemValue('smart-sale-phone', '');
+
+  // Initialize restock inputs
+  setElemValue('smart-restock-qty', '1');
+  setElemValue('smart-restock-buy-price', prod.buyPrice || 0);
+  setElemValue('smart-restock-sell-price', prod.sellPrice || 0);
+
+  const modal = document.getElementById('modal-smart-code-action');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  // Switch to preferred action tab
+  if (defaultAction === 'sale') {
+    window.setSmartModalTab('sale');
+  } else if (defaultAction === 'restock') {
+    window.setSmartModalTab('restock');
+  } else {
+    window.setSmartModalTab('choose');
+  }
+};
+
+window.closeSmartCodeActionModal = function() {
+  AppState.currentSmartProduct = null;
+  const modal = document.getElementById('modal-smart-code-action');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.setSmartModalTab = function(tab) {
+  const chooseSec = document.getElementById('smart-action-choose-section');
+  const saleSec = document.getElementById('smart-action-sale-section');
+  const restockSec = document.getElementById('smart-action-restock-section');
+
+  if (tab === 'choose') {
+    chooseSec?.classList.remove('hidden');
+    saleSec?.classList.add('hidden');
+    restockSec?.classList.add('hidden');
+  } else if (tab === 'sale') {
+    chooseSec?.classList.add('hidden');
+    saleSec?.classList.remove('hidden');
+    restockSec?.classList.add('hidden');
+    setTimeout(() => document.getElementById('smart-sale-qty')?.focus(), 100);
+  } else if (tab === 'restock') {
+    chooseSec?.classList.add('hidden');
+    saleSec?.classList.add('hidden');
+    restockSec?.classList.remove('hidden');
+    setTimeout(() => document.getElementById('smart-restock-qty')?.focus(), 100);
+  }
+};
+
+// Confirm Direct Sale from Smart Code Modal
+window.confirmSmartCodeSale = async function() {
+  const prod = AppState.currentSmartProduct;
+  if (!prod) return;
+
+  const qty = parseInt(document.getElementById('smart-sale-qty')?.value, 10) || 1;
+  const sellPrice = parseFloat(document.getElementById('smart-sale-price')?.value) || prod.sellPrice || 0;
+  const customerName = (document.getElementById('smart-sale-customer')?.value || '').trim() || 'عميل نقدي';
+  const customerPhone = (document.getElementById('smart-sale-phone')?.value || '').trim();
+
+  if (prod.quantity < qty) {
+    if (!confirm(`تنبيه: الكمية المتوفرة بالمخزن (${prod.quantity}) أقل من الكمية المطلوبة (${qty}). هل تريد إتمام البيع بالسالب؟`)) {
+      return;
+    }
+  }
+
+  try {
+    await recordDirectCategorySale({
+      productId: prod.id,
+      barcode: prod.barcode || prod.imei,
+      name: prod.name,
+      category: prod.category,
+      quantity: qty,
+      sellPrice,
+      buyPrice: prod.buyPrice || 0,
+      customerName,
+      customerPhone,
+      saleDate: new Date().toISOString()
+    });
+
+    closeSmartCodeActionModal();
+    playScanBeep(true);
+    showToast(`✅ تم بيع [${prod.name}] ونزل فوراً في صفحة مبيعات ${getCategoryArabicName(prod.category)}!`, 'check_circle');
+
+    // Switch to category sales page
+    navigateTo(getCategoryViewPath(prod.category));
+    window.switchCategoryTab(prod.category, 'sales');
+  } catch (e) {
+    console.error(e);
+    showToast('حدث خطأ أثناء تسجيل عملية البيع', 'error');
+  }
+};
+
+// Confirm Restock from Smart Code Modal
+window.confirmSmartCodeRestock = async function() {
+  const prod = AppState.currentSmartProduct;
+  if (!prod) return;
+
+  const qty = parseInt(document.getElementById('smart-restock-qty')?.value, 10) || 1;
+  const newBuyPrice = document.getElementById('smart-restock-buy-price')?.value;
+  const newSellPrice = document.getElementById('smart-restock-sell-price')?.value;
+
+  try {
+    await recordDirectCategoryRestock({
+      productId: prod.id,
+      deltaQty: qty,
+      newBuyPrice,
+      newSellPrice,
+      restockDate: new Date().toISOString()
+    });
+
+    closeSmartCodeActionModal();
+    playScanBeep(true);
+    showToast(`📦 تم توريد +${qty} حبات إلى مخزون ${getCategoryArabicName(prod.category)} وتحديث التاريخ بنجاح!`, 'inventory_2');
+
+    // Switch to category inventory page
+    navigateTo(getCategoryViewPath(prod.category));
+    window.switchCategoryTab(prod.category, 'inventory');
+  } catch (e) {
+    console.error(e);
+    showToast('حدث خطأ أثناء توريد المخزون', 'error');
+  }
+};
+
+// Quick Stock Increment (+1, +5, +10)
+window.quickAdjustStock = async function(prodId, delta) {
+  const prod = Store.products.find(p => p.id === prodId);
+  if (!prod) return;
+
+  try {
+    await adjustProductStock(prodId, delta);
+    showToast(`تم تعديل مخزون [${prod.name}]: ${delta > 0 ? '+' + delta : delta} حبة`, 'check_circle');
+  } catch (e) {
+    showToast('خطأ أثناء تعديل المخزون', 'error');
+  }
+};
+
+// ==========================================
+// HARDWARE SCANNER & BARCODE DISPATCHER
+// ==========================================
+
+let barcodeBuffer = '';
+let lastKeyTime = Date.now();
+
 function setupBarcodeScannerListener() {
-  let buffer = '';
-  let lastKeyTime = Date.now();
-  const SCANNER_INTERVAL_MS = 65; // max time between characters from a hardware gun
-
   window.addEventListener('keydown', (e) => {
-    // F3 shortcut opens Camera Barcode Scanner
-    if (e.key === 'F3') {
-      e.preventDefault();
-      window.openCameraScanner();
-      return;
-    }
-
-    if (['F1', 'F2', 'F4', 'F7', 'F11', 'Escape'].includes(e.key)) {
-      buffer = '';
-      return;
-    }
-
-    const activeElem = document.activeElement;
-    const isSpecificBarcodeInput = activeElem && (
-      activeElem.id === 'barcodeScannerInput' || 
-      activeElem.id === 'pos-barcode-search' || 
-      activeElem.id === 'prod-barcode' || 
-      activeElem.id === 'prod-phone-imei' ||
-      activeElem.id === 'camera-manual-barcode-input'
-    );
+    // If active element is an input or textarea (except general barcode inputs), don't intercept typing
+    const active = document.activeElement;
+    const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+    const isSpecialBarInput = active && (active.id === 'barcodeScannerInput' || active.id === 'pos-barcode-search' || active.id === 'quickCodeManualInput');
 
     const currentTime = Date.now();
-    const timeDiff = currentTime - lastKeyTime;
-    lastKeyTime = currentTime;
 
     if (e.key === 'Enter') {
-      const trimmed = buffer.trim();
-      if (trimmed.length >= 3) {
-        buffer = '';
+      if (barcodeBuffer.length >= 2) {
         e.preventDefault();
-        handleScannedBarcode(trimmed);
+        const code = barcodeBuffer.trim();
+        barcodeBuffer = '';
+        handleScannedBarcode(code);
         return;
       }
-      buffer = '';
+      barcodeBuffer = '';
       return;
     }
 
     if (e.key.length === 1) {
-      // If typing slowly (human) outside a barcode input, reset buffer
-      if (!isSpecificBarcodeInput && timeDiff > SCANNER_INTERVAL_MS && buffer.length > 0) {
-        buffer = e.key;
-      } else {
-        buffer += e.key;
+      if (currentTime - lastKeyTime > 100) {
+        barcodeBuffer = '';
+      }
+      barcodeBuffer += e.key;
+      lastKeyTime = currentTime;
+
+      // Hardware gun auto-capture when not inside a text field
+      if (!isInput) {
+        if (barcodeBuffer.length >= 3) {
+          clearTimeout(window._barcodeScanTimeout);
+          window._barcodeScanTimeout = setTimeout(() => {
+            if (barcodeBuffer.length >= 3) {
+              const code = barcodeBuffer.trim();
+              barcodeBuffer = '';
+              handleScannedBarcode(code);
+            }
+          }, 70);
+        }
       }
     }
-  }, true);
-
-  const bindEnterToBarcode = (inputId) => {
-    const el = document.getElementById(inputId);
-    if (el) {
-      el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          const val = el.value.trim();
-          if (val) {
-            e.preventDefault();
-            handleScannedBarcode(val);
-            el.value = '';
-          }
-        }
-      });
-    }
-  };
-
-  bindEnterToBarcode('barcodeScannerInput');
-  bindEnterToBarcode('pos-barcode-search');
-  bindEnterToBarcode('chargers-search-input');
-  bindEnterToBarcode('headphones-search-input');
-  bindEnterToBarcode('phones-search-input');
-  bindEnterToBarcode('speakers-search-input');
+  });
 }
 
 export function handleScannedBarcode(barcode, targetField = null) {
   if (!barcode) return;
   const cleanCode = barcode.trim();
-  if (cleanCode.length < 2) return;
+  if (cleanCode.length < 1) return;
 
-  console.log(`🔍 Barcode received: ${cleanCode}`);
+  console.log(`🔍 Scanned / Entered Code: ${cleanCode}`);
   playScanBeep(true);
 
-  // 1. If Add Product modal is currently open or targeted
+  // 1. If Product Form is currently open
   const prodFormModal = document.getElementById('modal-product-form');
-  const isProdFormOpen = prodFormModal && !prodFormModal.classList.contains('hidden');
-  if (targetField === 'prod-barcode' || isProdFormOpen) {
+  if (targetField === 'prod-barcode' || (prodFormModal && !prodFormModal.classList.contains('hidden'))) {
     const barInput = document.getElementById('prod-barcode');
     if (barInput) {
       barInput.value = cleanCode;
@@ -1399,19 +1680,16 @@ export function handleScannedBarcode(barcode, targetField = null) {
     const cat = document.getElementById('prod-category')?.value;
     if (cat === 'phones') {
       const imeiInput = document.getElementById('prod-phone-imei');
-      if (imeiInput && !imeiInput.value) {
-        imeiInput.value = cleanCode;
-      }
+      if (imeiInput && !imeiInput.value) imeiInput.value = cleanCode;
     }
     showToast(`تم مسح الباركود بنجاح: ${cleanCode}`, 'barcode_scanner');
     document.getElementById('prod-name')?.focus();
     return;
   }
 
-  // 2. If Quick POS (F2) is currently open
+  // 2. If Quick POS is currently open
   const posModal = document.getElementById('modal-quick-pos');
-  const isPOSOpen = posModal && !posModal.classList.contains('hidden');
-  if (isPOSOpen || targetField === 'pos') {
+  if (targetField === 'pos' || (posModal && !posModal.classList.contains('hidden'))) {
     const product = Store.products.find(p => 
       (p.barcode && p.barcode.trim().toLowerCase() === cleanCode.toLowerCase()) ||
       (p.imei && p.imei.trim().toLowerCase() === cleanCode.toLowerCase())
@@ -1427,243 +1705,564 @@ export function handleScannedBarcode(barcode, targetField = null) {
       showToast(`تمت إضافة [${product.name}] إلى الفاتورة بنجاح`, 'shopping_cart');
     } else {
       playScanBeep(false);
-      showToast(`الباركود [${cleanCode}] غير مسجل بالمخزن. جاري فتح نموذج الإضافة...`, 'warning');
+      showToast(`الباركود [${cleanCode}] غير مسجل. جاري فتح نموذج الإضافة...`, 'warning');
       window.openAddProductModal(getDefaultCategoryForCurrentView(), null, cleanCode);
     }
     return;
   }
 
-  // 3. General Screen Scan: Look up product in Store
-  const foundProd = Store.products.find(p => 
-    (p.barcode && p.barcode.trim().toLowerCase() === cleanCode.toLowerCase()) ||
-    (p.imei && p.imei.trim().toLowerCase() === cleanCode.toLowerCase())
-  );
-
-  if (foundProd) {
-    // Existing product -> Open Quick Intake & Action Modal
-    window.openQuickIntakeModal(foundProd);
-  } else {
-    // New product -> Open Add Product form with pre-filled barcode
-    showToast(`باركود جديد [${cleanCode}]! جاري فتح نافذة الإضافة وتعبئة الباركود تلقائياً`, 'add_circle');
-    window.openAddProductModal(getDefaultCategoryForCurrentView(), null, cleanCode);
-  }
+  // 3. General Screen: Smart Code Action Modal (بيع أو تسجيل)
+  window.openSmartCodeActionModal(cleanCode);
 }
 
 function getDefaultCategoryForCurrentView() {
   switch (AppState.currentView) {
-    case 'chargers-cables': return 'chargers';
-    case 'phones-sales-inventory': return 'phones';
+    case 'chargers-inventory': return 'chargers';
+    case 'cables-inventory': return 'cables';
     case 'headphones-audio': return 'headphones';
     case 'speakers-sound': return 'speakers';
+    case 'phones-sales-inventory': return 'phones';
+    case 'covers-inventory': return 'covers';
+    case 'accessories-inventory': return 'accessories';
     default: return 'chargers';
   }
 }
 
-// =========================================================================
-// CAMERA BARCODE SCANNER (Html5Qrcode)
-// =========================================================================
+// ==========================================
+// SMS FORWARDER & WEBHOOK AUTO-SYNC
+// ==========================================
 
-window.openCameraScanner = async function(targetField = null) {
-  currentTargetField = targetField;
-  const modal = document.getElementById('modal-camera-barcode');
+function startSMSPoller() {
+  if (typeof window === 'undefined') return;
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/recent-sms');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sms && data.sms.length > 0) {
+          handleIncomingServerSMSList(data.sms);
+        }
+      }
+    } catch (e) {
+      // In local file:/// mode or server offline, fail silently
+    }
+  }, 3000);
+}
+
+function handleIncomingServerSMSList(smsList) {
+  const processedIds = JSON.parse(localStorage.getItem('hilmy_processed_sms_ids') || '[]');
+  let hasNew = false;
+
+  smsList.forEach(smsItem => {
+    if (!processedIds.includes(smsItem.id)) {
+      processedIds.push(smsItem.id);
+      hasNew = true;
+
+      processIncomingSMS({
+        sender: smsItem.sender,
+        body: smsItem.message,
+        simPhone: smsItem.sim,
+        slot: smsItem.sim,
+        timestamp: smsItem.timestamp
+      });
+    }
+  });
+
+  if (hasNew) {
+    localStorage.setItem('hilmy_processed_sms_ids', JSON.stringify(processedIds.slice(-200)));
+    playScanBeep(true);
+    showToast('📩 تم استقبال رسالة كاش جديدة من الهاتف وتحديث المحفظة تلقائياً!', 'mark_email_read');
+    renderVodafoneHub();
+    renderSmsSyncHub();
+  }
+}
+
+function renderSmsSyncHub() {
+  const tbody = document.getElementById('sms-sync-history-tbody');
+  if (tbody) {
+    const inbox = Store.smsInbox || [];
+    if (inbox.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" class="py-12 text-center text-on-surface-variant">
+            <span class="text-xs">لم يتم استلام أي رسائل كاش من الهاتف حتى الآن. استخدم تطبيق SMS Forwarder على هاتفك أو الصق الرسالة يدوياً.</span>
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = inbox.map(item => {
+        const p = item.parsed || {};
+        return `
+          <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+            <td class="py-2.5 px-3 font-numeric-table font-bold">${formatDateArabic(item.timestamp)}</td>
+            <td class="py-2.5 px-3 font-bold">${item.sender || 'فودافون كاش'}</td>
+            <td class="py-2.5 px-3 max-w-xs truncate" title="${item.body}">${item.body}</td>
+            <td class="py-2.5 px-3 font-numeric-table font-bold ${p.type === 'deposit' ? 'text-emerald-400' : 'text-rose-400'}">
+              ${p.type === 'deposit' ? '+' : '-'}${formatMoney(p.amount || 0)} ج.م
+            </td>
+            <td class="py-2.5 px-3 font-bold text-on-surface">
+              ${item.matchedLineNum ? 'خط ' + item.matchedLineNum : 'غير محدد'}
+            </td>
+            <td class="py-2.5 px-3 text-center">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${item.isProcessed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}">
+                ${item.isProcessed ? 'تم التسجيل بنجاح' : 'معلق'}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  // Fetch LAN IP for display
+  fetch('/api/network-info')
+    .then(r => r.json())
+    .then(data => {
+      if (data.urls && data.urls[0]) {
+        setElemText('sms-webhook-url-display', `${data.urls[0]}/api/sms-webhook`);
+        setElemText('mobile-network-url-display', data.urls[0]);
+      }
+    })
+    .catch(() => {
+      setElemText('sms-webhook-url-display', 'http://192.168.1.X:3000/api/sms-webhook');
+      setElemText('mobile-network-url-display', 'http://192.168.1.X:3000');
+    });
+}
+
+// Manual SMS Parser Modal
+window.openSMSParserModal = function() {
+  const modal = document.getElementById('modal-sms-parser');
+  if (modal) {
+    setElemValue('manual-sms-input-text', '');
+    const preview = document.getElementById('sms-parser-live-preview');
+    if (preview) preview.classList.add('hidden');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    setTimeout(() => document.getElementById('manual-sms-input-text')?.focus(), 100);
+  }
+};
+
+window.closeSMSParserModal = function() {
+  const modal = document.getElementById('modal-sms-parser');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.liveParsePastedSMS = function() {
+  const text = document.getElementById('manual-sms-input-text')?.value || '';
+  const parsed = parseCashSMS(text);
+  const preview = document.getElementById('sms-parser-live-preview');
+
+  if (!parsed || !parsed.isCashSMS) {
+    if (preview) preview.classList.add('hidden');
+    return;
+  }
+
+  if (preview) preview.classList.remove('hidden');
+
+  setElemText('sms-preview-provider', parsed.provider.toUpperCase());
+  setElemText('sms-preview-type', parsed.type === 'deposit' ? 'إيداع / استلام (+)' : 'تحويل / سحب (-)');
+  setElemText('sms-preview-amount', `${formatMoney(parsed.amount)} ج.م`);
+  setElemText('sms-preview-customer', parsed.customerPhone || 'غير مذكور');
+  setElemText('sms-preview-balance-after', parsed.balanceAfter !== null ? `${formatMoney(parsed.balanceAfter)} ج.م` : 'غير مذكور');
+  setElemText('sms-preview-txid', parsed.transactionId || 'تلقائي');
+
+  // Match line
+  let targetLine = 1;
+  if (parsed.customerPhone) {
+    const match = Store.vodafoneLines.find(l => l.phone && l.phone.includes(parsed.customerPhone));
+    if (match) targetLine = match.lineNum;
+  }
+  setElemValue('sms-target-line-select', targetLine);
+};
+
+window.confirmApplyPastedSMS = async function() {
+  const text = document.getElementById('manual-sms-input-text')?.value || '';
+  const parsed = parseCashSMS(text);
+  if (!parsed || !parsed.isCashSMS) {
+    showToast("تعذر التعرف على بيانات الرسالة", "warning");
+    return;
+  }
+
+  const lineNum = parseInt(document.getElementById('sms-target-line-select')?.value, 10) || 1;
+
+  try {
+    await recordVodafoneTransaction({
+      lineNum,
+      type: parsed.type,
+      amount: parsed.amount,
+      commission: parsed.commission || 0,
+      customerPhone: parsed.customerPhone || '',
+      notes: `رسالة نصية (${parsed.transactionId ? '#' + parsed.transactionId : 'يدوية'})`
+    });
+
+    if (parsed.balanceAfter !== null && !isNaN(parsed.balanceAfter)) {
+      const idx = Store.vodafoneLines.findIndex(l => l.lineNum === lineNum);
+      if (idx !== -1) {
+        Store.vodafoneLines[idx].balance = parsed.balanceAfter;
+        updateVodafoneLineSettings(lineNum, { balance: parsed.balanceAfter });
+      }
+    }
+
+    closeSMSParserModal();
+    playScanBeep(true);
+    showToast(`✅ تم تسجيل حركة الكاش بنجاح في خط ${lineNum} وتحديث الرصيد!`, 'check_circle');
+    renderVodafoneHub();
+  } catch (e) {
+    showToast('حدث خطأ أثناء تطبيق الرسالة', 'error');
+  }
+};
+
+// ==========================================
+// VODAFONE EVENTS & MODALS
+// ==========================================
+
+function setupVodafoneEvents() {
+  const btnDep = document.getElementById('btn-voda-deposit');
+  const btnWith = document.getElementById('btn-voda-withdraw');
+
+  btnDep?.addEventListener('click', () => window.executeVodafoneTx('deposit'));
+  btnWith?.addEventListener('click', () => window.executeVodafoneTx('withdraw'));
+}
+
+window.executeVodafoneTx = async function(type) {
+  const lineNum = AppState.activeVodafoneLine;
+  const amount = parseFloat(document.getElementById('voda-tx-amount')?.value) || 0;
+  const commission = parseFloat(document.getElementById('voda-tx-commission')?.value) || 0;
+  const customerPhone = (document.getElementById('voda-tx-customer-phone')?.value || '').trim();
+  const notes = (document.getElementById('voda-tx-notes')?.value || '').trim();
+
+  if (amount <= 0) {
+    showToast("يرجى إدخال مبلغ صحيح للعملية", "warning");
+    return;
+  }
+
+  try {
+    await recordVodafoneTransaction({
+      lineNum,
+      type,
+      amount,
+      commission,
+      customerPhone,
+      notes
+    });
+
+    setElemValue('voda-tx-amount', '');
+    setElemValue('voda-tx-commission', '');
+    setElemValue('voda-tx-customer-phone', '');
+    setElemValue('voda-tx-notes', '');
+
+    playScanBeep(true);
+    showToast(`تم تسجيل حركة ${type === 'deposit' ? 'إيداع' : 'سحب'} بنجاح على خط ${lineNum}`, 'check_circle');
+    renderVodafoneHub();
+  } catch (e) {
+    showToast("حدث خطأ أثناء تسجيل المعاملة", "error");
+  }
+};
+
+window.openLineSettingsModal = (lineNum) => {
+  const line = Store.vodafoneLines.find(l => l.lineNum === lineNum);
+  if (!line) return;
+  setElemValue('line-settings-num', line.lineNum);
+  setElemValue('line-settings-phone', line.phone || '');
+  setElemValue('line-settings-limit', line.monthlyLimit || 100000);
+  const modal = document.getElementById('modal-line-settings');
   if (modal) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
   }
-
-  if (typeof Html5Qrcode === 'undefined') {
-    showToast('جاري تحميل مكتبة الكاميرا...', 'info');
-    return;
-  }
-
-  const viewportEl = document.getElementById('camera-scanner-viewport');
-  if (!viewportEl) return;
-
-  try {
-    if (html5QrScannerInstance) {
-      try {
-        await html5QrScannerInstance.stop();
-      } catch (e) {}
-      html5QrScannerInstance = null;
-    }
-
-    html5QrScannerInstance = new Html5Qrcode("camera-scanner-viewport");
-
-    // Enumerate cameras
-    try {
-      const devices = await Html5Qrcode.getCameras();
-      const dropdown = document.getElementById('camera-select-dropdown');
-      if (dropdown && devices && devices.length > 0) {
-        dropdown.innerHTML = devices.map((d, idx) => `
-          <option value="${d.id}">${d.label || `كاميرا ${idx + 1}`}</option>
-        `).join('');
-      }
-    } catch (e) {}
-
-    const config = {
-      fps: 15,
-      qrbox: { width: 260, height: 160 },
-      aspectRatio: 1.333333
-    };
-
-    // Start with environment (rear camera) or default camera
-    const cameraConfig = { facingMode: "environment" };
-
-    await html5QrScannerInstance.start(
-      cameraConfig,
-      config,
-      (decodedText) => {
-        console.log(`📷 [Camera Scan Hit]: ${decodedText}`);
-        playScanBeep(true);
-        if (navigator.vibrate) navigator.vibrate(100);
-        window.closeCameraScanner();
-        handleScannedBarcode(decodedText, currentTargetField);
-      },
-      () => {}
-    );
-
-  } catch (err) {
-    console.error('Camera init error:', err);
-    // If environment camera failed, try with any available camera
-    try {
-      const devices = await Html5Qrcode.getCameras();
-      if (devices && devices.length > 0) {
-        await html5QrScannerInstance.start(
-          devices[0].id,
-          { fps: 15, qrbox: { width: 260, height: 160 } },
-          (decodedText) => {
-            playScanBeep(true);
-            window.closeCameraScanner();
-            handleScannedBarcode(decodedText, currentTargetField);
-          },
-          () => {}
-        );
-        return;
-      }
-    } catch (e) {}
-    showToast(`تعذر فتح الكاميرا: ${err.message || 'يرجى السماح بصلاحية الكاميرا في المتصفح'}`, 'error');
-  }
 };
 
-window.closeCameraScanner = async function() {
-  if (html5QrScannerInstance) {
-    try {
-      await html5QrScannerInstance.stop();
-    } catch (e) {}
-    html5QrScannerInstance = null;
-  }
-  const modal = document.getElementById('modal-camera-barcode');
+window.closeLineSettingsModal = () => {
+  const modal = document.getElementById('modal-line-settings');
   if (modal) {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
 };
 
-window.switchCamera = async function(cameraId) {
-  if (!cameraId || !html5QrScannerInstance) return;
-  try {
-    await html5QrScannerInstance.stop();
-    const config = { fps: 15, qrbox: { width: 260, height: 160 } };
-    await html5QrScannerInstance.start(
-      cameraId,
-      config,
-      (decodedText) => {
-        playScanBeep(true);
-        window.closeCameraScanner();
-        handleScannedBarcode(decodedText, currentTargetField);
-      },
-      () => {}
-    );
-  } catch (e) {
-    console.error('Switch camera error:', e);
+window.saveLineSettings = async () => {
+  const num = parseInt(document.getElementById('line-settings-num')?.value, 10);
+  const phone = (document.getElementById('line-settings-phone')?.value || '').trim();
+  const monthlyLimit = parseFloat(document.getElementById('line-settings-limit')?.value) || 100000;
+
+  await updateVodafoneLineSettings(num, { phone, monthlyLimit });
+  closeLineSettingsModal();
+  showToast(`تم تحديث إعدادات خط ${num} بنجاح`, 'check_circle');
+  renderVodafoneHub();
+};
+
+window.openEditVodafoneTxModal = (txId) => {
+  const tx = Store.vodafoneTransactions.find(t => t.id === txId);
+  if (!tx) return;
+  AppState.editingVodafoneTxId = txId;
+  setElemValue('edit-voda-amount', tx.amount);
+  setElemValue('edit-voda-commission', tx.commission || 0);
+  setElemValue('edit-voda-phone', tx.customerPhone || '');
+  setElemValue('edit-voda-notes', tx.notes || '');
+
+  const modal = document.getElementById('modal-edit-voda-tx');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
   }
 };
 
-window.toggleCameraTorch = async function() {
-  if (!html5QrScannerInstance) return;
-  try {
-    isTorchEnabled = !isTorchEnabled;
-    await html5QrScannerInstance.applyVideoConstraints({
-      advanced: [{ torch: isTorchEnabled }]
-    });
-    showToast(isTorchEnabled ? 'تم تشغيل الفلاش 💡' : 'تم إيقاف الفلاش', 'flash_on');
-  } catch (e) {
-    showToast('جهاز الكاميرا لا يدعم الفلاش', 'warning');
-  }
-};
-
-window.submitManualCameraBarcode = function() {
-  const input = document.getElementById('camera-manual-barcode-input');
-  if (input && input.value.trim()) {
-    const code = input.value.trim();
-    input.value = '';
-    window.closeCameraScanner();
-    handleScannedBarcode(code, currentTargetField);
-  }
-};
-
-// =========================================================================
-// PRODUCT QUICK INTAKE & ACTION MODAL
-// =========================================================================
-
-window.openQuickIntakeModal = function(product) {
-  currentQuickIntakeProduct = product;
-  const modal = document.getElementById('modal-quick-intake');
-  if (!modal) return;
-
-  setElemText('quick-intake-badge', getCategoryArabicName(product.category));
-  setElemText('quick-intake-barcode', product.barcode || product.imei || '-');
-  setElemText('quick-intake-name', product.name || 'بدون اسم');
-  setElemText('quick-intake-buy-price', `${formatMoney(product.buyPrice || 0)} ج.م`);
-  setElemText('quick-intake-sell-price', `${formatMoney(product.sellPrice || 0)} ج.م`);
-  setElemText('quick-intake-stock', `${product.quantity || 0} قطع بالمخزن`);
-  setElemValue('quick-intake-prod-id', product.id);
-
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-};
-
-window.closeQuickIntakeModal = function() {
-  currentQuickIntakeProduct = null;
-  const modal = document.getElementById('modal-quick-intake');
+window.closeEditVodafoneTxModal = () => {
+  AppState.editingVodafoneTxId = null;
+  const modal = document.getElementById('modal-edit-voda-tx');
   if (modal) {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
 };
 
-window.quickAdjustStock = async function(delta) {
-  if (!currentQuickIntakeProduct) return;
-  const prodId = currentQuickIntakeProduct.id;
-  const currentQty = parseInt(currentQuickIntakeProduct.quantity) || 0;
-  const newQty = currentQty + delta;
+window.saveEditedVodafoneTx = async () => {
+  const txId = AppState.editingVodafoneTxId;
+  if (!txId) return;
 
-  try {
-    await adjustProductStock(prodId, delta);
-    showToast(`تم توريد +${delta} حبات إلى المخزن! الرصيد الجديد: ${newQty}`, 'check_circle');
-    window.closeQuickIntakeModal();
-  } catch (e) {
-    showToast('حدث خطأ أثناء تعديل المخزون', 'error');
+  const amount = parseFloat(document.getElementById('edit-voda-amount')?.value) || 0;
+  const commission = parseFloat(document.getElementById('edit-voda-commission')?.value) || 0;
+  const customerPhone = (document.getElementById('edit-voda-phone')?.value || '').trim();
+  const notes = (document.getElementById('edit-voda-notes')?.value || '').trim();
+
+  await updateVodafoneTransaction(txId, { amount, commission, customerPhone, notes });
+  closeEditVodafoneTxModal();
+  showToast("تم تعديل حركة الكاش بنجاح", "check_circle");
+  renderVodafoneHub();
+};
+
+window.confirmDeleteVodafoneTx = async (txId) => {
+  if (confirm("هل أنت متأكد من حذف هذه الحركة؟ سيتم تعديل رصيد الخط تلقائياً.")) {
+    await deleteVodafoneTransaction(txId);
+    showToast("تم حذف الحركة واستعادة رصيد الخط بنجاح", "delete");
+    renderVodafoneHub();
   }
-};
-
-window.quickIntakeSellInPOS = function() {
-  if (!currentQuickIntakeProduct) return;
-  const prod = currentQuickIntakeProduct;
-  window.closeQuickIntakeModal();
-  window.triggerQuickPOS();
-  addItemToCart(prod);
-};
-
-window.quickIntakeEditProduct = function() {
-  if (!currentQuickIntakeProduct) return;
-  const prod = currentQuickIntakeProduct;
-  window.closeQuickIntakeModal();
-  window.openEditProductModal(prod.id);
 };
 
 // ==========================================
-// LAPTOP QUICK POS MODAL & SPLIT REGISTER (F2)
+// PRODUCT FORM CRUD MODAL (Enhanced with Covers & Cables)
+// ==========================================
+
+function setupProductModal() {
+  const form = document.getElementById('form-product');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await window.saveProductForm();
+    });
+  }
+
+  const catSelect = document.getElementById('prod-category');
+  if (catSelect) {
+    catSelect.addEventListener('change', () => {
+      updateProductModalFields(catSelect.value);
+    });
+  }
+}
+
+window.openAddProductModal = (category = null, subcategory = null, barcode = null) => {
+  AppState.editingProductId = null;
+  setElemText('modal-prod-title', 'إضافة صنف جديد للمخزن');
+  setElemValue('prod-id', '');
+  setElemValue('prod-barcode', barcode || '');
+  setElemValue('prod-name', '');
+  setElemValue('prod-buy-price', '');
+  setElemValue('prod-sell-price', '');
+  setElemValue('prod-quantity', '1');
+  setElemValue('prod-brand', '');
+  setElemValue('prod-model', '');
+  setElemValue('prod-phone-imei', barcode || '');
+  setElemValue('prod-phone-storage', '128GB');
+  setElemValue('prod-phone-color', 'أسود');
+
+  const cat = category || getDefaultCategoryForCurrentView();
+  setElemValue('prod-category', cat);
+  updateProductModalFields(cat);
+
+  if (subcategory) {
+    setElemValue('prod-subcategory', subcategory);
+  }
+
+  const modal = document.getElementById('modal-product-form');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    setTimeout(() => {
+      if (barcode) {
+        document.getElementById('prod-name')?.focus();
+      } else {
+        document.getElementById('prod-barcode')?.focus();
+      }
+    }, 100);
+  }
+};
+
+window.openEditProductModal = (id) => {
+  const prod = Store.products.find(p => p.id === id);
+  if (!prod) return;
+
+  AppState.editingProductId = id;
+  setElemText('modal-prod-title', 'تعديل بيانات الصنف والمخزون');
+  setElemValue('prod-id', prod.id);
+  setElemValue('prod-barcode', prod.barcode || '');
+  setElemValue('prod-name', prod.name || '');
+  setElemValue('prod-category', prod.category || 'chargers');
+  updateProductModalFields(prod.category || 'chargers');
+
+  setElemValue('prod-subcategory', prod.subcategory || '');
+  setElemValue('prod-buy-price', prod.buyPrice || 0);
+  setElemValue('prod-sell-price', prod.sellPrice || 0);
+  setElemValue('prod-quantity', prod.quantity || 0);
+  setElemValue('prod-brand', prod.brand || '');
+  setElemValue('prod-model', prod.model || '');
+  setElemValue('prod-phone-imei', prod.imei || '');
+  setElemValue('prod-phone-storage', prod.storage || '');
+  setElemValue('prod-phone-color', prod.color || '');
+
+  const modal = document.getElementById('modal-product-form');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closeProductModal = () => {
+  AppState.editingProductId = null;
+  const modal = document.getElementById('modal-product-form');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+function updateProductModalFields(category) {
+  const subcatSelect = document.getElementById('prod-subcategory');
+  const subcatGroup = document.getElementById('prod-subcategory-group');
+  const phoneFields = document.getElementById('phone-specific-fields');
+
+  if (category === 'phones') {
+    phoneFields?.classList.remove('hidden');
+    subcatGroup?.classList.add('hidden');
+  } else {
+    phoneFields?.classList.add('hidden');
+    subcatGroup?.classList.remove('hidden');
+
+    if (subcatSelect) {
+      if (category === 'chargers') {
+        subcatSelect.innerHTML = `
+          <option value="complete">شاحن كامل</option>
+          <option value="adapter">رأس شاحن</option>
+          <option value="fast">شاحن سريع (Fast/PD)</option>
+          <option value="wireless">شاحن لاسلكي</option>
+        `;
+      } else if (category === 'cables') {
+        subcatSelect.innerHTML = `
+          <option value="typec">وصلة Type-C عريضة</option>
+          <option value="microusb">وصلة Micro عادية</option>
+          <option value="pin">وصلة Pin / Lightning آيفون</option>
+          <option value="aux">كابل صوت AUX</option>
+          <option value="otg">وصلة OTG</option>
+        `;
+      } else if (category === 'headphones') {
+        subcatSelect.innerHTML = `
+          <option value="silicone">سماعة جلدة (In-Ear)</option>
+          <option value="classic">سماعة عضم (Classic)</option>
+          <option value="bluetooth">سماعة بلوتوث (Wireless)</option>
+        `;
+      } else if (category === 'speakers') {
+        subcatSelect.innerHTML = `
+          <option value="small">صب صغير (Mini)</option>
+          <option value="medium">صب وسط (Medium)</option>
+          <option value="large">صب كبير (Party/Big)</option>
+        `;
+      } else if (category === 'covers') {
+        subcatSelect.innerHTML = `
+          <option value="clear">جراب شفاف (Clear)</option>
+          <option value="silicone">جراب سيليكون مطاطي</option>
+          <option value="armor">جراب حماية مضاد للصدمات</option>
+          <option value="leather">جراب جلد فاخر</option>
+          <option value="magsafe">جراب مغناطيسي (MagSafe)</option>
+          <option value="wallet">جراب محفظة</option>
+        `;
+      } else if (category === 'accessories') {
+        subcatSelect.innerHTML = `
+          <option value="screen_protector">اسكرينة حماية شاشة</option>
+          <option value="holder">حامل هاتف / ستاند سيارة</option>
+          <option value="memory">كارت ميموري / فلاشة</option>
+          <option value="powerbank">باور بانك</option>
+          <option value="general">إكسسوار عام</option>
+        `;
+      }
+    }
+  }
+}
+
+window.saveProductForm = async () => {
+  const barcode = (document.getElementById('prod-barcode')?.value || '').trim();
+  const name = (document.getElementById('prod-name')?.value || '').trim();
+  const category = document.getElementById('prod-category')?.value || 'chargers';
+  const subcategory = document.getElementById('prod-subcategory')?.value || '';
+  const buyPrice = parseFloat(document.getElementById('prod-buy-price')?.value) || 0;
+  const sellPrice = parseFloat(document.getElementById('prod-sell-price')?.value) || 0;
+  const quantity = parseInt(document.getElementById('prod-quantity')?.value, 10) || 0;
+
+  const brand = (document.getElementById('prod-brand')?.value || '').trim();
+  const model = (document.getElementById('prod-model')?.value || '').trim();
+  const imei = (document.getElementById('prod-phone-imei')?.value || '').trim();
+  const storage = document.getElementById('prod-phone-storage')?.value || '';
+  const color = document.getElementById('prod-phone-color')?.value || '';
+
+  if (!name) {
+    showToast("يرجى إدخال اسم الصنف", "warning");
+    return;
+  }
+
+  const productData = {
+    barcode: barcode || (category === 'phones' ? imei : ''),
+    name,
+    category,
+    subcategory,
+    buyPrice,
+    sellPrice,
+    quantity,
+    brand,
+    model,
+    imei,
+    storage,
+    color
+  };
+
+  try {
+    if (AppState.editingProductId) {
+      await updateProduct(AppState.editingProductId, productData);
+      showToast(`تم تعديل بيانات [${name}] بنجاح`, 'check_circle');
+    } else {
+      await addProduct(productData);
+      showToast(`تم تسجيل [${name}] في مخزون ${getCategoryArabicName(category)} بنجاح!`, 'check_circle');
+    }
+
+    closeProductModal();
+    renderCurrentView();
+  } catch (e) {
+    showToast("حدث خطأ أثناء حفظ الصنف", "error");
+  }
+};
+
+window.confirmDeleteProduct = async (id) => {
+  const prod = Store.products.find(p => p.id === id);
+  if (!prod) return;
+  if (confirm(`هل أنت متأكد من حذف الصنف [${prod.name}] نهائياً من المخزن؟`)) {
+    await deleteProduct(id);
+    showToast(`تم حذف الصنف [${prod.name}] بنجاح`, 'delete');
+    renderCurrentView();
+  }
+};
+
+// ==========================================
+// QUICK POS MODAL & CASHIER (F2)
 // ==========================================
 
 function setupQuickPOS() {
@@ -1729,25 +2328,20 @@ function setupQuickPOS() {
 
   window.setPOSCatalogCategory = (cat) => {
     AppState.posCatalogCategory = cat;
-    document.querySelectorAll('.pos-cat-pill').forEach(b => {
-      b.classList.remove('bg-secondary', 'text-white');
-      b.classList.add('bg-surface-container', 'text-on-surface');
+    document.querySelectorAll('[data-pos-cat]').forEach(btn => {
+      btn.className = btn.getAttribute('data-pos-cat') === cat
+        ? 'px-3 py-1.5 rounded-lg bg-primary text-white shrink-0 cursor-pointer font-bold'
+        : 'px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface shrink-0 cursor-pointer font-bold';
     });
-    const active = document.querySelector(`.pos-cat-pill[data-cat="${cat}"]`);
-    if (active) {
-      active.classList.remove('bg-surface-container', 'text-on-surface');
-      active.classList.add('bg-secondary', 'text-white');
-    }
     renderPOSCatalog(cat, AppState.posCatalogSearch);
   };
 }
 
-// Render Widescreen Catalog on Laptop POS Right Panel
 function renderPOSCatalog(category = 'all', searchQuery = '') {
-  const container = document.getElementById('pos-catalog-grid');
-  if (!container) return;
+  const grid = document.getElementById('pos-catalog-grid');
+  if (!grid) return;
 
-  let items = Store.products;
+  let items = Store.products.filter(p => (p.quantity || 0) > 0);
   if (category !== 'all') {
     items = items.filter(p => p.category === category);
   }
@@ -1755,383 +2349,195 @@ function renderPOSCatalog(category = 'all', searchQuery = '') {
     items = items.filter(p => 
       (p.name || '').toLowerCase().includes(searchQuery) ||
       (p.barcode || '').toLowerCase().includes(searchQuery) ||
-      (p.imei || '').toLowerCase().includes(searchQuery) ||
-      (p.model || '').toLowerCase().includes(searchQuery)
+      (p.imei || '').toLowerCase().includes(searchQuery)
     );
   }
 
   if (items.length === 0) {
-    container.innerHTML = `
-      <div class="col-span-full py-16 text-center text-on-surface-variant flex flex-col items-center justify-center gap-2">
-        <span class="material-symbols-outlined text-[40px] opacity-30">inventory_2</span>
-        <span class="font-headline-sm text-headline-sm font-bold">لا توجد منتجات مطابقة في المخزن</span>
-        <span class="font-body-sm text-body-sm">اضغط F1 لإضافة صنف جديد فوراً</span>
+    grid.innerHTML = `
+      <div class="col-span-full py-10 text-center text-on-surface-variant">
+        <span class="text-xs">لا توجد منتجات مطابقة في الكتالوج</span>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = items.map(p => {
-    const isAvail = p.category !== 'phones' ? (p.quantity > 0) : (p.status === 'available');
-    return `
-      <div 
-        onclick="window.posSelectProduct('${p.id}')"
-        class="p-3 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container-high hover:border-secondary cursor-pointer transition-all flex flex-col justify-between group active:scale-98 shadow-sm">
-        <div>
-          <div class="flex items-center justify-between text-xs text-on-surface-variant mb-1 font-numeric-table">
-            <span class="bg-surface-container px-1.5 py-0.5 rounded text-[11px] font-bold">${getCategoryArabicName(p.category)}</span>
-            <span class="${isAvail ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}">
-              ${p.category === 'phones' ? (isAvail ? 'متوفر' : 'مباع') : `متاح: ${p.quantity}`}
-            </span>
-          </div>
-          <h4 class="font-headline-sm font-bold text-on-surface text-sm line-clamp-2">${p.name}</h4>
-        </div>
-        <div class="mt-2.5 pt-2 border-t border-outline-variant/20 flex items-center justify-between">
-          <span class="font-numeric-table text-emerald-400 font-bold text-base">${formatMoney(p.sellPrice)} ج.م</span>
-          <span class="material-symbols-outlined text-secondary opacity-0 group-hover:opacity-100 text-lg transition-opacity">add_shopping_cart</span>
-        </div>
+  grid.innerHTML = items.map(prod => `
+    <div 
+      onclick="window.addProdToCartById('${prod.id}')"
+      class="p-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 flex flex-col justify-between gap-1.5 cursor-pointer transition-all hover:scale-[1.02] shadow-xs"
+    >
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-bold text-rose-400 truncate">${getCategoryArabicName(prod.category)}</span>
+        <span class="font-numeric-table font-bold text-[10px] text-on-surface-variant">${prod.quantity} حبة</span>
       </div>
-    `;
-  }).join('');
+      <h5 class="text-xs font-bold text-on-surface truncate" title="${prod.name}">${prod.name}</h5>
+      <div class="flex items-center justify-between pt-1 border-t border-outline-variant/20">
+        <span class="font-numeric-table font-bold text-emerald-400 text-xs">${formatMoney(prod.sellPrice)} ج.م</span>
+        <span class="material-symbols-outlined text-rose-500 text-sm">add_shopping_cart</span>
+      </div>
+    </div>
+  `).join('');
 }
 
-function getCategoryArabicName(cat) {
-  switch (cat) {
-    case 'chargers': return 'شواحن';
-    case 'phones': return 'هواتف';
-    case 'headphones': return 'سماعات';
-    case 'speakers': return 'صبات';
-    default: return 'صنف';
-  }
-}
+window.addProdToCartById = (id) => {
+  const prod = Store.products.find(p => p.id === id);
+  if (prod) addItemToCart(prod);
+};
 
-function addItemToCart(product) {
-  if (product.category === 'phones' && product.status !== 'available') {
-    showToast("عفواً هذا الهاتف تم بيعه بالفعل!", "warning");
-    return;
-  }
-
-  const existingIdx = AppState.cart.findIndex(i => i.id === product.id);
-  if (existingIdx !== -1) {
-    if (product.category === 'phones') {
-      showToast("هذا الهاتف مسجل برقم IMEI فريد وموجود بالفعل بالسلة", "warning");
-      return;
-    }
-    if (AppState.cart[existingIdx].quantity >= product.quantity) {
-      showToast(`الكمية المطلوبة تتجاوز المخزون المتوفر (${product.quantity})`, "warning");
-      return;
-    }
-    AppState.cart[existingIdx].quantity += 1;
+function addItemToCart(prod) {
+  const existing = AppState.cart.find(i => i.id === prod.id);
+  if (existing) {
+    existing.quantity += 1;
   } else {
-    if (product.quantity <= 0 && product.category !== 'phones') {
-      showToast("تنبيه: هذا الصنف نفذ من المخزون ولكن تم إضافته بالسلة", "warning");
-    }
     AppState.cart.push({
-      id: product.id,
-      name: product.name,
-      barcode: product.barcode || product.imei || '',
-      category: product.category,
-      price: product.sellPrice || 0,
-      quantity: 1,
-      maxQty: product.quantity || 999
+      id: prod.id,
+      name: prod.name,
+      barcode: prod.barcode || prod.imei || '',
+      category: prod.category || 'chargers',
+      price: prod.sellPrice || 0,
+      buyPrice: prod.buyPrice || 0,
+      quantity: 1
     });
   }
-
+  playScanBeep(true);
   renderPOSCart();
-  const posSearch = document.getElementById('pos-barcode-search');
-  if (posSearch && posSearch.value) {
-    posSearch.value = '';
-    AppState.posCatalogSearch = '';
-    renderPOSCatalog(AppState.posCatalogCategory, '');
-  }
 }
-
-window.adjustCartQty = (id, delta) => {
-  const item = AppState.cart.find(i => i.id === id);
-  if (!item) return;
-
-  const newQty = item.quantity + delta;
-  if (newQty <= 0) {
-    window.removeCartItem(id);
-    return;
-  }
-  if (item.category === 'phones' && newQty > 1) {
-    showToast("الهاتف يحتوي على IMEI فردي واحد فقط", "warning");
-    return;
-  }
-  item.quantity = newQty;
-  renderPOSCart();
-};
-
-window.removeCartItem = (id) => {
-  AppState.cart = AppState.cart.filter(i => i.id !== id);
-  renderPOSCart();
-};
 
 function renderPOSCart() {
-  const container = document.getElementById('pos-cart-items');
-  const countBadge = document.getElementById('pos-cart-count');
-  if (countBadge) countBadge.innerText = `${AppState.cart.length} أصناف في الفاتورة`;
+  const tbody = document.getElementById('pos-cart-tbody');
+  const totalItemsCount = AppState.cart.reduce((acc, i) => acc + i.quantity, 0);
+  const subtotal = AppState.cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  const total = Math.max(0, subtotal - (AppState.cartDiscount || 0));
 
-  if (!container) return;
+  setElemText('pos-cart-count-badge', `${totalItemsCount} عناصر`);
+  setElemText('pos-subtotal', `${formatMoney(subtotal)} ج.م`);
+  setElemText('pos-total-amount', `${formatMoney(total)} ج.م`);
+
+  calculatePOSChange();
+
+  if (!tbody) return;
 
   if (AppState.cart.length === 0) {
-    container.innerHTML = `
-      <div class="h-64 flex flex-col items-center justify-center text-on-surface-variant gap-2 text-center">
-        <span class="material-symbols-outlined text-[48px] opacity-30">shopping_cart</span>
-        <span class="font-headline-sm text-headline-sm font-bold">فاتورة العميل فارغة</span>
-        <span class="font-body-sm text-body-sm">امسح باركود الصنف أو اختر من القائمة على اليمين</span>
-      </div>
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="py-12 text-center text-on-surface-variant">
+          <span class="text-xs">السلة فارغة. امسح الباركود أو اختر من الكتالوج.</span>
+        </td>
+      </tr>
     `;
-    setElemText('pos-subtotal', '0.00 ج.م');
-    setElemText('pos-total', '0.00 ج.م');
-    setElemValue('pos-cash-paid', '');
-    setElemText('pos-change', '0.00 ج.م');
     return;
   }
 
-  let subtotal = 0;
-  container.innerHTML = AppState.cart.map(item => {
-    const itemTotal = item.price * item.quantity;
-    subtotal += itemTotal;
-    return `
-      <div class="flex items-center justify-between p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
-        <div class="flex flex-col flex-1">
-          <span class="font-headline-sm font-bold text-on-surface text-base">${item.name}</span>
-          <div class="flex items-center gap-2 mt-0.5 text-on-surface-variant font-numeric-table text-xs">
-            <span>${formatMoney(item.price)} ج.م</span>
-            <span>×</span>
-            <span>${item.quantity}</span>
-            <span>=</span>
-            <span class="text-secondary font-bold text-sm">${formatMoney(itemTotal)} ج.م</span>
-          </div>
+  tbody.innerHTML = AppState.cart.map((item, idx) => `
+    <tr class="border-b border-surface-container-low text-xs">
+      <td class="py-2.5 px-3 font-bold text-on-surface">${item.name}</td>
+      <td class="py-2.5 px-3 font-numeric-table text-on-surface">${formatMoney(item.price)}</td>
+      <td class="py-2.5 px-3">
+        <div class="flex items-center gap-1 font-numeric-table font-bold">
+          <button onclick="window.updateCartQty(${idx}, -1)" class="w-5 h-5 rounded bg-surface-container text-xs">-</button>
+          <span>${item.quantity}</span>
+          <button onclick="window.updateCartQty(${idx}, 1)" class="w-5 h-5 rounded bg-surface-container text-xs">+</button>
         </div>
-        <div class="flex items-center gap-2">
-          <div class="flex items-center bg-surface-container rounded-lg border border-outline-variant/40">
-            <button onclick="window.adjustCartQty('${item.id}', -1)" class="w-7 h-7 flex items-center justify-center font-bold text-on-surface hover:bg-surface-container-high rounded-r-lg">-</button>
-            <span class="w-8 text-center font-numeric-table font-bold text-sm">${item.quantity}</span>
-            <button onclick="window.adjustCartQty('${item.id}', 1)" class="w-7 h-7 flex items-center justify-center font-bold text-on-surface hover:bg-surface-container-high rounded-l-lg">+</button>
-          </div>
-          <button onclick="window.removeCartItem('${item.id}')" class="text-rose-400 hover:bg-rose-500/20 p-1.5 rounded-lg transition-colors" title="حذف من الفاتورة">
-            <span class="material-symbols-outlined text-[18px]">delete</span>
-          </button>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  const discount = AppState.cartDiscount || 0;
-  const total = Math.max(0, subtotal - discount);
-
-  setElemText('pos-subtotal', `${formatMoney(subtotal)} ج.م`);
-  setElemText('pos-total', `${formatMoney(total)} ج.م`);
-
-  const cashInput = document.getElementById('pos-cash-paid');
-  if (cashInput && (!cashInput.value || parseFloat(cashInput.value) === 0)) {
-    cashInput.value = total > 0 ? total : '';
-  }
-  calculatePOSChange();
+      </td>
+      <td class="py-2.5 px-3 font-numeric-table font-bold text-emerald-400">${formatMoney(item.price * item.quantity)}</td>
+      <td class="py-2.5 px-3 text-center">
+        <button onclick="window.removeCartItem(${idx})" class="text-rose-400 hover:text-rose-300"><span class="material-symbols-outlined text-[16px]">close</span></button>
+      </td>
+    </tr>
+  `).join('');
 }
+
+window.updateCartQty = (idx, delta) => {
+  if (!AppState.cart[idx]) return;
+  AppState.cart[idx].quantity += delta;
+  if (AppState.cart[idx].quantity <= 0) {
+    AppState.cart.splice(idx, 1);
+  }
+  renderPOSCart();
+};
+
+window.removeCartItem = (idx) => {
+  AppState.cart.splice(idx, 1);
+  renderPOSCart();
+};
 
 function calculatePOSChange() {
-  const totalStr = document.getElementById('pos-total')?.innerText.replace(' ج.م', '').replace(/,/g, '') || '0';
-  const total = parseFloat(totalStr) || 0;
+  const subtotal = AppState.cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  const total = Math.max(0, subtotal - (AppState.cartDiscount || 0));
   const paid = parseFloat(document.getElementById('pos-cash-paid')?.value) || 0;
   const change = Math.max(0, paid - total);
-  setElemText('pos-change', `${formatMoney(change)} ج.م`);
+  setElemText('pos-change-due', `${formatMoney(change)} ج.م`);
 }
-
-window.posSelectProduct = (id) => {
-  const p = Store.products.find(item => item.id === id);
-  if (p) {
-    addItemToCart(p);
-  }
-};
 
 async function executePOSCheckout() {
   if (AppState.cart.length === 0) {
-    showToast("سلة المبيعات فارغة!", "warning");
+    showToast("سلة المشتريات فارغة", "warning");
     return;
   }
 
   const subtotal = AppState.cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-  const discount = AppState.cartDiscount || 0;
-  const totalAmount = Math.max(0, subtotal - discount);
-  const cashPaid = parseFloat(document.getElementById('pos-cash-paid')?.value) || totalAmount;
-  const change = Math.max(0, cashPaid - totalAmount);
-  const customerName = document.getElementById('pos-cust-name')?.value || 'عميل نقدي';
-  const customerPhone = document.getElementById('pos-cust-phone')?.value || '';
+  const total = Math.max(0, subtotal - (AppState.cartDiscount || 0));
+  const paid = parseFloat(document.getElementById('pos-cash-paid')?.value) || total;
+  const change = Math.max(0, paid - total);
+  const custName = (document.getElementById('pos-customer-name')?.value || '').trim() || 'عميل نقدي';
+  const custPhone = (document.getElementById('pos-customer-phone')?.value || '').trim();
 
   try {
     const invoice = await checkoutSale({
       items: AppState.cart,
       subtotal,
-      discount,
-      totalAmount,
-      cashPaid,
+      discount: AppState.cartDiscount,
+      totalAmount: total,
+      cashPaid: paid,
       change,
-      customerName,
-      customerPhone,
-      cashier: 'أحمد الكاشير'
+      customerName: custName,
+      customerPhone: custPhone
     });
 
     AppState.cart = [];
     AppState.cartDiscount = 0;
-    if (document.getElementById('pos-discount-input')) document.getElementById('pos-discount-input').value = '0';
-    if (document.getElementById('pos-cust-name')) document.getElementById('pos-cust-name').value = '';
-    if (document.getElementById('pos-cust-phone')) document.getElementById('pos-cust-phone').value = '';
+    setElemValue('pos-cash-paid', '');
+    setElemValue('pos-customer-name', '');
+    setElemValue('pos-customer-phone', '');
 
-    window.closeQuickPOS();
-    showToast(`تم حفظ الفاتورة بنجاح رقم ${invoice.invoiceNumber} وخصم المخزون`, 'verified');
-
-    // تم إيقاف الطباعة التلقائية لمربع الحوار بناء على رغبة المستخدم
-  } catch (err) {
-    showToast(`فشل إتمام البيع: ${err.message}`, 'error');
+    closeQuickPOS();
+    playScanBeep(true);
+    showToast(`تم إتمام الفاتورة ${invoice.invoiceNumber} بنجاح!`, 'receipt_long');
+    window.printInvoiceReceipt(invoice.id);
+  } catch (e) {
+    showToast("حدث خطأ أثناء إتمام عملية البيع", "error");
   }
 }
 
-// ==========================================
-// PROFESSIONAL POS INVOICE & RECEIPT PRINTING
-// ==========================================
+// Receipt Viewer
+window.printInvoiceReceipt = (invoiceId) => {
+  const inv = Store.salesInvoices.find(s => s.id === invoiceId);
+  if (!inv) return;
 
-AppState.activePrintingInvoiceId = null;
-AppState.activePrintFormat = '80mm';
+  setElemText('thermal-store-name', 'سنترال حلمي');
+  setElemText('receipt-inv-num', inv.invoiceNumber);
+  setElemText('receipt-date', formatDateArabic(inv.timestamp));
+  setElemText('receipt-customer', inv.customerName || 'عميل نقدي');
+  setElemText('receipt-total', `${formatMoney(inv.totalAmount)} ج.م`);
+  setElemText('receipt-cash', `${formatMoney(inv.cashPaid || inv.totalAmount)} ج.م`);
+  setElemText('receipt-change', `${formatMoney(inv.change || 0)} ج.م`);
 
-function generateReceiptHTML(invoice, format = '80mm') {
-  const isA4 = format === 'a4';
-  const widthStyle = isA4 ? 'max-w-3xl mx-auto p-8' : 'w-[80mm] mx-auto p-4';
-  const fontSize = isA4 ? 'text-sm' : 'text-xs';
-
-  const itemsRows = (invoice.items || []).map((item, idx) => `
-    <tr class="border-b border-gray-200">
-      <td class="py-1.5 text-right font-medium">
-        <div>${item.name || 'صنف'}</div>
-        ${item.barcode ? `<div class="text-[10px] text-gray-500 font-mono">${item.barcode}</div>` : ''}
-      </td>
-      <td class="py-1.5 text-center font-mono font-bold">${item.quantity || 1}</td>
-      <td class="py-1.5 text-center font-mono">${formatMoney(item.price || 0)}</td>
-      <td class="py-1.5 text-left font-mono font-bold">${formatMoney(item.total || (item.price * item.quantity))}</td>
-    </tr>
-  `).join('');
-
-  return `
-    <div id="thermal-receipt-printable" class="${widthStyle} bg-white text-black font-sans leading-relaxed select-text" style="direction: rtl;">
-      
-      <!-- Store Header -->
-      <div class="text-center pb-3 border-b-2 border-dashed border-gray-400">
-        <div class="inline-block p-1 bg-black text-white rounded-lg mb-1 font-bold text-xs">HELMY POS</div>
-        <h2 class="${isA4 ? 'text-2xl' : 'text-lg'} font-black tracking-tight">حلمي سنترال وموبايل</h2>
-        <p class="text-[11px] text-gray-700 font-medium mt-0.5">للهواتف الذكية والإكسسوارات والشواحن وخدمات فودافون كاش</p>
-        <p class="text-[10px] text-gray-600 mt-0.5">الفرع الرئيسي • هاتف المبيعات: 01000000000</p>
-      </div>
-
-      <!-- Invoice Meta Details -->
-      <div class="py-2.5 border-b border-dashed border-gray-300 text-[11px] space-y-1">
-        <div class="flex justify-between items-center">
-          <span class="text-gray-600">رقم الفاتورة:</span>
-          <span class="font-mono font-bold text-black">${invoice.invoiceNumber || 'INV-001'}</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-gray-600">التاريخ والوقت:</span>
-          <span class="font-mono">${formatDate(invoice.timestamp)} - ${formatTime(invoice.timestamp)}</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-gray-600">اسم الكاشير:</span>
-          <span class="font-medium">${invoice.cashier || 'أدمن الوردية • حلمي'}</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-gray-600">العميل:</span>
-          <span class="font-medium">${invoice.customerName || 'عميل نقدي'} ${invoice.customerPhone ? `(${invoice.customerPhone})` : ''}</span>
-        </div>
-      </div>
-
-      <!-- Items Table -->
-      <div class="py-2 border-b-2 border-dashed border-gray-400">
-        <table class="w-full ${fontSize}">
-          <thead>
-            <tr class="border-b-2 border-black text-gray-800 text-[11px]">
-              <th class="text-right py-1.5">الصنف</th>
-              <th class="text-center py-1.5">الكمية</th>
-              <th class="text-center py-1.5">السعر</th>
-              <th class="text-left py-1.5">الإجمالي</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsRows}
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Financial Calculation Summary -->
-      <div class="py-2.5 border-b-2 border-dashed border-gray-400 text-xs space-y-1">
-        <div class="flex justify-between items-center text-gray-700">
-          <span>المجموع الفرعي:</span>
-          <span class="font-mono font-bold">${formatMoney(invoice.subtotal || invoice.totalAmount)} ج.م</span>
-        </div>
-        ${(invoice.discount || 0) > 0 ? `
-          <div class="flex justify-between items-center text-red-600 font-bold">
-            <span>الخصم المباشر:</span>
-            <span class="font-mono">-${formatMoney(invoice.discount)} ج.م</span>
-          </div>
-        ` : ''}
-        <div class="flex justify-between items-center py-1.5 border-t border-b border-black my-1 text-black font-black ${isA4 ? 'text-lg' : 'text-base'}">
-          <span>صافي المطلوب:</span>
-          <span class="font-mono">${formatMoney(invoice.totalAmount)} ج.م</span>
-        </div>
-        <div class="flex justify-between items-center text-gray-800 pt-0.5">
-          <span>المبلغ المدفوع:</span>
-          <span class="font-mono font-bold">${formatMoney(invoice.cashPaid || invoice.totalAmount)} ج.م</span>
-        </div>
-        <div class="flex justify-between items-center text-gray-800">
-          <span>المتبقي للعميل (الباقي):</span>
-          <span class="font-mono font-bold text-emerald-700">${formatMoney(invoice.change || 0)} ج.م</span>
-        </div>
-      </div>
-
-      <!-- Barcode Visual Representation -->
-      <div class="py-3 text-center border-b border-dashed border-gray-300">
-        <div class="inline-block tracking-widest font-mono font-bold text-sm bg-gray-100 px-3 py-1 rounded border border-gray-300 mb-1">
-          *${invoice.invoiceNumber || 'INV-001'}*
-        </div>
-        <div class="text-[9px] text-gray-500">امسح الكود بمسدس الباركود للاسترجاع السريع</div>
-      </div>
-
-      <!-- Policies & Thank you note -->
-      <div class="pt-3 text-center text-[10px] text-gray-600 space-y-1">
-        <p class="font-bold text-black">البضاعة المباعة ترد وتستبدل خلال 14 يوماً مع أصل الفاتورة</p>
-        <p>القطع الإلكترونية والشواحن بضمان التجربة الفورية والاستبدال</p>
-        <p class="pt-1 text-black font-medium">سعداء بخدمتكم دائماً في حلمي سنترال وموبايل 📱⚡</p>
-        <div class="text-[8px] text-gray-400 pt-1">نظام حلمي كاشير سحابي • مدعوم بمزامنة لحظية</div>
-      </div>
-
-    </div>
-  `;
-}
-
-window.printInvoiceReceipt = (invoiceId, format = '80mm') => {
-  const invoice = Store.salesInvoices.find(inv => inv.id === invoiceId) || Store.salesInvoices[0];
-  if (!invoice) {
-    showToast('لم يتم العثور على الفاتورة', 'warning');
-    return;
+  const tbody = document.getElementById('receipt-items-tbody');
+  if (tbody) {
+    tbody.innerHTML = (inv.items || []).map(item => `
+      <tr class="border-b border-dashed border-black/20 text-xs">
+        <td class="py-1 text-right font-bold">${item.name}</td>
+        <td class="py-1 text-center font-numeric-table font-bold">${item.quantity}</td>
+        <td class="py-1 text-left font-numeric-table font-bold">${formatMoney(item.price * item.quantity)}</td>
+      </tr>
+    `).join('');
   }
-
-  AppState.activePrintingInvoiceId = invoice.id;
-  AppState.activePrintFormat = format;
 
   const modal = document.getElementById('modal-thermal-receipt');
-  const container = document.getElementById('thermal-receipt-content');
-
-  if (modal && container) {
-    container.innerHTML = generateReceiptHTML(invoice, format);
+  if (modal) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-  }
-};
-
-window.setReceiptFormat = (format) => {
-  AppState.activePrintFormat = format;
-  if (AppState.activePrintingInvoiceId) {
-    window.printInvoiceReceipt(AppState.activePrintingInvoiceId, format);
   }
 };
 
@@ -2143,250 +2549,15 @@ window.closeThermalReceiptModal = () => {
   }
 };
 
-window.executePrintReceipt = (format = null) => {
-  window.closeThermalReceiptModal();
-  showToast('تمت معاينة الفاتورة بنجاح (تم إيقاف أوامر الطباعة نهائياً بناء على طلبك)', 'verified');
-};
-
-
 // ==========================================
-// UNIVERSAL PRODUCT CRUD MODALS
-// ==========================================
-
-function setupProductModal() {
-  const categorySelect = document.getElementById('prod-category');
-  if (categorySelect) {
-    categorySelect.addEventListener('change', (e) => {
-      updateProductModalFields(e.target.value);
-    });
-  }
-
-  window.generateRandomBarcode = () => {
-    const randomCode = '622' + Math.floor(100000000 + Math.random() * 900000000);
-    setElemValue('prod-barcode', randomCode);
-  };
-
-  window.openAddProductModal = (category = 'chargers', subcategory = null, barcode = '') => {
-    AppState.editingProductId = null;
-    setElemText('modal-prod-title', '+ إضافة صنف جديد للمخزن');
-    
-    setElemValue('prod-id', '');
-    setElemValue('prod-name', '');
-    setElemValue('prod-barcode', barcode || '');
-    setElemValue('prod-buy-price', '');
-    setElemValue('prod-sell-price', '');
-    setElemValue('prod-qty', '1');
-    setElemValue('prod-category', category);
-    
-    updateProductModalFields(category);
-    if (subcategory) {
-      setElemValue('prod-subcategory', subcategory);
-    }
-
-    const modal = document.getElementById('modal-product-form');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      setTimeout(() => {
-        if (!barcode) document.getElementById('prod-barcode')?.focus();
-        else document.getElementById('prod-name')?.focus();
-      }, 100);
-    }
-  };
-
-  window.openEditProductModal = (id) => {
-    const prod = Store.products.find(p => p.id === id);
-    if (!prod) return;
-
-    AppState.editingProductId = id;
-    setElemText('modal-prod-title', 'تعديل بيانات الصنف');
-
-    setElemValue('prod-id', prod.id);
-    setElemValue('prod-name', prod.name || '');
-    setElemValue('prod-barcode', prod.barcode || prod.imei || '');
-    setElemValue('prod-buy-price', prod.buyPrice || 0);
-    setElemValue('prod-sell-price', prod.sellPrice || 0);
-    setElemValue('prod-qty', prod.quantity || 0);
-    setElemValue('prod-category', prod.category || 'chargers');
-
-    updateProductModalFields(prod.category || 'chargers');
-    setElemValue('prod-subcategory', prod.subcategory || '');
-
-    setElemValue('prod-phone-brand', prod.brand || '');
-    setElemValue('prod-phone-model', prod.model || '');
-    setElemValue('prod-phone-imei', prod.imei || '');
-    setElemValue('prod-phone-storage', prod.storage || '');
-    setElemValue('prod-phone-color', prod.color || '');
-
-    const modal = document.getElementById('modal-product-form');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-  };
-
-  window.closeProductModal = () => {
-    const modal = document.getElementById('modal-product-form');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-  };
-
-  window.saveProductForm = async () => {
-    const category = document.getElementById('prod-category')?.value || 'chargers';
-    const name = document.getElementById('prod-name')?.value || '';
-    const barcode = document.getElementById('prod-barcode')?.value || '';
-    const buyPrice = parseFloat(document.getElementById('prod-buy-price')?.value) || 0;
-    const sellPrice = parseFloat(document.getElementById('prod-sell-price')?.value) || 0;
-    const quantity = parseInt(document.getElementById('prod-qty')?.value, 10) || 0;
-    const subcategory = document.getElementById('prod-subcategory')?.value || '';
-
-    if (!name.trim()) {
-      showToast("يرجى إدخال اسم الصنف", "warning");
-      document.getElementById('prod-name')?.focus();
-      return;
-    }
-
-    const productData = {
-      name,
-      barcode,
-      category,
-      subcategory,
-      buyPrice,
-      sellPrice,
-      quantity
-    };
-
-    if (category === 'phones') {
-      productData.brand = document.getElementById('prod-phone-brand')?.value || '';
-      productData.model = document.getElementById('prod-phone-model')?.value || name;
-      productData.imei = document.getElementById('prod-phone-imei')?.value || barcode;
-      productData.storage = document.getElementById('prod-phone-storage')?.value || '';
-      productData.color = document.getElementById('prod-phone-color')?.value || '';
-      productData.status = 'available';
-    }
-
-    try {
-      if (AppState.editingProductId) {
-        await updateProduct(AppState.editingProductId, productData);
-        showToast("تم تحديث بيانات الصنف بنجاح ومزامنتها", "verified");
-      } else {
-        await addProduct(productData);
-        showToast("تمت إضافة الصنف الجديد بنجاح إلى الفيربيز والمخزن", "verified");
-      }
-      closeProductModal();
-    } catch (err) {
-      showToast(`خطأ في الحفظ: ${err.message}`, "error");
-    }
-  };
-
-  window.confirmDeleteProduct = (id) => {
-    const prod = Store.products.find(p => p.id === id);
-    if (!prod) return;
-
-    AppState.deleteTarget = {
-      type: 'product',
-      id: prod.id,
-      title: 'تأكيد حذف الصنف من المخزن',
-      message: `هل أنت متأكد من حذف الصنف [${prod.name}] نهائياً؟`
-    };
-    openDeleteConfirmModal();
-  };
-}
-
-function updateProductModalFields(category) {
-  const subcatSelect = document.getElementById('prod-subcategory');
-  const phoneFields = document.getElementById('prod-phone-specific-fields');
-  const subcatContainer = document.getElementById('prod-subcategory-container');
-
-  if (category === 'phones') {
-    if (phoneFields) phoneFields.classList.remove('hidden');
-    if (subcatContainer) subcatContainer.classList.add('hidden');
-  } else {
-    if (phoneFields) phoneFields.classList.add('hidden');
-    if (subcatContainer) subcatContainer.classList.remove('hidden');
-
-    if (subcatSelect) {
-      if (category === 'chargers') {
-        subcatSelect.innerHTML = `
-          <option value="complete">شاحن كامل (Complete Charger)</option>
-          <option value="adapter">رأس شاحن (Adapter/Head)</option>
-          <option value="typec">وصلة شحن عريضة (Type-C)</option>
-          <option value="microusb">وصلة شحن عادية (Micro-USB)</option>
-          <option value="pin">وصلة شحن رفيعة (Pin/iPhone)</option>
-        `;
-      } else if (category === 'headphones') {
-        subcatSelect.innerHTML = `
-          <option value="silicone">سماعة جلدة (In-Ear)</option>
-          <option value="classic">سماعة عضم (Classic)</option>
-          <option value="bluetooth">سماعة بلوتوث (Bluetooth Wireless)</option>
-        `;
-      } else if (category === 'speakers') {
-        subcatSelect.innerHTML = `
-          <option value="small">صب صغير (Small Speaker)</option>
-          <option value="medium">صب وسط (Medium Speaker)</option>
-          <option value="large">صب كبير (Large Speaker)</option>
-        `;
-      }
-    }
-  }
-}
-
-// ==========================================
-// UNIVERSAL DELETE CONFIRMATION MODAL
-// ==========================================
-
-function openDeleteConfirmModal() {
-  const modal = document.getElementById('modal-delete-confirm');
-  if (!modal || !AppState.deleteTarget) return;
-
-  setElemText('delete-confirm-title', AppState.deleteTarget.title || 'تأكيد الحذف');
-  setElemText('delete-confirm-message', AppState.deleteTarget.message || 'هل أنت متأكد؟');
-
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-}
-
-window.closeDeleteConfirmModal = () => {
-  const modal = document.getElementById('modal-delete-confirm');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
-  AppState.deleteTarget = null;
-};
-
-window.executeDeleteAction = async () => {
-  if (!AppState.deleteTarget) return;
-  const target = AppState.deleteTarget;
-  closeDeleteConfirmModal();
-
-  try {
-    if (target.type === 'product') {
-      await deleteProduct(target.id);
-      showToast("تم حذف الصنف من المخزن بنجاح", "delete");
-    } else if (target.type === 'vodafone_tx') {
-      await deleteVodafoneTransaction(target.id);
-      showToast("تم حذف المعاملة والتراجع عن أثرها المالي", "delete");
-    } else if (target.type === 'vodafone_reset') {
-      await resetVodafoneLine(target.id);
-      showToast(`تمت إعادة تعيين بيانات خط فودافون كاش (${target.id}) بنجاح`, "refresh");
-    }
-  } catch (err) {
-    showToast(`فشل الحذف: ${err.message}`, "error");
-  }
-};
-
-// ==========================================
-// CASH DRAWER & SHIFT MODALS
+// DRAWER & KEYBOARD SHORTCUTS
 // ==========================================
 
 function setupDrawerEvents() {
   window.openOpeningCashModal = () => {
     const modal = document.getElementById('modal-opening-cash');
     if (modal) {
-      setElemValue('opening-cash-amount', Store.drawer ? (Store.drawer.openingCash || '') : '');
+      setElemValue('opening-cash-amount', Store.drawer?.currentCash || 0);
       modal.classList.remove('hidden');
       modal.classList.add('flex');
     }
@@ -2408,7 +2579,7 @@ function setupDrawerEvents() {
       reason: 'تحديد رصيد افتتاح الدرج'
     });
     closeOpeningCashModal();
-    showToast(`تم اعتماد رصيد الافتتاح: ${formatMoney(amount)} ج.م`, 'check_circle');
+    showToast(`تم اعتماد رصيد افتتاح الدرج: ${formatMoney(amount)} ج.م`, 'check_circle');
   };
 
   window.openDrawerAdjustModal = (type = 'in') => {
@@ -2416,8 +2587,6 @@ function setupDrawerEvents() {
     if (modal) {
       setElemValue('drawer-adjust-type', type);
       setElemText('drawer-adjust-title', type === 'in' ? 'إيداع نقدية في درج الكاشير (+)' : 'سحب نقدية من درج الكاشير (-)');
-      setElemValue('drawer-adjust-amount', '');
-      setElemValue('drawer-adjust-reason', '');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
     }
@@ -2434,7 +2603,7 @@ function setupDrawerEvents() {
   window.saveDrawerAdjustment = async () => {
     const type = document.getElementById('drawer-adjust-type')?.value || 'in';
     const amount = parseFloat(document.getElementById('drawer-adjust-amount')?.value) || 0;
-    const reason = document.getElementById('drawer-adjust-reason')?.value || (type === 'in' ? 'إيداع نقدي' : 'سحب نقدي');
+    const reason = (document.getElementById('drawer-adjust-reason')?.value || '').trim() || (type === 'in' ? 'إيداع نقدية' : 'سحب نقدية');
 
     if (amount <= 0) {
       showToast("يرجى إدخال مبلغ صحيح", "warning");
@@ -2447,10 +2616,6 @@ function setupDrawerEvents() {
   };
 }
 
-// ==========================================
-// KEYBOARD SHORTCUTS
-// ==========================================
-
 function setupKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F1') {
@@ -2459,30 +2624,170 @@ function setupKeyboardShortcuts() {
     } else if (e.key === 'F2') {
       e.preventDefault();
       window.triggerQuickPOS();
+    } else if (e.key === 'F3') {
+      e.preventDefault();
+      window.openCameraScanner();
     } else if (e.key === 'F4') {
       e.preventDefault();
-      navigateTo('vodafone-cash-wallets');
+      document.getElementById('quickCodeManualInput')?.focus();
     } else if (e.key === 'F7') {
       e.preventDefault();
       window.openThemeModal();
     } else if (e.key === 'Escape') {
       window.closeQuickPOS();
       window.closeProductModal();
-      window.closeDeleteConfirmModal();
+      window.closeSmartCodeActionModal();
+      window.closeSMSParserModal();
       window.closeLineSettingsModal();
       window.closeEditVodafoneTxModal();
       window.closeThemeModal();
       window.closeThermalReceiptModal();
       window.closeOpeningCashModal();
       window.closeDrawerAdjustModal();
+      window.closePhoneAccessModal();
+      window.closeCameraScanner();
     }
   });
 }
 
 // ==========================================
-// TOAST NOTIFICATIONS
+// CAMERA SCANNER MODAL (F3)
 // ==========================================
 
+let html5QrCodeInstance = null;
+let currentTargetField = null;
+
+window.openCameraScanner = async function(target = null) {
+  currentTargetField = target;
+  const modal = document.getElementById('modal-camera-barcode');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('جاري تحميل مكتبة الكاميرا...', 'info');
+    return;
+  }
+
+  try {
+    if (html5QrCodeInstance) {
+      try { await html5QrCodeInstance.stop(); } catch(e){}
+    }
+    html5QrCodeInstance = new Html5Qrcode("camera-scanner-viewport");
+    await html5QrCodeInstance.start(
+      { facingMode: "environment" },
+      { fps: 15, qrbox: { width: 250, height: 150 } },
+      (decodedText) => {
+        playScanBeep(true);
+        window.closeCameraScanner();
+        handleScannedBarcode(decodedText, currentTargetField);
+      },
+      () => {}
+    );
+  } catch (err) {
+    console.error("Camera start error:", err);
+    showToast("تعذر تشغيل الكاميرا: تأكد من السماح بصلاحيات الكاميرا", "error");
+  }
+};
+
+window.closeCameraScanner = async function() {
+  if (html5QrCodeInstance) {
+    try { await html5QrCodeInstance.stop(); } catch(e){}
+    html5QrCodeInstance = null;
+  }
+  const modal = document.getElementById('modal-camera-barcode');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.submitManualCameraBarcode = function() {
+  const input = document.getElementById('camera-manual-barcode-input');
+  if (input && input.value.trim()) {
+    const code = input.value.trim();
+    input.value = '';
+    window.closeCameraScanner();
+    handleScannedBarcode(code, currentTargetField);
+  }
+};
+
+// Phone Access Modal
+window.openPhoneAccessModal = function() {
+  const modal = document.getElementById('modal-phone-access');
+  if (modal) {
+    fetch('/api/network-info')
+      .then(r => r.json())
+      .then(data => {
+        if (data.urls && data.urls[0]) {
+          setElemText('phone-access-url', data.urls[0]);
+          const qrImg = document.getElementById('phone-access-qr-img');
+          if (qrImg) {
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(data.urls[0])}`;
+          }
+        }
+      })
+      .catch(() => {
+        setElemText('phone-access-url', 'http://' + window.location.host);
+      });
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closePhoneAccessModal = function() {
+  const modal = document.getElementById('modal-phone-access');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+// Mobile Categories Navigation Menu
+window.openMobileCategoryMenu = function() {
+  const modal = document.getElementById('modal-mobile-categories');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closeMobileCategoryMenu = function() {
+  const modal = document.getElementById('modal-mobile-categories');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+// Fast Code Prompt for Mobile
+window.openQuickCodePrompt = function() {
+  const code = prompt("⚡ اكتب كود الصنف (مثلاً: 70) أو امسح الباركود للبيع أو التوريد:");
+  if (code && code.trim()) {
+    handleScannedBarcode(code.trim());
+  }
+};
+
+// Audio Beep
+function playScanBeep(success = true) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = success ? 'sine' : 'sawtooth';
+    osc.frequency.value = success ? 880 : 320;
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + (success ? 0.12 : 0.25));
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + (success ? 0.12 : 0.25));
+  } catch (e) {}
+}
+
+// Toasts
 export function showToast(msg, icon = 'check_circle') {
   const toast = document.getElementById('action-toast');
   const toastMsg = document.getElementById('toast-message');
@@ -2500,10 +2805,7 @@ export function showToast(msg, icon = 'check_circle') {
 }
 window.showToast = showToast;
 
-// ==========================================
-// FORMATTING HELPERS
-// ==========================================
-
+// Helpers
 function formatMoney(num) {
   return (parseFloat(num) || 0).toLocaleString('en-US', {
     minimumFractionDigits: 2,
@@ -2511,23 +2813,35 @@ function formatMoney(num) {
   });
 }
 
-function formatCompactMoney(num) {
-  const n = parseFloat(num) || 0;
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-  return n.toFixed(0);
-}
-
-function formatDate(isoStr) {
-  if (!isoStr) return '';
-  const d = new Date(isoStr);
-  return d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+function formatDateArabic(isoStr) {
+  if (!isoStr) return 'غير محدد';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    return d.toLocaleDateString('ar-EG', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (e) {
+    return isoStr;
+  }
 }
 
 function formatTime(isoStr) {
   if (!isoStr) return '';
   const d = new Date(isoStr);
   return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function isToday(isoStr) {
+  if (!isoStr) return false;
+  const d = new Date(isoStr);
+  const now = new Date();
+  return d.toDateString() === now.toDateString();
 }
 
 function setElemText(id, val) {
@@ -2540,182 +2854,31 @@ function setElemValue(id, val) {
   if (el) el.value = val;
 }
 
+function getCategoryArabicName(cat) {
+  switch (cat) {
+    case 'chargers': return 'قسم الشواحن';
+    case 'cables': return 'قسم الوصلات';
+    case 'headphones': return 'قسم السماعات والصوتيات';
+    case 'speakers': return 'قسم الصبات والمكبرات';
+    case 'phones': return 'قسم التليفونات';
+    case 'covers': return 'قسم الجرابات والحمايات';
+    case 'accessories': return 'قسم الإكسسوارات العامة';
+    default: return 'المخزن العام';
+  }
+}
+
+function getCategoryViewPath(cat) {
+  switch (cat) {
+    case 'chargers': return 'chargers-inventory';
+    case 'cables': return 'cables-inventory';
+    case 'headphones': return 'headphones-audio';
+    case 'speakers': return 'speakers-sound';
+    case 'phones': return 'phones-sales-inventory';
+    case 'covers': return 'covers-inventory';
+    case 'accessories': return 'accessories-inventory';
+    default: return 'chargers-inventory';
+  }
+}
+
 window.navigateTo = navigateTo;
 window.formatMoney = formatMoney;
-
-window.onCategoryChange = function() {
-  const cat = document.getElementById('prod-category')?.value;
-  if (cat && typeof updateProductModalFields === 'function') {
-    updateProductModalFields(cat);
-  }
-};
-
-
-// =========================================================================
-// EMBEDDED LIVE CAMERA & PHOTO SNAPSHOT SERVICE ("في قلب السيستم")
-// =========================================================================
-
-let posEmbeddedScannerInstance = null;
-let formEmbeddedScannerInstance = null;
-
-window.triggerPhotoCapture = function(targetField = null) {
-  currentTargetField = targetField;
-  const fileInput = document.getElementById('camera-photo-snapshot-input');
-  if (fileInput) {
-    fileInput.click();
-  }
-};
-
-window.handlePhotoSnapshotSelected = async function(event) {
-  const file = event.target.files && event.target.files[0];
-  if (!file) return;
-
-  showToast('جاري فحص وتصوير الباركود من اللقطة...', 'photo_camera');
-
-  try {
-    if (typeof Html5Qrcode === 'undefined') {
-      showToast('مكتبة الكاميرا غير محملة', 'error');
-      return;
-    }
-
-    // Create a temporary scanner instance on a detached or existing container
-    const scannerId = document.getElementById('camera-scanner-viewport') ? "camera-scanner-viewport" : "pos-embedded-camera-viewport";
-    const tempScanner = new Html5Qrcode(scannerId);
-    
-    const decodedText = await tempScanner.scanFile(file, false);
-    console.log(`📸 [Photo Barcode Decoded]: ${decodedText}`);
-    playScanBeep(true);
-    if (navigator.vibrate) navigator.vibrate(120);
-
-    showToast(`تم التقاط الباركود من الصورة: ${decodedText}`, 'check_circle');
-    handleScannedBarcode(decodedText, currentTargetField);
-  } catch (err) {
-    console.error('Photo decode error:', err);
-    playScanBeep(false);
-    showToast('تعذر قراءة الباركود من الصورة: يرجى التقاط صورة أوضح أو تقريب الكاميرا', 'warning');
-  } finally {
-    event.target.value = '';
-  }
-};
-
-window.togglePosEmbeddedCamera = async function() {
-  const container = document.getElementById('pos-camera-viewport-container');
-  const btnText = document.getElementById('pos-camera-btn-text');
-  const toggleBtn = document.getElementById('btn-toggle-pos-camera');
-
-  if (!container) return;
-
-  // If already running -> stop it
-  if (posEmbeddedScannerInstance) {
-    try {
-      await posEmbeddedScannerInstance.stop();
-    } catch (e) {}
-    posEmbeddedScannerInstance = null;
-    container.classList.add('hidden');
-    if (btnText) btnText.innerText = 'تشغيل الكاميرا الحية';
-    if (toggleBtn) toggleBtn.classList.replace('bg-emerald-600', 'bg-gradient-to-r');
-    showToast('تم إيقاف كاميرا الكاشير', 'videocam_off');
-    return;
-  }
-
-  // Start embedded camera
-  if (typeof Html5Qrcode === 'undefined') {
-    showToast('جاري تجهيز الكاميرا...', 'info');
-    return;
-  }
-
-  container.classList.remove('hidden');
-  if (btnText) btnText.innerText = 'إيقاف الكاميرا';
-
-  try {
-    posEmbeddedScannerInstance = new Html5Qrcode("pos-embedded-camera-viewport");
-    
-    const config = {
-      fps: 15,
-      qrbox: { width: 240, height: 140 },
-      aspectRatio: 1.333333
-    };
-
-    let cameraConfig = { facingMode: "environment" };
-    try {
-      const devices = await Html5Qrcode.getCameras();
-      if (devices && devices.length > 0) {
-        cameraConfig = devices[0].id;
-      }
-    } catch (e) {}
-
-    await posEmbeddedScannerInstance.start(
-      cameraConfig,
-      config,
-      (decodedText) => {
-        console.log(`🎯 [Embedded POS Scan]: ${decodedText}`);
-        playScanBeep(true);
-        if (navigator.vibrate) navigator.vibrate(100);
-
-        // Flash green ring on container
-        container.classList.add('ring-4', 'ring-emerald-400');
-        setTimeout(() => container.classList.remove('ring-4', 'ring-emerald-400'), 500);
-
-        handleScannedBarcode(decodedText, 'pos');
-      },
-      () => {}
-    );
-
-    showToast('كاميرا الكاشير الحية تعمل الآن! قرّب أي منتج أمام شاشة اللاب توب', 'videocam');
-
-  } catch (err) {
-    console.error('Embedded POS camera error:', err);
-    container.classList.add('hidden');
-    if (btnText) btnText.innerText = 'تشغيل الكاميرا الحية';
-    posEmbeddedScannerInstance = null;
-    showToast(`تعذر فتح الكاميرا: ${err.message || 'تأكد من فتح التطبيق عبر السيرفر المحلي أو السماح بالكاميرا'}`, 'error');
-  }
-};
-
-window.toggleFormEmbeddedCamera = async function() {
-  const container = document.getElementById('form-embedded-camera-container');
-  if (!container) return;
-
-  if (formEmbeddedScannerInstance) {
-    try {
-      await formEmbeddedScannerInstance.stop();
-    } catch (e) {}
-    formEmbeddedScannerInstance = null;
-    container.classList.add('hidden');
-    return;
-  }
-
-  if (typeof Html5Qrcode === 'undefined') return;
-
-  container.classList.remove('hidden');
-
-  try {
-    formEmbeddedScannerInstance = new Html5Qrcode("form-camera-viewport");
-    await formEmbeddedScannerInstance.start(
-      { facingMode: "environment" },
-      { fps: 15, qrbox: { width: 220, height: 130 } },
-      async (decodedText) => {
-        playScanBeep(true);
-        try {
-          await formEmbeddedScannerInstance.stop();
-        } catch (e) {}
-        formEmbeddedScannerInstance = null;
-        container.classList.add('hidden');
-
-        // Fill form
-        const barInput = document.getElementById('prod-barcode');
-        if (barInput) {
-          barInput.value = decodedText;
-          barInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        showToast(`تم تصوير الباركود بنجاح: ${decodedText}`, 'check_circle');
-        document.getElementById('prod-name')?.focus();
-      },
-      () => {}
-    );
-  } catch (err) {
-    container.classList.add('hidden');
-    formEmbeddedScannerInstance = null;
-    showToast('تعذر تشغيل الكاميرا داخل النموذج', 'error');
-  }
-};
