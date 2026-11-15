@@ -2293,9 +2293,10 @@ window.saveProductForm = async () => {
 window.confirmDeleteProduct = async (id) => {
   const prod = Store.products.find(p => p.id === id);
   if (!prod) return;
-  if (confirm(`هل أنت متأكد من حذف الصنف [${prod.name}] نهائياً من المخزن؟`)) {
+  if (confirm(`هل أنت متأكد تماماً من حذف الصنف [${prod.name}] نهائياً من المخزن؟\n\n⚠️ سيتم حذفه تماماً ولن يرجع نهائياً عند إدخال أي أكواد أخرى.`)) {
+    const prodName = prod.name;
     await deleteProduct(id);
-    showToast(`تم حذف الصنف [${prod.name}] بنجاح`, 'delete');
+    showToast(`تم حذف الصنف [${prodName}] نهائياً من السيستم`, 'delete');
     renderCurrentView();
   }
 };
