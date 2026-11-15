@@ -768,6 +768,166 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
   return invoiceData;
 }
 
+export async function updateSaleInvoice(invoiceId, updatedData) {
+  const invIdx = Store.salesInvoices.findIndex(s => s.id === invoiceId);
+  if (invIdx === -1) return false;
+
+  const invoice = Store.salesInvoices[invIdx];
+  const oldTotal = parseFloat(invoice.totalAmount) || 0;
+
+  // If specific item quantity, price, or details changed
+  if (updatedData.itemIndex !== undefined || updatedData.productId) {
+    let targetItem = null;
+    if (updatedData.itemIndex !== undefined && invoice.items && invoice.items[updatedData.itemIndex]) {
+      targetItem = invoice.items[updatedData.itemIndex];
+    } else if (updatedData.productId && invoice.items) {
+      targetItem = invoice.items.find(i => i.productId === updatedData.productId);
+    } else if (invoice.items && invoice.items.length > 0) {
+      targetItem = invoice.items[0];
+    }
+
+    if (targetItem) {
+      const oldQty = parseInt(targetItem.quantity, 10) || 1;
+      const newQty = updatedData.quantity !== undefined ? (parseInt(updatedData.quantity, 10) || 1) : oldQty;
+      const newPrice = updatedData.price !== undefined ? (parseFloat(updatedData.price) || 0) : targetItem.price;
+      const newBuyPrice = updatedData.buyPrice !== undefined ? (parseFloat(updatedData.buyPrice) || 0) : (targetItem.buyPrice || 0);
+
+      const qtyDiff = newQty - oldQty; // >0 means sold more, <0 means returned items to stock
+      if (qtyDiff !== 0 && targetItem.productId) {
+        const prod = Store.products.find(p => p.id === targetItem.productId);
+        if (prod) {
+          prod.quantity = Math.max(0, (parseInt(prod.quantity, 10) || 0) - qtyDiff);
+          prod.updatedAt = new Date().toISOString();
+          setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
+          notifySubscribers("products_updated", Store.products);
+          if (db) {
+            setDoc(doc(db, "products", prod.id), prod, { merge: true }).catch(console.warn);
+          }
+        }
+      }
+
+      targetItem.quantity = newQty;
+      targetItem.price = newPrice;
+      targetItem.buyPrice = newBuyPrice;
+      targetItem.total = newPrice * newQty;
+    }
+  }
+
+  // Recalculate invoice totals
+  const newSubtotal = invoice.items.reduce((acc, it) => acc + (parseFloat(it.total) || 0), 0);
+  const discount = updatedData.discount !== undefined ? (parseFloat(updatedData.discount) || 0) : (invoice.discount || 0);
+  const newTotal = Math.max(0, newSubtotal - discount);
+
+  invoice.subtotal = newSubtotal;
+  invoice.discount = discount;
+  invoice.totalAmount = newTotal;
+  if (updatedData.customerName !== undefined) invoice.customerName = updatedData.customerName;
+  if (updatedData.customerPhone !== undefined) invoice.customerPhone = updatedData.customerPhone;
+  if (updatedData.timestamp) invoice.timestamp = updatedData.timestamp;
+  invoice.updatedAt = new Date().toISOString();
+
+  // Adjust Cash Drawer if total amount changed
+  const cashDelta = newTotal - oldTotal;
+  if (cashDelta !== 0) {
+    await recordCashDrawerEntry({
+      type: cashDelta > 0 ? 'in' : 'out',
+      amount: Math.abs(cashDelta),
+      reason: `تعديل إجمالي فاتورة بيع ${invoice.invoiceNumber} (${cashDelta > 0 ? 'زيادة' : 'خصم'})`
+    });
+  }
+
+  // Save to local store & localStorage
+  setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+
+  // Update Firestore
+  if (db) {
+    try {
+      await updateDoc(doc(db, "sales_invoices", invoiceId), {
+        items: invoice.items,
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        totalAmount: invoice.totalAmount,
+        customerName: invoice.customerName,
+        customerPhone: invoice.customerPhone,
+        timestamp: invoice.timestamp,
+        updatedAt: invoice.updatedAt
+      });
+    } catch (err) {
+      try {
+        await setDoc(doc(db, "sales_invoices", invoiceId), invoice, { merge: true });
+      } catch (e2) {
+        console.warn("Error updating sale invoice in Firestore:", e2);
+      }
+    }
+  }
+
+  notifySubscribers("sales_updated", Store.salesInvoices);
+  return invoice;
+}
+
+export async function deleteSaleInvoice(invoiceId) {
+  const invIdx = Store.salesInvoices.findIndex(s => s.id === invoiceId);
+  if (invIdx === -1) return false;
+
+  const invoice = Store.salesInvoices[invIdx];
+
+  // 1. Revert product stock for each sold item
+  if (invoice.items && Array.isArray(invoice.items)) {
+    for (const item of invoice.items) {
+      if (item.productId) {
+        const prod = Store.products.find(p => p.id === item.productId);
+        if (prod) {
+          const qty = parseInt(item.quantity, 10) || 1;
+          prod.quantity = (parseInt(prod.quantity, 10) || 0) + qty;
+          if (prod.category === 'phones') {
+            prod.status = 'available';
+            delete prod.customerName;
+            delete prod.customerPhone;
+            delete prod.soldAt;
+          }
+          prod.updatedAt = new Date().toISOString();
+          if (db) {
+            try {
+              await setDoc(doc(db, "products", prod.id), prod, { merge: true });
+            } catch (err) {
+              console.warn("Error updating product stock in Firestore upon sale deletion:", err);
+            }
+          }
+        }
+      }
+    }
+    setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
+    notifySubscribers("products_updated", Store.products);
+  }
+
+  // 2. Adjust Cash Drawer (remove the cash that came in from this sale)
+  const amountToDeduct = parseFloat(invoice.totalAmount) || 0;
+  if (amountToDeduct > 0) {
+    await recordCashDrawerEntry({
+      type: 'out',
+      amount: amountToDeduct,
+      reason: `إلغاء وحذف نهائي لفاتورة بيع ${invoice.invoiceNumber || ''}`
+    });
+  }
+
+  // 3. Remove permanently from local store & localStorage
+  Store.salesInvoices.splice(invIdx, 1);
+  setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+
+  // 4. Delete permanently from Firestore
+  if (db) {
+    try {
+      await deleteDoc(doc(db, "sales_invoices", invoiceId));
+    } catch (err) {
+      console.warn("Error permanently deleting sale from Firestore:", err);
+    }
+  }
+
+  // 5. Notify all listeners
+  notifySubscribers("sales_updated", Store.salesInvoices);
+  return true;
+}
+
 // --- CASH DRAWER ENTRY ---
 
 export async function recordCashDrawerEntry({ type, amount, reason }) {

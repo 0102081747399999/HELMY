@@ -25,6 +25,8 @@ import {
   resetVodafoneLine,
   resetAllVodafoneLines,
   checkoutSale,
+  updateSaleInvoice,
+  deleteSaleInvoice,
   recordCashDrawerEntry
 } from './firebase-config.js';
 
@@ -443,7 +445,7 @@ window.switchCategoryTab = function(category, tab) {
 function getCategorySales(cat) {
   const sales = [];
   (Store.salesInvoices || []).forEach(inv => {
-    (inv.items || []).forEach(item => {
+    (inv.items || []).forEach((item, itemIdx) => {
       const itemCat = item.category || '';
       let matches = (itemCat === cat);
       if (!matches && cat === 'chargers' && (itemCat === 'chargers' || itemCat === 'chargers-cables')) matches = true;
@@ -451,10 +453,12 @@ function getCategorySales(cat) {
 
       if (matches) {
         sales.push({
+          invoiceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
           timestamp: inv.timestamp,
           customerName: inv.customerName || 'عميل نقدي',
           customerPhone: inv.customerPhone || '',
+          itemIndex: itemIdx,
           ...item
         });
       }
@@ -469,7 +473,7 @@ function renderSalesTableHTML(salesList, categoryArabicName) {
   if (salesList.length === 0) {
     return `
       <tr>
-        <td colspan="8" class="py-14 text-center">
+        <td colspan="9" class="py-14 text-center">
           <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
             <span class="material-symbols-outlined text-[38px] opacity-30">receipt_long</span>
             <span class="font-headline-sm font-bold text-on-surface">لا توجد عمليات بيع مسجلة لهذا القسم حتى الآن</span>
@@ -513,6 +517,18 @@ function renderSalesTableHTML(salesList, categoryArabicName) {
         <td class="py-3 px-4 text-on-surface-variant">
           ${sale.customerName || 'عميل نقدي'} (${sale.invoiceNumber})
         </td>
+        <td class="py-3 px-4 text-center">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="window.openEditSaleModal('${sale.invoiceId}', '${sale.productId || sale.barcode || ''}')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-600 hover:text-white font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer" title="تعديل عملية البيع">
+              <span class="material-symbols-outlined text-[15px]">edit</span>
+              <span>تعديل</span>
+            </button>
+            <button onclick="window.confirmDeleteSale('${sale.invoiceId}')" class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer" title="حذف نهائي للعملية واسترجاع المخزون">
+              <span class="material-symbols-outlined text-[15px]">delete_forever</span>
+              <span>حذف</span>
+            </button>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
@@ -549,9 +565,17 @@ function renderDashboard() {
           <td class="py-3 px-4 font-numeric-table font-bold text-on-surface">${formatMoney(inv.totalAmount)} ج.م</td>
           <td class="py-3 px-4 text-on-surface-variant text-xs">${inv.customerName || 'عميل نقدي'}</td>
           <td class="py-3 px-4 text-center">
-            <button onclick="window.printInvoiceReceipt('${inv.id}')" class="p-1.5 rounded-lg text-secondary hover:bg-secondary/10 transition-colors" title="عرض تفاصيل الفاتورة">
-              <span class="material-symbols-outlined text-[18px]">receipt_long</span>
-            </button>
+            <div class="flex items-center justify-center gap-1">
+              <button onclick="window.printInvoiceReceipt('${inv.id}')" class="p-1.5 rounded-lg text-secondary hover:bg-secondary/10 transition-colors cursor-pointer" title="عرض تفاصيل الفاتورة">
+                <span class="material-symbols-outlined text-[18px]">receipt_long</span>
+              </button>
+              <button onclick="window.openEditSaleModal('${inv.id}')" class="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer" title="تعديل عملية البيع">
+                <span class="material-symbols-outlined text-[18px]">edit</span>
+              </button>
+              <button onclick="window.confirmDeleteSale('${inv.id}')" class="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer" title="حذف نهائي للعملية واسترجاع المخزون">
+                <span class="material-symbols-outlined text-[18px]">delete_forever</span>
+              </button>
+            </div>
           </td>
         </tr>
       `).join('');
@@ -616,30 +640,45 @@ function renderVodafoneHub() {
       return `
         <button 
           onclick="window.selectVodafoneLine(${l.lineNum})"
-          class="p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer relative ${
+          class="p-2.5 rounded-xl border flex flex-col justify-between gap-1.5 transition-all cursor-pointer relative text-right min-h-[72px] ${
             isSelected 
-              ? 'bg-primary text-white border-primary shadow-md ring-2 ring-rose-500/40' 
+              ? 'bg-rose-600 text-white border-rose-500 shadow-md ring-2 ring-rose-500/50' 
               : 'bg-surface-container-low hover:bg-surface-container text-on-surface border-outline-variant/30'
           }"
+          title="خط ${l.lineNum} - ${hasPhone ? l.phone : 'اضغط لإضافة الرقم'}"
         >
-          <div class="flex items-center gap-1">
-            <span class="text-xs font-bold">خط ${l.lineNum}</span>
-            <span class="w-2 h-2 rounded-full ${hasBalance ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
+          <div class="flex items-center justify-between w-full">
+            <span class="text-xs font-black flex items-center gap-1">
+              <span class="material-symbols-outlined text-[15px] ${isSelected ? 'text-white' : 'text-rose-400'}">sim_card</span>
+              <span>خط ${l.lineNum}</span>
+            </span>
+            <span class="w-2.5 h-2.5 rounded-full ${hasBalance ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-slate-500'}"></span>
           </div>
-          <span class="font-numeric-table font-bold text-[11px] ${isSelected ? 'text-white' : 'text-emerald-400'}">
-            ${formatMoney(l.balance || 0)}
-          </span>
-          <span class="text-[9px] truncate max-w-[80px] ${isSelected ? 'text-rose-200' : 'text-on-surface-variant'}">
-            ${hasPhone ? l.phone : 'بدون رقم'}
-          </span>
+
+          <div class="w-full text-center py-1 px-1.5 rounded-lg ${isSelected ? 'bg-black/25' : 'bg-surface-container border border-outline-variant/20'}">
+            <span class="font-numeric-table font-bold text-xs block truncate ${hasPhone ? (isSelected ? 'text-white' : 'text-sky-300') : (isSelected ? 'text-rose-200' : 'text-amber-400/90')}">
+              ${hasPhone ? l.phone : '+ أضف الرقم'}
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between w-full text-[11px] pt-0.5 border-t ${isSelected ? 'border-white/20' : 'border-outline-variant/20'}">
+            <span class="text-[10px] ${isSelected ? 'text-rose-200' : 'text-on-surface-variant'}">الرصيد:</span>
+            <span class="font-numeric-table font-black ${isSelected ? 'text-white' : 'text-emerald-400'}">
+              ${formatMoney(l.balance || 0)} ج.م
+            </span>
+          </div>
         </button>
       `;
     }).join('');
   }
 
   // Active Line Details
-  setElemText('active-line-badge', `خط ${line.lineNum} - نشط`);
-  setElemText('active-line-phone-display', line.phone || 'لم يتم تعيين رقم هاتف للخط');
+  setElemText('active-line-badge', `خط ${line.lineNum} ${line.phone ? '- ' + line.phone : ''} (نشط)`);
+  setElemText('active-line-phone-display', line.phone ? `رقم الشريحة: ${line.phone}` : 'لم يتم تسجيل رقم هاتف للخط');
+  const quickPhoneInput = document.getElementById('active-line-quick-phone');
+  if (quickPhoneInput) quickPhoneInput.value = line.phone || '';
+  const quickPhoneLabel = document.getElementById('active-line-quick-label');
+  if (quickPhoneLabel) quickPhoneLabel.innerText = `رقم هاتف خط ${line.lineNum} (فودافون كاش):`;
   setElemText('active-line-balance-big', `${formatMoney(line.balance || 0)} ج.م`);
   setElemText('active-line-month-transferred', `${formatMoney(line.totalTransferredMonth || 0)} ج.م`);
   
@@ -2882,3 +2921,217 @@ function getCategoryViewPath(cat) {
 
 window.navigateTo = navigateTo;
 window.formatMoney = formatMoney;
+
+// ==========================================
+// VODAFONE QUICK PHONE NUMBER ACTIONS
+// ==========================================
+
+window.saveActiveLineQuickPhone = async () => {
+  const lineNum = AppState.activeVodafoneLine;
+  const input = document.getElementById('active-line-quick-phone');
+  const phone = (input?.value || '').trim();
+
+  await updateVodafoneLineSettings(lineNum, { phone });
+  showToast(`تم حفظ رقم خط ${lineNum} بنجاح: ${phone || 'تم تفريغ الرقم'}`, 'check_circle');
+  renderVodafoneHub();
+};
+
+window.openAllLinesModal = () => {
+  const container = document.getElementById('all-lines-inputs-grid');
+  if (container) {
+    container.innerHTML = Store.vodafoneLines.map(l => `
+      <div class="p-3 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-xs text-on-surface flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-rose-500 text-sm">sim_card</span>
+            <span>خط ${l.lineNum}</span>
+          </span>
+          <span class="font-numeric-table font-bold text-[11px] text-emerald-400">${formatMoney(l.balance || 0)} ج.م</span>
+        </div>
+        <div>
+          <label class="block text-[10px] text-on-surface-variant font-bold mb-1">رقم الشريحة (فودافون كاش):</label>
+          <input type="tel" data-line-num="${l.lineNum}" value="${l.phone || ''}" placeholder="010xxxxxxxx" class="all-lines-phone-input w-full bg-surface-container text-on-surface font-numeric-table font-bold text-xs rounded-xl px-3 py-2 border border-outline-variant/40 focus:ring-2 focus:ring-rose-500 focus:outline-none" />
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const modal = document.getElementById('modal-all-lines-phones');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closeAllLinesModal = () => {
+  const modal = document.getElementById('modal-all-lines-phones');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.saveAllLinesPhones = async () => {
+  const inputs = document.querySelectorAll('.all-lines-phone-input');
+  let count = 0;
+  for (const input of inputs) {
+    const lineNum = parseInt(input.getAttribute('data-line-num'), 10);
+    const phone = (input.value || '').trim();
+    if (lineNum >= 1 && lineNum <= 18) {
+      await updateVodafoneLineSettings(lineNum, { phone });
+      count++;
+    }
+  }
+  closeAllLinesModal();
+  showToast(`تم حفظ وتحديث أرقام جميع الخطوط بنجاح (${count} خط)`, "check_circle");
+  renderVodafoneHub();
+};
+
+// ==========================================
+// SALES EDIT & PERMANENT DELETE HANDLERS
+// ==========================================
+
+window.openEditSaleModal = (invoiceId, productIdOrBarcode) => {
+  const inv = Store.salesInvoices.find(s => s.id === invoiceId);
+  if (!inv) {
+    showToast("لم يتم العثور على الفاتورة المطلوبة", "error");
+    return;
+  }
+
+  // Find target item
+  let targetItem = null;
+  if (productIdOrBarcode && inv.items) {
+    targetItem = inv.items.find(i => i.productId === productIdOrBarcode || i.barcode === productIdOrBarcode);
+  }
+  if (!targetItem && inv.items && inv.items.length > 0) {
+    targetItem = inv.items[0];
+  }
+
+  if (!targetItem) {
+    showToast("لا توجد أصناف قابلة للتعديل في هذه الفاتورة", "error");
+    return;
+  }
+
+  setElemValue('edit-sale-invoice-id', inv.id);
+  setElemValue('edit-sale-product-id', targetItem.productId || '');
+  setElemValue('edit-sale-buy-price', targetItem.buyPrice || 0);
+  setElemText('edit-sale-inv-num', `فاتورة رقم: ${inv.invoiceNumber}`);
+  setElemText('edit-sale-prod-name', targetItem.name || 'منتج');
+  setElemText('edit-sale-prod-barcode', `الكود: ${targetItem.barcode || '-'}`);
+  setElemText('edit-sale-buy-price-display', `${formatMoney(targetItem.buyPrice || 0)} ج.م`);
+
+  setElemValue('edit-sale-qty', targetItem.quantity || 1);
+  setElemValue('edit-sale-price', targetItem.price || 0);
+  setElemValue('edit-sale-customer-name', inv.customerName || '');
+  setElemValue('edit-sale-customer-phone', inv.customerPhone || '');
+
+  // Format timestamp for datetime-local: YYYY-MM-DDTHH:mm
+  try {
+    const d = inv.timestamp ? new Date(inv.timestamp) : new Date();
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
+    setElemValue('edit-sale-timestamp', localISOTime);
+  } catch (e) {
+    setElemValue('edit-sale-timestamp', '');
+  }
+
+  window.calcEditSaleTotals();
+
+  const modal = document.getElementById('modal-edit-sale');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closeEditSaleModal = () => {
+  const modal = document.getElementById('modal-edit-sale');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.calcEditSaleTotals = () => {
+  const qty = parseInt(document.getElementById('edit-sale-qty')?.value, 10) || 1;
+  const price = parseFloat(document.getElementById('edit-sale-price')?.value) || 0;
+  const buyPrice = parseFloat(document.getElementById('edit-sale-buy-price')?.value) || 0;
+
+  const total = price * qty;
+  const profit = (price - buyPrice) * qty;
+
+  setElemText('edit-sale-total-display', `${formatMoney(total)} ج.م`);
+  const profitEl = document.getElementById('edit-sale-profit-display');
+  if (profitEl) {
+    profitEl.innerText = `${profit >= 0 ? '+' : ''}${formatMoney(profit)} ج.م`;
+    profitEl.className = `font-numeric-table font-black text-lg ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+  }
+};
+
+window.saveEditedSale = async () => {
+  const invoiceId = document.getElementById('edit-sale-invoice-id')?.value;
+  const productId = document.getElementById('edit-sale-product-id')?.value;
+  const qty = parseInt(document.getElementById('edit-sale-qty')?.value, 10) || 1;
+  const price = parseFloat(document.getElementById('edit-sale-price')?.value) || 0;
+  const customerName = (document.getElementById('edit-sale-customer-name')?.value || '').trim() || 'عميل نقدي';
+  const customerPhone = (document.getElementById('edit-sale-customer-phone')?.value || '').trim();
+  const timeVal = document.getElementById('edit-sale-timestamp')?.value;
+  const timestamp = timeVal ? new Date(timeVal).toISOString() : new Date().toISOString();
+
+  if (qty <= 0) {
+    showToast("يجب أن تكون الكمية المباعة 1 على الأقل", "warning");
+    return;
+  }
+  if (price < 0) {
+    showToast("سعر البيع لا يمكن أن يكون سالباً", "warning");
+    return;
+  }
+
+  const updated = await updateSaleInvoice(invoiceId, {
+    productId,
+    quantity: qty,
+    price,
+    customerName,
+    customerPhone,
+    timestamp
+  });
+
+  if (updated) {
+    closeEditSaleModal();
+    showToast("تم حفظ تعديلات عملية البيع وتحديث المخزون والدرج بنجاح", "check_circle");
+    renderCurrentView();
+    updateGlobalHeaderBadges();
+  } else {
+    showToast("تعذر حفظ التعديل، يرجى المحاولة مرة أخرى", "error");
+  }
+};
+
+window.confirmDeleteSale = async (invoiceId) => {
+  const inv = Store.salesInvoices.find(s => s.id === invoiceId);
+  if (!inv) {
+    showToast("لم يتم العثور على الفاتورة المطلوبة", "error");
+    return;
+  }
+
+  const itemsDesc = inv.items ? inv.items.map(i => `${i.name} (${i.quantity} حبة)`).join(' + ') : 'الصنف المباع';
+  const totalAmount = formatMoney(inv.totalAmount || 0);
+
+  const confirmMsg = `هل أنت متأكد تماماً من حذف عملية البيع (فاتورة رقم ${inv.invoiceNumber}) نهائياً؟\n\n` +
+    `📦 الصنف: ${itemsDesc}\n` +
+    `💰 الإجمالي: ${totalAmount} ج.م\n\n` +
+    `⚠️ تنبيه هام:\n` +
+    `1. سيتم حذف الفاتورة نهائياً وتاماً من السيستم وقاعدة البيانات.\n` +
+    `2. سيتم استرجاع الكمية المباعة إلى المخزون تلقائياً.\n` +
+    `3. سيتم خصم مبلغ الفاتورة من الخزينة تلقائياً.`;
+
+  if (confirm(confirmMsg)) {
+    const success = await deleteSaleInvoice(invoiceId);
+    if (success) {
+      showToast(`تم حذف فاتورة البيع ${inv.invoiceNumber} نهائياً واسترجاع البضاعة للمخزن بنجاح`, "delete");
+      renderCurrentView();
+      updateGlobalHeaderBadges();
+    } else {
+      showToast("تعذر حذف الفاتورة، يرجى المحاولة مرة أخرى", "error");
+    }
+  }
+};
