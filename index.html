@@ -271,69 +271,84 @@
            ========================================== -->
       <section id="view-dashboard-overview" class="flex flex-col gap-6">
         
-        <!-- Store Hero Banner (سنترال حلمي) -->
-        <div class="relative w-full rounded-2xl overflow-hidden shadow-2xl border border-rose-950/40 bg-slate-950 group">
-          <div class="relative w-full h-40 sm:h-48 md:h-56 overflow-hidden bg-slate-950">
-            <img 
-              id="adminStoreBannerImg" 
-              src="images/hilmy-banner.svg" 
-              alt="سنترال حلمي - إدارة محمد حلمي" 
-              class="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]"
-              onerror="this.onerror=null; this.src='images/hilmy-banner.svg';"
-            />
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
-            <div class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/30 to-rose-950/40"></div>
-            <div class="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none"></div>
-          </div>
+        <!-- Store Hero Banner (الصورة لوحدها تماماً بدون أي كتابة فوقها أو تداخل) -->
+        <div class="w-full rounded-2xl overflow-hidden shadow-2xl border border-rose-950/40 bg-slate-950 group">
+          <img 
+            id="adminStoreBannerImg" 
+            src="images/hilmy-banner.svg" 
+            alt="بانر سنترال حلمي" 
+            class="w-full h-44 sm:h-56 md:h-64 lg:h-72 object-cover object-center transition-transform duration-700 group-hover:scale-[1.01]"
+            onerror="this.onerror=null; this.src='images/hilmy-banner.svg';"
+          />
+        </div>
 
-          <div class="absolute bottom-0 inset-x-0 p-4 sm:p-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div class="flex items-center gap-3 sm:gap-4">
-              <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-rose-600 via-red-600 to-rose-950 p-[2px] shadow-2xl shrink-0 ring-2 ring-rose-500/50">
-                <div class="w-full h-full bg-slate-950/95 backdrop-blur-md rounded-[14px] flex flex-col items-center justify-center">
-                  <span class="text-xl sm:text-2xl font-black text-rose-500 tracking-wider">حلمي</span>
-                  <span class="text-[8px] font-bold text-slate-400 tracking-widest -mt-1 uppercase">POS</span>
-                </div>
+        <!-- Store Header & Management Bar (كل الكتابة واللوجو مترتبة بره بنظام وشياكة) -->
+        <div class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl backdrop-blur-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+          
+          <!-- القسم الأيمن: اللوجو + الاسم + وسم إدارة محمد حلمي + الشارات -->
+          <div class="flex items-center gap-4 sm:gap-5 flex-wrap sm:flex-nowrap">
+            <!-- صندوق اللوجو المستقل -->
+            <div class="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-gradient-to-br from-rose-600 via-red-600 to-rose-950 p-[2px] shadow-xl shrink-0 ring-2 ring-rose-500/40">
+              <div class="w-full h-full bg-slate-950 rounded-[14px] flex flex-col items-center justify-center">
+                <span class="text-2xl font-black text-rose-500 tracking-wider">حلمي</span>
+                <span class="text-[9px] font-bold text-slate-400 tracking-widest uppercase">POS</span>
               </div>
+            </div>
 
-              <div>
-                <div class="flex items-center gap-2 flex-wrap mb-1">
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-600 text-white shadow-md shadow-rose-900/50 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-                    سنترال حلمي 🟢
-                  </span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-900/80 text-rose-300 border border-rose-800/60 backdrop-blur-md">
-                    ⚡ 18 محفظة كاش
-                  </span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-900/80 text-emerald-300 border border-emerald-800/60 backdrop-blur-md">
-                    📱 نظام الكود الذكي يدوي ومسح
-                  </span>
-                </div>
-
-                <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
-                  سنترال حلمي <span class="text-rose-500 font-extrabold text-xl sm:text-2xl tracking-widest">| CENTRAL HILMY</span>
+            <!-- بيانات المحل المنظمة -->
+            <div class="flex flex-col gap-1.5">
+              <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  سنترال حلمي
                 </h1>
                 
-                <p class="text-xs sm:text-sm text-slate-300 mt-0.5 font-medium drop-shadow-md max-w-2xl">
-                  منظومة نقاط البيع الذكية والمخازن المتكاملة (شواحن، وصلات، سماعات، صبات، تليفونات، وجرابات) مع ربط رسائل الهاتف وتصفير الخطوط.
-                </p>
+                <!-- وسم الإدارة الرسمي -->
+                <span class="px-3.5 py-1 rounded-xl text-xs sm:text-sm font-black bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm flex items-center gap-1.5">
+                  <span class="text-sm">👑</span>
+                  <span>إدارة: محمد حلمي</span>
+                </span>
+
+                <!-- شارة حالة النظام -->
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-600/90 text-white shadow-sm flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  النظام متصل
+                </span>
+              </div>
+
+              <!-- تفاصيل الأقسام والخدمات -->
+              <div class="flex items-center gap-2 flex-wrap text-xs text-slate-300 font-medium">
+                <span class="px-2.5 py-0.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-rose-300 flex items-center gap-1">
+                  ⚡ 18 محفظة فودافون كاش
+                </span>
+                <span class="px-2.5 py-0.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-sky-300 flex items-center gap-1">
+                  📱 مخازن ومبيعات بالباركود
+                </span>
+                <span class="px-2.5 py-0.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-emerald-300 flex items-center gap-1">
+                  ⚡ درج نقدية تلقائي
+                </span>
+                <span class="text-slate-400 text-[11px] hidden md:inline">
+                  (شواحن • وصلات • سماعات • صبات • تليفونات • جرابات)
+                </span>
               </div>
             </div>
-
-            <div class="flex items-center gap-2 flex-wrap shrink-0">
-              <button onclick="window.triggerQuickPOS()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-950/60 flex items-center gap-1.5 border border-rose-400/30 transition-all cursor-pointer">
-                <span class="material-symbols-outlined text-base">point_of_sale</span>
-                <span>نقطة بيع سريعة (F2)</span>
-              </button>
-              <button onclick="window.openAddProductModal()" class="px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs border border-slate-700/60 backdrop-blur-md flex items-center gap-1.5 transition-all cursor-pointer">
-                <span class="material-symbols-outlined text-base">add_box</span>
-                <span>إضافة صنف</span>
-              </button>
-              <button onclick="window.openSMSParserModal()" class="px-3 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold text-xs border border-emerald-700/60 backdrop-blur-md flex items-center gap-1.5 transition-all cursor-pointer">
-                <span class="material-symbols-outlined text-base">mark_email_read</span>
-                <span>📩 لصق رسالة كاش</span>
-              </button>
-            </div>
           </div>
+
+          <!-- القسم الأيسر: أزرار العمليات السريعة مترتبة بنظام -->
+          <div class="flex items-center gap-2.5 flex-wrap shrink-0 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800">
+            <button onclick="window.triggerQuickPOS()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-950/60 flex items-center justify-center gap-2 border border-rose-400/30 transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-lg">point_of_sale</span>
+              <span>نقطة بيع سريعة (F2)</span>
+            </button>
+            <button onclick="window.openAddProductModal()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-slate-700/80 shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-lg">add_box</span>
+              <span>إضافة صنف</span>
+            </button>
+            <button onclick="window.openSMSParserModal()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 font-bold text-xs border border-emerald-700/60 shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-lg">mark_email_read</span>
+              <span>📩 رسائل كاش الهاتف</span>
+            </button>
+          </div>
+
         </div>
 
         <!-- Dashboard KPI Summary Cards -->
@@ -3117,6 +3132,29 @@ async function initRealtimeSync() {
       console.warn("Drawer sync error:", error);
     });
 
+    // 6. Sync SMS Inbox (Filtered with permanent deleted blacklist)
+    const smsCol = collection(db, "sms_inbox");
+    onSnapshot(smsCol, (snapshot) => {
+      const blacklist = getDeletedSMSBlacklist();
+      const messages = [];
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        const docId = docSnap.id;
+        const internalId = d.id || '';
+        if (blacklist.has(docId) || (internalId && blacklist.has(internalId))) {
+          deleteDoc(doc(db, "sms_inbox", docId)).catch(console.warn);
+          return;
+        }
+        messages.push({ id: docId, ...d });
+      });
+      messages.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      Store.smsInbox = messages;
+      setLocal(STORAGE_KEYS.SMS_INBOX, messages);
+      notifySubscribers("sms_inbox_updated", messages);
+    }, (error) => {
+      console.warn("SMS inbox sync error:", error);
+    });
+
   } catch (err) {
     console.error("Firebase sync initialization failed:", err);
     updateConnectionUI(false, "وضع العمل المحلي");
@@ -3710,6 +3748,9 @@ function deleteSMS(smsId) {
     setLocal(STORAGE_KEYS.SMS_INBOX, Store.smsInbox);
     notifySubscribers("sms_inbox_updated", Store.smsInbox);
   }
+  if (db && smsId) {
+    deleteDoc(doc(db, "sms_inbox", smsId)).catch(console.warn);
+  }
 }
 
 function clearAllSMS() {
@@ -3722,6 +3763,11 @@ function clearAllSMS() {
   notifySubscribers("sms_inbox_updated", []);
   if (typeof fetch !== 'undefined') {
     fetch('/api/clear-sms', { method: 'POST' }).catch(() => {});
+  }
+  if (db) {
+    getDocs(collection(db, "sms_inbox")).then(snap => {
+      snap.forEach(d => deleteDoc(doc(db, "sms_inbox", d.id)).catch(console.warn));
+    }).catch(console.warn);
   }
 }
 
@@ -4172,6 +4218,14 @@ async function processIncomingSMS({ sender, body, simPhone, slot, timestamp }) {
     }
     smsRecord.isProcessed = true;
     setLocal(STORAGE_KEYS.SMS_INBOX, Store.smsInbox);
+  }
+
+  if (db) {
+    try {
+      await setDoc(doc(db, "sms_inbox", smsRecord.id), smsRecord);
+    } catch (err) {
+      console.warn("Failed to sync SMS to Firestore:", err);
+    }
   }
 
   notifySubscribers("sms_received", smsRecord);

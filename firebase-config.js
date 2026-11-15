@@ -454,6 +454,29 @@ export async function initRealtimeSync() {
       console.warn("Drawer sync error:", error);
     });
 
+    // 6. Sync SMS Inbox (Filtered with permanent deleted blacklist)
+    const smsCol = collection(db, "sms_inbox");
+    onSnapshot(smsCol, (snapshot) => {
+      const blacklist = getDeletedSMSBlacklist();
+      const messages = [];
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        const docId = docSnap.id;
+        const internalId = d.id || '';
+        if (blacklist.has(docId) || (internalId && blacklist.has(internalId))) {
+          deleteDoc(doc(db, "sms_inbox", docId)).catch(console.warn);
+          return;
+        }
+        messages.push({ id: docId, ...d });
+      });
+      messages.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      Store.smsInbox = messages;
+      setLocal(STORAGE_KEYS.SMS_INBOX, messages);
+      notifySubscribers("sms_inbox_updated", messages);
+    }, (error) => {
+      console.warn("SMS inbox sync error:", error);
+    });
+
   } catch (err) {
     console.error("Firebase sync initialization failed:", err);
     updateConnectionUI(false, "وضع العمل المحلي");
@@ -1047,6 +1070,9 @@ export function deleteSMS(smsId) {
     setLocal(STORAGE_KEYS.SMS_INBOX, Store.smsInbox);
     notifySubscribers("sms_inbox_updated", Store.smsInbox);
   }
+  if (db && smsId) {
+    deleteDoc(doc(db, "sms_inbox", smsId)).catch(console.warn);
+  }
 }
 
 export function clearAllSMS() {
@@ -1059,6 +1085,11 @@ export function clearAllSMS() {
   notifySubscribers("sms_inbox_updated", []);
   if (typeof fetch !== 'undefined') {
     fetch('/api/clear-sms', { method: 'POST' }).catch(() => {});
+  }
+  if (db) {
+    getDocs(collection(db, "sms_inbox")).then(snap => {
+      snap.forEach(d => deleteDoc(doc(db, "sms_inbox", d.id)).catch(console.warn));
+    }).catch(console.warn);
   }
 }
 
@@ -1509,6 +1540,14 @@ export async function processIncomingSMS({ sender, body, simPhone, slot, timesta
     }
     smsRecord.isProcessed = true;
     setLocal(STORAGE_KEYS.SMS_INBOX, Store.smsInbox);
+  }
+
+  if (db) {
+    try {
+      await setDoc(doc(db, "sms_inbox", smsRecord.id), smsRecord);
+    } catch (err) {
+      console.warn("Failed to sync SMS to Firestore:", err);
+    }
   }
 
   notifySubscribers("sms_received", smsRecord);
