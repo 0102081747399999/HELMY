@@ -1831,6 +1831,20 @@
           </div>
         </div>
 
+        <!-- Dual Tab Switcher: مخزون المخزن اليدوي VS مبيعات المخزن اليدوي -->
+        <div class="flex items-center gap-2 border-b border-outline-variant/30 pb-3 flex-wrap">
+          <button onclick="window.switchCategoryTab('manual', 'inventory')" data-cat-tab-for="manual" data-cat-tab="inventory" class="px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-amber-500/40 flex items-center gap-2 cursor-pointer">
+            <span class="material-symbols-outlined text-base">inventory_2</span>
+            <span>📦 مخزون الأصناف اليدوية بالمحل</span>
+          </button>
+          <button onclick="window.switchCategoryTab('manual', 'sales')" data-cat-tab-for="manual" data-cat-tab="sales" class="px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-2 cursor-pointer">
+            <span class="material-symbols-outlined text-base">receipt_long</span>
+            <span>📜 مبيعات المخزن اليدوي (<span id="manual-sales-count-badge">0 مبيعات</span>)</span>
+          </button>
+        </div>
+
+        <!-- TAB 1: MANUAL INVENTORY CONTAINER (المخزون اليدوي) -->
+        <div id="manual-inventory-container" class="flex flex-col gap-6">
         <!-- KPI Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div class="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col gap-1">
@@ -1946,6 +1960,75 @@
                 <!-- Populated by JS -->
               </tbody>
             </table>
+          </div>
+        </div>
+        </div>
+
+        <!-- TAB 2: MANUAL SALES CONTAINER (مبيعات المخزن اليدوي) -->
+        <div id="manual-sales-container" class="hidden flex flex-col gap-6">
+          <!-- Manual Sales KPIs -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col gap-1">
+              <span class="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-emerald-500 text-base">payments</span>
+                <span>إجمالي مبيعات المخزن اليدوي</span>
+              </span>
+              <span id="manual-sales-total-val" class="font-numeric-table font-bold text-2xl text-emerald-500">0.00 ج.م</span>
+              <span class="text-[11px] text-on-surface-variant">إيراد الأصناف اليدوية المباعة</span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col gap-1">
+              <span class="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-teal-500 text-base">trending_up</span>
+                <span>صافي الأرباح المحققة</span>
+              </span>
+              <span id="manual-sales-profit-val" class="font-numeric-table font-bold text-2xl text-teal-400">+0.00 ج.م</span>
+              <span class="text-[11px] text-emerald-400 font-bold">أرباح نقدية فعلية</span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col gap-1">
+              <span class="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sky-500 text-base">receipt_long</span>
+                <span>عدد عمليات البيع اليدوية</span>
+              </span>
+              <span id="manual-sales-operations-count" class="font-numeric-table font-bold text-2xl text-sky-400">0</span>
+              <span class="text-[11px] text-on-surface-variant">عملية بيع مسجلة</span>
+            </div>
+          </div>
+
+          <!-- Manual Sales Table -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col">
+            <div class="p-4 border-b border-outline-variant/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-500 text-lg">receipt_long</span>
+                <span class="font-bold text-sm text-on-surface">سجل مبيعات المخزن اليدوي والأصناف الحرة</span>
+              </div>
+              <div class="relative flex-1 max-w-sm">
+                <span class="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg">search</span>
+                <input type="text" id="manual-sales-search-input" oninput="window.renderManualInventoryPage()" placeholder="بحث في مبيعات المخزن اليدوي..." class="w-full bg-surface-container-low text-on-surface rounded-xl pr-10 pl-4 py-2 text-xs border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"/>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-right text-sm">
+                <thead class="bg-surface-container-low text-on-surface-variant border-b border-outline-variant/20 text-xs">
+                  <tr>
+                    <th class="py-3 px-4 font-bold">تاريخ وتوقيت البيع</th>
+                    <th class="py-3 px-4 font-bold">الكود / الباركود</th>
+                    <th class="py-3 px-4 font-bold">اسم الصنف اليدوي</th>
+                    <th class="py-3 px-4 font-bold">الكمية</th>
+                    <th class="py-3 px-4 font-bold">سعر البيع</th>
+                    <th class="py-3 px-4 font-bold">الإجمالي</th>
+                    <th class="py-3 px-4 font-bold">صافي الربح</th>
+                    <th class="py-3 px-4 font-bold">العميل ورقم الفاتورة</th>
+                    <th class="py-3 px-4 font-bold text-center">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="manual-sales-table-body" class="divide-y divide-outline-variant/10 text-xs">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -5357,12 +5440,27 @@ function getCategorySales(cat) {
   const sales = [];
   (Store.salesInvoices || []).forEach(inv => {
     (inv.items || []).forEach((item, itemIdx) => {
-      const itemCat = item.category || '';
+      // Find matching product if category is missing or general
+      const itemProd = item.productId 
+        ? Store.products.find(p => p.id === item.productId) 
+        : (item.barcode ? Store.products.find(p => p.barcode === item.barcode || p.imei === item.barcode) : null);
+      
+      const itemCat = item.category || (itemProd ? itemProd.category : 'general');
+
       let matches = (itemCat === cat);
       if (!matches && cat === 'chargers' && (itemCat === 'chargers' || itemCat === 'chargers-cables')) matches = true;
       if (!matches && cat === 'cables' && (itemCat === 'cables' || itemCat === 'chargers-cables')) matches = true;
 
       if (matches) {
+        const buyP = (item.buyPrice !== undefined && item.buyPrice !== null && !isNaN(parseFloat(item.buyPrice))) 
+          ? parseFloat(item.buyPrice) 
+          : (itemProd ? (itemProd.buyPrice || 0) : 0);
+        const sellP = parseFloat(item.price) || 0;
+        const q = parseInt(item.quantity, 10) || 1;
+        const profit = (item.profit !== undefined && item.profit !== null && !isNaN(parseFloat(item.profit)))
+          ? parseFloat(item.profit)
+          : ((sellP - buyP) * q);
+
         sales.push({
           invoiceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
@@ -5370,7 +5468,12 @@ function getCategorySales(cat) {
           customerName: inv.customerName || 'عميل نقدي',
           customerPhone: inv.customerPhone || '',
           itemIndex: itemIdx,
-          ...item
+          ...item,
+          category: itemCat,
+          buyPrice: buyP,
+          price: sellP,
+          quantity: q,
+          profit
         });
       }
     });
@@ -8310,6 +8413,30 @@ function isToday(isoStr) {
   return d.toDateString() === now.toDateString();
 }
 
+function isYesterday(isoStr) {
+  if (!isoStr) return false;
+  const d = new Date(isoStr);
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  return d.toDateString() === y.toDateString();
+}
+
+function isLast7Days(isoStr) {
+  if (!isoStr) return false;
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diffTime = now.getTime() - d.getTime();
+  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= 7;
+}
+
+function isThisMonth(isoStr) {
+  if (!isoStr) return false;
+  const d = new Date(isoStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
 function setElemText(id, val) {
   const el = document.getElementById(id);
   if (el) el.innerText = val;
@@ -8429,8 +8556,12 @@ window.openEditSaleModal = (invoiceId, productIdOrBarcode) => {
 
   // Find target item
   let targetItem = null;
-  if (productIdOrBarcode && inv.items) {
-    targetItem = inv.items.find(i => i.productId === productIdOrBarcode || i.barcode === productIdOrBarcode);
+  if (productIdOrBarcode !== undefined && productIdOrBarcode !== null && inv.items) {
+    if (typeof productIdOrBarcode === 'number' && inv.items[productIdOrBarcode]) {
+      targetItem = inv.items[productIdOrBarcode];
+    } else {
+      targetItem = inv.items.find(i => i.productId === productIdOrBarcode || i.barcode === productIdOrBarcode);
+    }
   }
   if (!targetItem && inv.items && inv.items.length > 0) {
     targetItem = inv.items[0];
@@ -8842,6 +8973,32 @@ export function renderManualInventoryPage() {
   setElemText('manual-stat-total-retail', `${formatMoney(totalRetail)} ج.م`);
   setElemText('manual-count-badge', `${allManual.length} أصناف مسجلة`);
 
+  // Render Manual Warehouse Sales (Tab 2)
+  const sales = getCategorySales('manual');
+  const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
+
+  setElemText('manual-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('manual-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
+  setElemText('manual-sales-count-badge', `${sales.length} مبيعات`);
+  setElemText('manual-sales-operations-count', `${sales.length} عملية بيع`);
+
+  const salesSearch = (document.getElementById('manual-sales-search-input')?.value || '').trim().toLowerCase();
+  let filteredSales = sales;
+  if (salesSearch) {
+    filteredSales = filteredSales.filter(s => 
+      (s.name || '').toLowerCase().includes(salesSearch) ||
+      (s.barcode || '').toLowerCase().includes(salesSearch) ||
+      (s.customerName || '').toLowerCase().includes(salesSearch) ||
+      (s.invoiceNumber || '').toLowerCase().includes(salesSearch)
+    );
+  }
+
+  const salesTbody = document.getElementById('manual-sales-table-body');
+  if (salesTbody) {
+    salesTbody.innerHTML = renderSalesTableHTML(filteredSales, 'المخزن اليدوي');
+  }
+
   const activeSub = AppState.activeManualSubcatFilter || 'all';
   const search = (document.getElementById('manual-search-input')?.value || '').trim().toLowerCase();
 
@@ -9011,6 +9168,24 @@ export function getAllSalesUnified() {
   const allSales = [];
   (Store.salesInvoices || []).forEach(inv => {
     (inv.items || []).forEach((item, itemIdx) => {
+      // Find matching product in Store.products to resolve category and buyPrice if missing
+      const matchedProd = (Store.products || []).find(p => 
+        (item.productId && p.id === item.productId) || 
+        (item.barcode && p.barcode && String(p.barcode).trim() === String(item.barcode).trim()) ||
+        (item.name && p.name && p.name.trim() === item.name.trim())
+      );
+      
+      const category = item.category || (matchedProd ? matchedProd.category : 'manual');
+      const buyPrice = (item.buyPrice !== undefined && item.buyPrice !== null && !isNaN(parseFloat(item.buyPrice))) 
+        ? parseFloat(item.buyPrice) 
+        : (matchedProd ? (parseFloat(matchedProd.buyPrice) || 0) : 0);
+      const sellPrice = parseFloat(item.price || item.sellPrice || 0);
+      const quantity = parseInt(item.quantity, 10) || 1;
+      const totalRow = sellPrice * quantity;
+      const profit = (item.profit !== undefined && item.profit !== null && !isNaN(parseFloat(item.profit))) 
+        ? parseFloat(item.profit) 
+        : (totalRow - (buyPrice * quantity));
+
       allSales.push({
         invoiceId: inv.id,
         invoiceNumber: inv.invoiceNumber,
@@ -9018,7 +9193,13 @@ export function getAllSalesUnified() {
         customerName: inv.customerName || 'عميل نقدي',
         customerPhone: inv.customerPhone || '',
         itemIndex: itemIdx,
-        ...item
+        ...item,
+        category,
+        buyPrice,
+        price: sellPrice,
+        quantity,
+        total: totalRow,
+        profit
       });
     });
   });
@@ -9031,7 +9212,17 @@ export function renderAllSalesMasterPage() {
 
   const totalSalesVal = allSales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
   const totalProfitVal = allSales.reduce((acc, s) => acc + (s.profit || 0), 0);
+  const totalItemsCount = allSales.reduce((acc, s) => acc + (s.quantity || 1), 0);
+  const totalInvoicesCount = (Store.salesInvoices || []).length;
 
+  // Update Main KPIs (Matching index.html)
+  setElemText('all-sales-count-badge', `${totalInvoicesCount} فواتير مباعة`);
+  setElemText('all-sales-stat-total', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('all-sales-stat-profit', `+${formatMoney(totalProfitVal)} ج.م`);
+  setElemText('all-sales-stat-items-count', totalItemsCount);
+  setElemText('all-sales-stat-invoices-count', totalInvoicesCount);
+
+  // Fallback KPIs
   setElemText('all-sales-kpi-total-val', `${formatMoney(totalSalesVal)} ج.م`);
   setElemText('all-sales-kpi-count', `${allSales.length} عمليات بيع`);
   setElemText('all-sales-kpi-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
@@ -9049,20 +9240,20 @@ window.switchAllSalesMasterTab = function(tab) {
   AppState.activeAllSalesTab = tab;
   const isSales = (tab === 'sales');
   
-  const tabBtnSales = document.getElementById('all-sales-tab-sales');
-  const tabBtnCatalog = document.getElementById('all-sales-tab-catalog');
-  const salesContainer = document.getElementById('master-tab-sales-container');
-  const catalogContainer = document.getElementById('master-tab-catalog-container');
+  const tabBtnSales = document.getElementById('tab-btn-master-sales') || document.getElementById('all-sales-tab-sales');
+  const tabBtnCatalog = document.getElementById('tab-btn-master-catalog') || document.getElementById('all-sales-tab-catalog');
+  const salesContainer = document.getElementById('master-sales-tab-content') || document.getElementById('master-tab-sales-container');
+  const catalogContainer = document.getElementById('master-catalog-tab-content') || document.getElementById('master-tab-catalog-container');
 
   if (tabBtnSales) {
     tabBtnSales.className = isSales 
-      ? 'px-5 py-2.5 rounded-xl font-bold text-xs bg-primary text-white shadow-md'
-      : 'px-5 py-2.5 rounded-xl font-bold text-xs bg-surface-container-low hover:bg-surface-container text-on-surface-variant';
+      ? 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 flex items-center gap-2 cursor-pointer'
+      : 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-2 cursor-pointer';
   }
   if (tabBtnCatalog) {
     tabBtnCatalog.className = !isSales 
-      ? 'px-5 py-2.5 rounded-xl font-bold text-xs bg-primary text-white shadow-md'
-      : 'px-5 py-2.5 rounded-xl font-bold text-xs bg-surface-container-low hover:bg-surface-container text-on-surface-variant';
+      ? 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 flex items-center gap-2 cursor-pointer'
+      : 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-2 cursor-pointer';
   }
 
   if (salesContainer) salesContainer.classList.toggle('hidden', !isSales);
@@ -9073,6 +9264,9 @@ window.switchAllSalesMasterTab = function(tab) {
 
 window.setAllSalesCategoryFilter = function(cat) {
   AppState.activeAllSalesCategoryFilter = cat;
+  const sel = document.getElementById('all-sales-filter-cat');
+  if (sel) sel.value = cat;
+
   document.querySelectorAll('[data-sales-cat]').forEach(btn => {
     const isActive = btn.getAttribute('data-sales-cat') === cat;
     btn.className = isActive 
@@ -9084,11 +9278,12 @@ window.setAllSalesCategoryFilter = function(cat) {
 
 window.setAllSalesDateFilter = function(period) {
   AppState.activeAllSalesDateFilter = period;
-  document.querySelectorAll('[data-sales-date]').forEach(btn => {
-    const isActive = btn.getAttribute('data-sales-date') === period;
+  document.querySelectorAll('[data-all-sales-date], [data-sales-date]').forEach(btn => {
+    const btnPeriod = btn.getAttribute('data-all-sales-date') || btn.getAttribute('data-sales-date');
+    const isActive = btnPeriod === period;
     btn.className = isActive 
-      ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-secondary text-white shadow-sm ring-1 ring-emerald-500/40 cursor-pointer'
-      : 'px-3 py-1.5 rounded-xl text-xs font-bold bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+      ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white cursor-pointer shadow-sm ring-1 ring-rose-500/40'
+      : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer';
   });
   renderAllSalesMasterPage();
 };
@@ -9101,7 +9296,8 @@ window.setAllSalesSearch = function(query) {
 function renderMasterSalesTable(allSales) {
   const catFilter = AppState.activeAllSalesCategoryFilter || 'all';
   const dateFilter = AppState.activeAllSalesDateFilter || 'all';
-  const search = AppState.allSalesSearch || '';
+  const searchInput = document.getElementById('all-sales-search-input');
+  const search = (searchInput ? searchInput.value : (AppState.allSalesSearch || '')).trim().toLowerCase();
 
   let filtered = allSales;
 
@@ -9115,6 +9311,10 @@ function renderMasterSalesTable(allSales) {
 
   if (dateFilter === 'today') {
     filtered = filtered.filter(s => isToday(s.timestamp));
+  } else if (dateFilter === 'yesterday') {
+    filtered = filtered.filter(s => isYesterday(s.timestamp));
+  } else if (dateFilter === 'week') {
+    filtered = filtered.filter(s => isLast7Days(s.timestamp));
   } else if (dateFilter === 'month') {
     filtered = filtered.filter(s => isThisMonth(s.timestamp));
   }
@@ -9129,7 +9329,7 @@ function renderMasterSalesTable(allSales) {
     );
   }
 
-  const tbody = document.getElementById('all-sales-master-table-body');
+  const tbody = document.getElementById('all-sales-table-body') || document.getElementById('all-sales-master-table-body');
   if (!tbody) return;
 
   if (filtered.length === 0) {
@@ -9138,8 +9338,8 @@ function renderMasterSalesTable(allSales) {
         <td colspan="9" class="py-14 text-center">
           <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
             <span class="material-symbols-outlined text-[42px] opacity-30">receipt_long</span>
-            <span class="font-headline-sm font-bold text-on-surface">لا توجد عمليات بيع تطابق الفلاتر</span>
-            <p class="text-xs">جرب تغيير الفلتر أو كتابة كلمة بحث أخرى.</p>
+            <span class="font-headline-sm font-bold text-on-surface">لا توجد عمليات بيع تطابق الفلاتر المحددة</span>
+            <p class="text-xs">جرب تغيير الفترة الزمنية أو اختيار "جميع الأقسام" أو مسح كلمة البحث.</p>
           </div>
         </td>
       </tr>
@@ -9149,45 +9349,50 @@ function renderMasterSalesTable(allSales) {
 
   tbody.innerHTML = filtered.map(item => {
     const totalRow = (item.price || 0) * (item.quantity || 1);
+    const profit = (item.profit !== undefined && item.profit !== null) 
+      ? item.profit 
+      : (totalRow - ((item.buyPrice || 0) * (item.quantity || 1)));
     const catName = getCategoryArabicName(item.category);
     return `
       <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
-        <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-          ${item.invoiceNumber || 'INV-DIRECT'}
+        <td class="py-3 px-4 font-numeric-table text-on-surface font-medium whitespace-nowrap">
+          <div class="font-bold">${formatDateArabic(item.timestamp)}</div>
+          <span class="text-[10px] text-on-surface-variant">${formatTime(item.timestamp)}</span>
         </td>
-        <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">
-          ${formatDateArabic(item.timestamp)}
+        <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm whitespace-nowrap">
+          <div>${item.invoiceNumber || 'INV-DIRECT'}</div>
+          ${item.barcode ? `<span class="text-[11px] text-on-surface-variant font-mono">#${item.barcode}</span>` : ''}
         </td>
         <td class="py-3 px-4">
-          <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant">${catName}</span>
+          <div class="font-bold text-on-surface text-sm">${item.name}</div>
+          <span class="inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface-container text-on-surface-variant">${catName}</span>
         </td>
-        <td class="py-3 px-4 font-bold text-on-surface text-sm">
-          ${item.name}
-          ${item.barcode ? `<span class="text-[11px] text-on-surface-variant font-numeric-table mr-1.5">#${item.barcode}</span>` : ''}
+        <td class="py-3 px-4 font-numeric-table font-bold text-on-surface text-center whitespace-nowrap">
+          ${item.quantity || 1} حبة
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-bold text-slate-300 text-sm whitespace-nowrap">
+          ${formatMoney(item.price)} ج.م
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-extrabold text-emerald-400 text-sm whitespace-nowrap">
+          ${formatMoney(totalRow)} ج.م
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-sm whitespace-nowrap">
+          ${profit >= 0 ? '+' : ''}${formatMoney(profit)} ج.م
         </td>
         <td class="py-3 px-4">
           <div class="font-bold text-on-surface">${item.customerName || 'عميل نقدي'}</div>
-          ${item.customerPhone ? `<div class="text-[11px] font-numeric-table text-on-surface-variant">${item.customerPhone}</div>` : ''}
+          ${item.customerPhone ? `<div class="text-[11px] font-numeric-table text-on-surface-variant flex items-center gap-1 mt-0.5"><span class="material-symbols-outlined text-[13px]">call</span>${item.customerPhone}</div>` : ''}
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold text-on-surface text-center">
-          ${item.quantity || 1}
-        </td>
-        <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400 text-sm">
-          ${formatMoney(item.price)} ج.م
-        </td>
-        <td class="py-3 px-4 font-numeric-table font-extrabold text-emerald-400 text-sm">
-          ${formatMoney(totalRow)} ج.م
-        </td>
-        <td class="py-3 px-4 text-center">
+        <td class="py-3 px-4 text-center whitespace-nowrap">
           <div class="flex items-center justify-center gap-1.5">
-            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة وعرض الفاتورة" class="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary">
+            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة وعرض الفاتورة" class="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary cursor-pointer">
               <span class="material-symbols-outlined text-[17px]">receipt_long</span>
             </button>
-            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant">
+            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer">
               <span class="material-symbols-outlined text-[17px]">edit</span>
             </button>
-            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف عملية البيع نهائياً" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400">
-              <span class="material-symbols-outlined text-[17px]">delete</span>
+            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف عملية البيع واسترجاع المخزون" class="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer">
+              <span class="material-symbols-outlined text-[17px]">delete_forever</span>
             </button>
           </div>
         </td>
@@ -9198,11 +9403,36 @@ function renderMasterSalesTable(allSales) {
 
 window.renderMasterCatalog = function() {
   const cat = AppState.activeMasterCatalogCat || 'all';
-  const search = (AppState.masterCatalogSearch || '').trim().toLowerCase();
+  const searchInput = document.getElementById('master-catalog-search-input');
+  const search = (searchInput ? searchInput.value : (AppState.masterCatalogSearch || '')).trim().toLowerCase();
+
+  // Render Category Filter Pills if container exists
+  const pillsContainer = document.getElementById('catalog-category-filter-pills');
+  if (pillsContainer) {
+    const cats = [
+      { id: 'all', label: 'جميع الأقسام' },
+      { id: 'phones', label: 'التليفونات' },
+      { id: 'chargers', label: 'الشواحن' },
+      { id: 'cables', label: 'الوصلات' },
+      { id: 'headphones', label: 'السماعات' },
+      { id: 'speakers', label: 'الصبات' },
+      { id: 'covers', label: 'الجرابات' },
+      { id: 'accessories', label: 'الإكسسوارات' },
+      { id: 'manual', label: 'المخزن اليدوي' }
+    ];
+    pillsContainer.innerHTML = cats.map(c => {
+      const isActive = cat === c.id;
+      return `<button onclick="window.setMasterCatalogCategory('${c.id}')" data-catalog-cat="${c.id}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${isActive ? 'bg-primary text-white shadow-sm ring-1 ring-rose-500/40' : 'bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30'}">${c.label}</button>`;
+    }).join('');
+  }
 
   let products = Store.products || [];
   if (cat !== 'all') {
-    products = products.filter(p => p.category === cat);
+    products = products.filter(p => {
+      if (cat === 'chargers' && (p.category === 'chargers' || p.category === 'chargers-cables')) return true;
+      if (cat === 'cables' && (p.category === 'cables' || p.category === 'chargers-cables')) return true;
+      return p.category === cat;
+    });
   }
   if (search) {
     products = products.filter(p => 
@@ -9213,7 +9443,7 @@ window.renderMasterCatalog = function() {
     );
   }
 
-  const grid = document.getElementById('master-catalog-grid');
+  const grid = document.getElementById('master-catalog-cards-grid') || document.getElementById('master-catalog-grid');
   if (!grid) return;
 
   if (products.length === 0) {
@@ -9255,10 +9485,10 @@ window.renderMasterCatalog = function() {
             <span class="font-bold text-base text-emerald-400 font-numeric-table">${formatMoney(prod.sellPrice)} ج.م</span>
           </div>
           <div class="grid grid-cols-2 gap-2">
-            <button onclick="window.openSmartCodeActionModal('${prod.barcode || prod.imei || prod.id}', 'sale')" class="w-full py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white font-bold text-xs transition-colors flex items-center justify-center gap-1">
+            <button onclick="window.openSmartCodeActionModal('${prod.barcode || prod.imei || prod.id}', 'sale')" class="w-full py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white font-bold text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer">
               <span>💰</span> بيع فوري
             </button>
-            <button onclick="window.addProdToCartById('${prod.id}')" class="w-full py-2 rounded-xl bg-secondary/20 hover:bg-secondary text-secondary hover:text-white font-bold text-xs transition-colors flex items-center justify-center gap-1">
+            <button onclick="window.addProdToCartById('${prod.id}')" class="w-full py-2 rounded-xl bg-secondary/20 hover:bg-secondary text-secondary hover:text-white font-bold text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer">
               <span>🛒</span> للسلة
             </button>
           </div>
@@ -9270,12 +9500,6 @@ window.renderMasterCatalog = function() {
 
 window.setMasterCatalogCategory = function(cat) {
   AppState.activeMasterCatalogCat = cat;
-  document.querySelectorAll('[data-catalog-cat]').forEach(btn => {
-    const isActive = btn.getAttribute('data-catalog-cat') === cat;
-    btn.className = isActive 
-      ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
-      : 'px-3 py-1.5 rounded-xl text-xs font-bold bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
-  });
   renderMasterCatalog();
 };
 
