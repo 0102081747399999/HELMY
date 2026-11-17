@@ -494,7 +494,7 @@ function updateGlobalHeaderBadges() {
   // Calculate totals
   const totalProds = Store.products.reduce((acc, p) => acc + (p.quantity || 0), 0);
   const totalSalesVal = Store.salesInvoices.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
-  const lowStockProducts = (Store.products || []).filter(p => (p.quantity || 0) <= 2 && p.status !== 'sold');
+  const lowStockProducts = getLowStockProducts();
   const lowStockCount = lowStockProducts.length;
 
   setElemText('stat-dash-stock-total', totalProds);
@@ -1983,10 +1983,11 @@ window.openSmartCodeActionModal = function(code, defaultAction = 'choose') {
   if (!code) return;
   const cleanCode = code.trim();
 
-  // Find product by barcode, code, or IMEI
+  // Find product by barcode, code, IMEI, or ID
   const prod = Store.products.find(p => 
     (p.barcode && p.barcode.trim().toLowerCase() === cleanCode.toLowerCase()) ||
-    (p.imei && p.imei.trim().toLowerCase() === cleanCode.toLowerCase())
+    (p.imei && p.imei.trim().toLowerCase() === cleanCode.toLowerCase()) ||
+    (p.id && String(p.id).trim().toLowerCase() === cleanCode.toLowerCase())
   );
 
   if (!prod) {
@@ -2074,14 +2075,15 @@ window.confirmSmartCodeSale = async function() {
   const customerName = (document.getElementById('smart-sale-customer')?.value || '').trim() || 'عميل نقدي';
   const customerPhone = (document.getElementById('smart-sale-phone')?.value || '').trim();
 
-  if (prod.quantity < qty) {
-    if (!confirm(`تنبيه: الكمية المتوفرة بالمخزن (${prod.quantity}) أقل من الكمية المطلوبة (${qty}). هل تريد إتمام البيع بالسالب؟`)) {
+  const prevQty = parseInt(prod.quantity, 10) || 0;
+  if (prevQty < qty) {
+    if (!confirm(`تنبيه: الكمية المتوفرة بالمخزن (${prevQty}) أقل من الكمية المطلوبة (${qty}). هل تريد إتمام البيع بالسالب؟`)) {
       return;
     }
   }
 
   try {
-    await recordDirectCategorySale({
+    const saleResult = await recordDirectCategorySale({
       productId: prod.id,
       barcode: prod.barcode || prod.imei,
       name: prod.name,
@@ -2096,19 +2098,35 @@ window.confirmSmartCodeSale = async function() {
 
     closeSmartCodeActionModal();
     playScanBeep(true);
-    showToast(`✅ تم بيع [${prod.name}] ونزل فوراً في صفحة مبيعات ${getCategoryArabicName(prod.category)}!`, 'check_circle');
 
-    // Real-time shortage alert
-    const remainingStock = (prod.quantity || 0) - qty;
+    const remainingStock = saleResult._remainingStock !== undefined ? saleResult._remainingStock : Math.max(0, prevQty - qty);
+
+    // 1. Toast for sale registration
+    showToast(`⚡ تم تسجيل بيع [${prod.name}] فوراً في قسم المبيعات! (المتبقي: ${remainingStock} حبة)`, 'check_circle', 3000);
+
+    // 2. Real-time shortage alert as demanded by user:
+    // "لو عندي من الحاجة 30 بعت 29 يتفضل واحدة يقول لي دي فضل، ويقول لي دي من ضمن النواقص"
     if (remainingStock <= 2) {
       setTimeout(() => {
-        showToast(`⚠️ تنبيه نواقص: خرج [${prod.name}] من المخزن وأصبح ناقصاً! (المتبقي: ${remainingStock <= 0 ? 'نفذت الكمية تماماً (0)' : remainingStock + ' قطع'})`, remainingStock <= 0 ? 'error' : 'warning');
-      }, 1000);
+        if (remainingStock === 1) {
+          showToast(`⚠️ تنبيه نواقص عاجل: تم بيع [${prod.name}]! فاضل قطعة واحدة فقط (1) وأصبح من ضمن النواقص! يرجى طلب توريد كمية جديدة فوراً.`, 'warning', 7000);
+          playScanBeep(false);
+        } else if (remainingStock <= 0) {
+          showToast(`🚨 تنبيه نفاد كمية: تم بيع [${prod.name}]! فاضل 0 (نفذت الكمية تماماً) - تم إدراجه فوراً في كشف النواقص!`, 'error', 7000);
+          playScanBeep(false);
+        } else if (remainingStock === 2) {
+          showToast(`⚠️ تنبيه نواقص: تم بيع [${prod.name}]! فاضل 2 قطع فقط وأصبح من ضمن النواقص.`, 'warning', 6000);
+        }
+      }, 450);
     }
 
-    // Switch to category sales page
+    // 3. Immediately refresh current view & header badges
+    updateGlobalHeaderBadges();
+
+    // Switch to category sales page and re-render instantly
     navigateTo(getCategoryViewPath(prod.category));
     window.switchCategoryTab(prod.category, 'sales');
+    renderCurrentView();
   } catch (e) {
     console.error(e);
     showToast('حدث خطأ أثناء تسجيل عملية البيع', 'error');
@@ -3091,6 +3109,8 @@ async function executePOSCheckout() {
   const custPhone = (document.getElementById('pos-customer-phone')?.value || '').trim();
 
   try {
+    const soldItems = [...AppState.cart];
+
     const invoice = await checkoutSale({
       items: AppState.cart,
       subtotal,
@@ -3102,7 +3122,6 @@ async function executePOSCheckout() {
       customerPhone: custPhone
     });
 
-    const soldItems = [...AppState.cart];
     AppState.cart = [];
     AppState.cartDiscount = 0;
     setElemValue('pos-cash-paid', '');
@@ -3111,17 +3130,39 @@ async function executePOSCheckout() {
 
     closeQuickPOS();
     playScanBeep(true);
-    showToast(`تم إتمام الفاتورة ${invoice.invoiceNumber} بنجاح!`, 'receipt_long');
+    showToast(`⚡ تم تسجيل الفاتورة ${invoice.invoiceNumber} فوراً في قسم المبيعات!`, 'receipt_long', 3500);
 
-    // Real-time shortage alerts for items in invoice
-    setTimeout(() => {
-      soldItems.forEach(cartItem => {
-        const prod = Store.products.find(p => p.id === cartItem.id);
-        if (prod && (prod.quantity || 0) <= 2) {
-          showToast(`⚠️ تنبيه نواقص: خرج [${prod.name}] من المخزن وأصبح ناقصاً! (المتبقي: ${prod.quantity <= 0 ? 'نفذت الكمية 0' : prod.quantity + ' قطع'})`, prod.quantity <= 0 ? 'error' : 'warning');
+    // Real-time shortage alerts for sold items as requested by user
+    const criticalShortages = [];
+    soldItems.forEach(cartItem => {
+      const prod = Store.products.find(p => p.id === cartItem.id);
+      if (prod) {
+        const remaining = prod.quantity !== undefined ? prod.quantity : 0;
+        if (remaining <= 2) {
+          criticalShortages.push({ name: prod.name, remaining });
         }
-      });
-    }, 1200);
+      }
+    });
+
+    if (criticalShortages.length > 0) {
+      setTimeout(() => {
+        playScanBeep(false);
+        criticalShortages.forEach((cs, idx) => {
+          setTimeout(() => {
+            if (cs.remaining === 1) {
+              showToast(`⚠️ تنبيه نواقص فوري: [${cs.name}] فاضل قطعة واحدة فقط (1)! أصبح من ضمن النواقص (يرجى طلب توريد)`, 'warning', 7000);
+            } else if (cs.remaining <= 0) {
+              showToast(`🚨 تنبيه نفاد كمية: [${cs.name}] فاضل 0 (نفذت الكمية تماماً)! تم تسجيله في النواقص`, 'error', 7000);
+            } else {
+              showToast(`⚠️ تنبيه نواقص: [${cs.name}] فاضل ${cs.remaining} قطع فقط ومن ضمن النواقص!`, 'warning', 6000);
+            }
+          }, idx * 800);
+        });
+      }, 500);
+    }
+
+    updateGlobalHeaderBadges();
+    renderCurrentView();
 
     window.printInvoiceReceipt(invoice.id);
   } catch (e) {
@@ -3407,19 +3448,21 @@ function playScanBeep(success = true) {
 }
 
 // Toasts
-export function showToast(msg, icon = 'check_circle') {
+let toastTimer = null;
+export function showToast(msg, icon = 'check_circle', durationMs = 4000) {
   const toast = document.getElementById('action-toast');
   const toastMsg = document.getElementById('toast-message');
   const toastIcon = document.getElementById('toast-icon');
   if (toast && toastMsg && toastIcon) {
+    if (toastTimer) clearTimeout(toastTimer);
     toastMsg.innerText = msg;
     toastIcon.innerText = icon;
     toast.classList.remove('hidden');
     toast.classList.add('flex');
-    setTimeout(() => {
+    toastTimer = setTimeout(() => {
       toast.classList.add('hidden');
       toast.classList.remove('flex');
-    }, 4000);
+    }, durationMs);
   }
 }
 window.showToast = showToast;
@@ -3815,7 +3858,10 @@ window.saveLinkedPhone = async function() {
 export function getLowStockProducts() {
   return (Store.products || []).filter(p => {
     if (p.category === 'phones' && p.status === 'sold') return false;
-    return (p.quantity || 0) <= 2;
+    const limit = (p.minStockLimit !== undefined && p.minStockLimit !== null && p.minStockLimit !== '' && !isNaN(parseInt(p.minStockLimit, 10))) 
+      ? parseInt(p.minStockLimit, 10) 
+      : 2;
+    return (p.quantity || 0) <= Math.max(2, limit);
   }).sort((a, b) => (a.quantity || 0) - (b.quantity || 0));
 }
 
@@ -3839,18 +3885,21 @@ window.closeLowStockModal = function() {
 
 window.filterLowStockModal = function(tab) {
   AppState.activeLowStockFilter = tab;
-  document.querySelectorAll('[data-stock-filter]').forEach(btn => {
-    const isActive = btn.getAttribute('data-stock-filter') === tab;
-    btn.className = isActive 
-      ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white transition-all shadow-sm'
-      : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container hover:bg-surface-container-high text-on-surface-variant transition-all';
-  });
   renderLowStockModalContent();
 };
 
 function renderLowStockModalContent() {
   const allShortages = getLowStockProducts();
   const filter = AppState.activeLowStockFilter || 'all';
+
+  const depletedCount = allShortages.filter(p => (p.quantity || 0) <= 0).length;
+  const lowCount = allShortages.filter(p => (p.quantity || 0) > 0 && (p.quantity || 0) <= 2).length;
+
+  setElemText('low-stock-count-all', allShortages.length);
+  setElemText('low-stock-count-depleted', depletedCount);
+  setElemText('low-stock-count-low', lowCount);
+  setElemText('modal-low-stock-badge', `${allShortages.length} صنف بحاجة لتوريد`);
+  setElemText('low-stock-modal-subtitle', `يوجد ${allShortages.length} صنف من ضمن النواقص بحاجة لتوريد فوري`);
 
   let filtered = allShortages;
   if (filter === 'depleted') {
@@ -3859,16 +3908,35 @@ function renderLowStockModalContent() {
     filtered = allShortages.filter(p => (p.quantity || 0) > 0 && (p.quantity || 0) <= 2);
   }
 
-  setElemText('modal-low-stock-badge', `${allShortages.length} صنف بحاجة لتوريد`);
+  // Update button active styles
+  const btnAll = document.getElementById('btn-low-stock-filter-all');
+  const btnDep = document.getElementById('btn-low-stock-filter-depleted');
+  const btnLow = document.getElementById('btn-low-stock-filter-low');
 
-  const listContainer = document.getElementById('low-stock-items-list');
+  if (btnAll) {
+    btnAll.className = (filter === 'all')
+      ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white cursor-pointer shadow-sm'
+      : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant hover:bg-surface-container-high cursor-pointer';
+  }
+  if (btnDep) {
+    btnDep.className = (filter === 'depleted')
+      ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 text-white cursor-pointer shadow-sm'
+      : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container text-rose-400 border border-rose-500/30 hover:bg-rose-500/10 cursor-pointer';
+  }
+  if (btnLow) {
+    btnLow.className = (filter === 'low')
+      ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white cursor-pointer shadow-sm'
+      : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 cursor-pointer';
+  }
+
+  const listContainer = document.getElementById('low-stock-items-container') || document.getElementById('low-stock-items-list');
   if (!listContainer) return;
 
   if (filtered.length === 0) {
     listContainer.innerHTML = `
       <div class="py-12 text-center text-on-surface-variant">
-        <span class="material-symbols-outlined text-4xl text-emerald-400 mb-2">inventory</span>
-        <p class="font-bold text-sm text-on-surface">لا توجد نواقص في هذا الفلتر حالياً!</p>
+        <span class="material-symbols-outlined text-4xl text-emerald-400 mb-2">check_circle</span>
+        <p class="font-bold text-sm text-on-surface">لا توجد نواقص في هذا القسم حالياً!</p>
         <p class="text-xs text-on-surface-variant mt-1">جميع الأصناف متوفرة بالمخزن بشكل سليم.</p>
       </div>
     `;
@@ -3876,37 +3944,60 @@ function renderLowStockModalContent() {
   }
 
   listContainer.innerHTML = filtered.map(item => {
-    const isZero = (item.quantity || 0) <= 0;
+    const qty = item.quantity || 0;
+    const isZero = qty <= 0;
+    const isSingle = qty === 1;
     const catName = getCategoryArabicName(item.category);
+
+    let statusBadge = '';
+    let qtyColorClass = '';
+    if (isZero) {
+      statusBadge = `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">🚨 نفذت الكمية تماماً (فاضل 0)</span>`;
+      qtyColorClass = 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
+    } else if (isSingle) {
+      statusBadge = `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/25 text-amber-300 border border-amber-500/40 animate-pulse">⚠️ فاضل قطعة واحدة فقط (1) - من ضمن النواقص!</span>`;
+      qtyColorClass = 'bg-amber-500/25 text-amber-300 border border-amber-500/40 ring-2 ring-amber-500/50';
+    } else {
+      statusBadge = `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/25">⚠️ فاضل ${qty} قطع (من ضمن النواقص)</span>`;
+      qtyColorClass = 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+    }
+
     return `
       <div class="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container hover:border-outline-variant/50 transition-all flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base ${isZero ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'}">
-            ${item.quantity || 0}
+          <div class="w-11 h-11 rounded-xl flex flex-col items-center justify-center font-bold text-base ${qtyColorClass}">
+            <span>${qty}</span>
+            <span class="text-[9px] -mt-1 font-normal">فاضل</span>
           </div>
           <div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <h5 class="font-bold text-on-surface text-sm">${item.name}</h5>
               <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface-container text-on-surface-variant">${catName}</span>
-              ${item.barcode ? `<span class="font-numeric-table text-[11px] text-secondary">#${item.barcode}</span>` : ''}
+              ${item.barcode ? `<span class="font-numeric-table text-[11px] text-secondary font-bold">#${item.barcode}</span>` : ''}
+              ${statusBadge}
             </div>
-            <div class="flex items-center gap-3 mt-0.5 text-xs text-on-surface-variant">
-              <span>سعر البيع: <b class="text-emerald-400 font-numeric-table">${formatMoney(item.sellPrice)} ج.م</b></span>
+            <div class="flex items-center gap-3 mt-1 text-xs text-on-surface-variant flex-wrap">
+              <span>سعر البيع: <b class="text-emerald-400 font-numeric-table font-bold">${formatMoney(item.sellPrice)} ج.م</b></span>
               <span>•</span>
-              <span class="${isZero ? 'text-rose-400 font-bold' : 'text-amber-400 font-bold'}">
-                ${isZero ? '⚠️ نفذت الكمية تماماً (0)' : `⚠️ متبقي ${item.quantity} حبات فقط`}
+              <span>سعر الشراء: <b class="text-on-surface font-numeric-table font-bold">${formatMoney(item.buyPrice)} ج.م</b></span>
+              <span>•</span>
+              <span class="font-bold text-amber-400">
+                ${isZero ? '🔴 غير متوفر للبيع' : `المتبقي للبيع: فاضل ${qty} قطعة فقط`}
               </span>
             </div>
           </div>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
-          <button onclick="window.quickRestockFromShortageModal('${item.id}', 5)" title="توريد +5 قطع فوراً" class="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition-all">
+          <button onclick="window.quickRestockFromShortageModal('${item.id}', 1)" title="توريد +1 قطعة فوراً" class="px-2 py-1.5 rounded-xl bg-primary/20 hover:bg-primary text-primary hover:text-white text-xs font-bold transition-all cursor-pointer">
+            +1 توريد
+          </button>
+          <button onclick="window.quickRestockFromShortageModal('${item.id}', 5)" title="توريد +5 قطع فوراً" class="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition-all cursor-pointer">
             +5 توريد
           </button>
-          <button onclick="window.quickRestockFromShortageModal('${item.id}', 10)" title="توريد +10 قطع فوراً" class="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition-all">
+          <button onclick="window.quickRestockFromShortageModal('${item.id}', 10)" title="توريد +10 قطع فوراً" class="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition-all cursor-pointer">
             +10 توريد
           </button>
-          <button onclick="window.openSmartCodeActionModal('${item.barcode || item.imei || item.id}', 'restock')" title="تفاصيل التوريد" class="p-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant">
+          <button onclick="window.openSmartCodeActionModal('${item.barcode || item.imei || item.id}', 'restock')" title="تفاصيل التوريد والأسعار" class="p-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant cursor-pointer">
             <span class="material-symbols-outlined text-[18px]">add_business</span>
           </button>
         </div>
@@ -3918,7 +4009,8 @@ function renderLowStockModalContent() {
 window.quickRestockFromShortageModal = async function(prodId, delta) {
   try {
     await quickAdjustStock(prodId, delta);
-    showToast(`📦 تم توريد +${delta} حبات للصنف بنجاح!`, 'inventory_2');
+    const p = Store.products.find(x => x.id === prodId);
+    showToast(`📦 تم توريد +${delta} حبات لصنف [${p?.name || ''}] بنجاح!`, 'inventory_2');
     renderLowStockModalContent();
     updateGlobalHeaderBadges();
     renderCurrentView();

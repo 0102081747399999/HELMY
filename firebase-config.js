@@ -592,13 +592,11 @@ export async function addProduct(productData) {
   setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
   notifySubscribers("products_updated", Store.products);
 
-  // Firestore sync using setDoc on the predefined docRef
+  // Firestore sync using setDoc on the predefined docRef in background (0ms delay)
   if (db && docRef) {
-    try {
-      await setDoc(docRef, newProduct);
-    } catch (err) {
+    setDoc(docRef, newProduct).catch(err => {
       console.warn("Failed to write product to Firestore, saved locally:", err);
-    }
+    });
   }
 
   return newProduct;
@@ -607,7 +605,7 @@ export async function addProduct(productData) {
 export async function updateProduct(id, updateData) {
   updateData.updatedAt = new Date().toISOString();
 
-  // Local update
+  // Local optimistic update
   const idx = Store.products.findIndex(p => p.id === id);
   if (idx !== -1) {
     Store.products[idx] = { ...Store.products[idx], ...updateData };
@@ -615,22 +613,16 @@ export async function updateProduct(id, updateData) {
     notifySubscribers("products_updated", Store.products);
   }
 
-  // Firestore update
+  // Firestore update in background (Async, 0ms lag for user)
   if (db) {
-    try {
-      const ref = doc(db, "products", id);
-      await updateDoc(ref, updateData);
-    } catch (err) {
-      try {
-        const q = query(collection(db, "products"), where("id", "==", id));
-        const snap = await getDocs(q);
+    updateDoc(doc(db, "products", id), updateData).catch(err => {
+      const q = query(collection(db, "products"), where("id", "==", id));
+      getDocs(q).then(snap => {
         snap.forEach(d => {
           updateDoc(doc(db, "products", d.id), updateData).catch(console.warn);
         });
-      } catch (err2) {
-        console.warn("Failed to update product in Firestore:", err2);
-      }
-    }
+      }).catch(console.warn);
+    });
   }
 }
 
@@ -639,43 +631,50 @@ export async function deleteProduct(id) {
 
   const targetId = String(id).trim();
 
-  // 1. Add specific targetId ONLY to permanent blacklist (never blacklists barcode or duplicates)
+  // 1. Add specific targetId ONLY to permanent blacklist
   blacklistProduct(targetId);
 
-  // 2. Remove ONLY this single item from local Store.products and localStorage
-  // Duplicate items or items sharing code/barcode/name are 100% PRESERVED!
+  // 2. Remove immediately from local Store.products and localStorage
   Store.products = Store.products.filter(p => p.id !== targetId);
   setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
   notifySubscribers("products_updated", Store.products);
 
-  // 3. Permanently delete ONLY this specific document from Firestore
+  // 3. Permanently delete from Firestore in background
   if (db) {
-    try {
-      await deleteDoc(doc(db, "products", targetId));
-    } catch (err) {
-      console.warn("Error deleting product doc directly from Firestore:", err);
-    }
-
-    try {
-      const qId = query(collection(db, "products"), where("id", "==", targetId));
-      const snapId = await getDocs(qId);
+    deleteDoc(doc(db, "products", targetId)).catch(console.warn);
+    const qId = query(collection(db, "products"), where("id", "==", targetId));
+    getDocs(qId).then(snapId => {
       snapId.forEach(d => {
         deleteDoc(doc(db, "products", d.id)).catch(console.warn);
       });
-    } catch (err) {}
+    }).catch(console.warn);
   }
 }
 
-// Adjust stock quantity
+// Adjust stock quantity immediately
 export async function adjustProductStock(id, changeQty) {
   const prod = Store.products.find(p => p.id === id);
   if (prod) {
     const newQty = Math.max(0, (prod.quantity || 0) + changeQty);
-    await updateProduct(id, { quantity: newQty });
+    prod.quantity = newQty;
+    prod.updatedAt = new Date().toISOString();
+    setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
+    notifySubscribers("products_updated", Store.products);
+
+    if (db) {
+      updateDoc(doc(db, "products", id), { quantity: newQty, updatedAt: prod.updatedAt }).catch(err => {
+        const q = query(collection(db, "products"), where("id", "==", id));
+        getDocs(q).then(snap => {
+          snap.forEach(d => {
+            updateDoc(doc(db, "products", d.id), { quantity: newQty, updatedAt: prod.updatedAt }).catch(console.warn);
+          });
+        }).catch(console.warn);
+      });
+    }
   }
 }
 
-// Direct Category Sale (Single-item fast sale by Code or Table action)
+// Direct Category Sale (Instant 0-delay Sale by Code or POS)
 export async function recordDirectCategorySale({ productId, barcode, name, category, quantity, sellPrice, buyPrice, customerName, customerPhone, saleDate }) {
   const numQty = parseInt(quantity, 10) || 1;
   const numSellPrice = parseFloat(sellPrice) || 0;
@@ -684,7 +683,7 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
   const totalProfit = (numSellPrice - numBuyPrice) * numQty;
   const timestamp = saleDate || new Date().toISOString();
 
-  // 1. Deduct stock from product
+  // 1. Deduct stock from product locally and immediately
   let prod = null;
   if (productId) {
     prod = Store.products.find(p => p.id === productId);
@@ -694,20 +693,23 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
     prod = Store.products.find(p => (p.barcode && p.barcode.trim().toLowerCase() === cleanBar) || (p.imei && p.imei.trim().toLowerCase() === cleanBar));
   }
 
+  let remainingQty = 0;
   if (prod) {
-    await adjustProductStock(prod.id, -numQty);
+    prod.quantity = Math.max(0, (prod.quantity || 0) - numQty);
+    remainingQty = prod.quantity;
+    prod.updatedAt = timestamp;
     if (prod.category === 'phones') {
-      await updateProduct(prod.id, {
-        status: 'sold',
-        customerName: customerName || 'عميل نقدي',
-        customerPhone: customerPhone || prod.linkedPhoneNumber || '',
-        soldAt: timestamp
-      });
+      prod.status = 'sold';
+      prod.customerName = customerName || 'عميل نقدي';
+      prod.customerPhone = customerPhone || prod.linkedPhoneNumber || '';
+      prod.soldAt = timestamp;
     }
+    setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
   }
 
   // 2. Create Sale Record
   const invoiceNumber = 'INV-' + (1000 + Store.salesInvoices.length + 1);
+  const localId = 'inv_' + Date.now();
   const saleItem = {
     productId: prod ? prod.id : (productId || ''),
     barcode: barcode || (prod ? prod.barcode : ''),
@@ -721,7 +723,7 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
   };
 
   const invoiceData = {
-    id: 'inv_' + Date.now(),
+    id: localId,
     invoiceNumber,
     items: [saleItem],
     subtotal: totalAmount,
@@ -738,28 +740,66 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
   Store.salesInvoices.unshift(invoiceData);
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
 
-  // 3. Add cash to drawer
-  await recordCashDrawerEntry({
+  // 3. Add cash to drawer locally
+  if (!Store.drawer) {
+    Store.drawer = {
+      shiftId: '#402',
+      openingCash: 0,
+      currentCash: 0,
+      history: []
+    };
+  }
+  let currentDrawer = parseFloat(Store.drawer.currentCash) || 0;
+  currentDrawer += totalAmount;
+  Store.drawer.currentCash = currentDrawer;
+  if (!Store.drawer.history) Store.drawer.history = [];
+  Store.drawer.history.unshift({
     type: 'in',
     amount: totalAmount,
-    reason: `بيع مباشر بالكود (${saleItem.barcode}) - ${saleItem.name}`
+    reason: `بيع مباشر بالكود (${saleItem.barcode || '-'}) - ${saleItem.name}`,
+    balanceAfter: currentDrawer,
+    timestamp
   });
+  setLocal(STORAGE_KEYS.DRAWER, Store.drawer);
 
+  // 4. INSTANT LOCAL-FIRST NOTIFICATIONS (0ms UI latency!)
   notifySubscribers("sales_updated", Store.salesInvoices);
+  notifySubscribers("products_updated", Store.products);
+  notifySubscribers("drawer_updated", Store.drawer);
 
-  // 4. Firestore sync
+  // 5. ASYNC CLOUD SYNC (Runs in background, never delays user)
   if (db) {
-    try {
-      const docRef = await addDoc(collection(db, "sales_invoices"), invoiceData);
+    if (prod) {
+      const prodUpdates = {
+        quantity: prod.quantity,
+        updatedAt: prod.updatedAt
+      };
+      if (prod.category === 'phones') {
+        prodUpdates.status = 'sold';
+        prodUpdates.customerName = prod.customerName;
+        prodUpdates.customerPhone = prod.customerPhone;
+        prodUpdates.soldAt = prod.soldAt;
+      }
+      updateDoc(doc(db, "products", prod.id), prodUpdates).catch(err => {
+        const q = query(collection(db, "products"), where("id", "==", prod.id));
+        getDocs(q).then(snap => {
+          snap.forEach(d => updateDoc(doc(db, "products", d.id), prodUpdates).catch(console.warn));
+        }).catch(console.warn);
+      });
+    }
+
+    setDoc(doc(db, "cash_drawer", "current_shift"), Store.drawer).catch(console.warn);
+
+    addDoc(collection(db, "sales_invoices"), invoiceData).then(docRef => {
       invoiceData.id = docRef.id;
-      const idx = Store.salesInvoices.findIndex(s => s.invoiceNumber === invoiceNumber);
+      const idx = Store.salesInvoices.findIndex(s => s.id === localId);
       if (idx !== -1) Store.salesInvoices[idx] = invoiceData;
       setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
-    } catch (err) {
-      console.warn("Failed to sync sale to Firestore:", err);
-    }
+    }).catch(console.warn);
   }
 
+  invoiceData._remainingStock = remainingQty;
+  invoiceData._soldProduct = prod;
   return invoiceData;
 }
 
@@ -773,32 +813,59 @@ export async function recordDirectCategoryRestock({ productId, deltaQty, newBuyP
   const newQty = Math.max(0, currentQty + addQty);
   const buyP = (newBuyPrice !== undefined && newBuyPrice !== '' && !isNaN(parseFloat(newBuyPrice))) ? parseFloat(newBuyPrice) : (prod.buyPrice || 0);
 
-  const updates = {
-    quantity: newQty,
-    lastRestockedAt: restockDate || new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
+  prod.quantity = newQty;
+  prod.lastRestockedAt = restockDate || new Date().toISOString();
+  prod.updatedAt = new Date().toISOString();
 
   if (newBuyPrice !== undefined && newBuyPrice !== '' && !isNaN(parseFloat(newBuyPrice))) {
-    updates.buyPrice = parseFloat(newBuyPrice);
+    prod.buyPrice = parseFloat(newBuyPrice);
   }
   if (newSellPrice !== undefined && newSellPrice !== '' && !isNaN(parseFloat(newSellPrice))) {
-    updates.sellPrice = parseFloat(newSellPrice);
+    prod.sellPrice = parseFloat(newSellPrice);
   }
 
-  await updateProduct(productId, updates);
+  setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
+  notifySubscribers("products_updated", Store.products);
 
   // Automatic Cash Drawer integration: deduct purchase cost from cash drawer
   const cost = (totalCost !== undefined && !isNaN(parseFloat(totalCost))) ? parseFloat(totalCost) : (addQty * buyP);
   if (cost > 0) {
-    await recordCashDrawerEntry({
+    if (!Store.drawer) Store.drawer = { shiftId: '#402', openingCash: 0, currentCash: 0, history: [] };
+    let currentDrawer = parseFloat(Store.drawer.currentCash) || 0;
+    currentDrawer -= cost;
+    Store.drawer.currentCash = currentDrawer;
+    if (!Store.drawer.history) Store.drawer.history = [];
+    Store.drawer.history.unshift({
       type: 'out',
       amount: cost,
-      reason: `توريد مخزون (${addQty} حبة) - ${prod.name}`
+      reason: `توريد مخزون (${addQty} حبة) - ${prod.name}`,
+      balanceAfter: currentDrawer,
+      timestamp: new Date().toISOString()
+    });
+    setLocal(STORAGE_KEYS.DRAWER, Store.drawer);
+    notifySubscribers("drawer_updated", Store.drawer);
+    if (db) {
+      setDoc(doc(db, "cash_drawer", "current_shift"), Store.drawer).catch(console.warn);
+    }
+  }
+
+  if (db) {
+    const updates = {
+      quantity: prod.quantity,
+      lastRestockedAt: prod.lastRestockedAt,
+      updatedAt: prod.updatedAt,
+      buyPrice: prod.buyPrice,
+      sellPrice: prod.sellPrice
+    };
+    updateDoc(doc(db, "products", productId), updates).catch(err => {
+      const q = query(collection(db, "products"), where("id", "==", productId));
+      getDocs(q).then(snap => {
+        snap.forEach(d => updateDoc(doc(db, "products", d.id), updates).catch(console.warn));
+      }).catch(console.warn);
     });
   }
 
-  return updates;
+  return prod;
 }
 
 // --- VODAFONE CASH OPERATIONS ---
@@ -1136,7 +1203,11 @@ export async function resetVodafoneLine(lineNum) {
 
 export async function checkoutSale({ items, subtotal, discount, totalAmount, cashPaid, change, customerName, customerPhone, cashier }) {
   const invoiceNumber = 'INV-' + (1000 + Store.salesInvoices.length + 1);
+  const localId = 'inv_' + Date.now();
+  const invoiceTimestamp = new Date().toISOString();
+
   const invoiceData = {
+    id: localId,
     invoiceNumber,
     items: items.map(item => ({
       productId: item.id,
@@ -1156,47 +1227,89 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
     customerName: customerName || 'عميل نقدي',
     customerPhone: customerPhone || '',
     cashier: cashier || 'كاشير سنترال حلمي',
-    timestamp: new Date().toISOString()
+    timestamp: invoiceTimestamp
   };
 
+  // 1. Immediately deduct stock locally from all items
+  const productStockUpdates = [];
   for (const item of items) {
     if (item.id) {
-      await adjustProductStock(item.id, -item.quantity);
       const prod = Store.products.find(p => p.id === item.id);
-      if (prod && prod.category === 'phones') {
-        await updateProduct(item.id, {
-          status: 'sold',
-          customerName: customerName || 'عميل نقدي',
-          customerPhone: customerPhone || '',
-          soldAt: new Date().toISOString()
-        });
+      if (prod) {
+        prod.quantity = Math.max(0, (prod.quantity || 0) - item.quantity);
+        prod.updatedAt = invoiceTimestamp;
+        const prodSyncData = {
+          id: prod.id,
+          quantity: prod.quantity,
+          updatedAt: prod.updatedAt
+        };
+        if (prod.category === 'phones') {
+          prod.status = 'sold';
+          prod.customerName = customerName || 'عميل نقدي';
+          prod.customerPhone = customerPhone || '';
+          prod.soldAt = invoiceTimestamp;
+          prodSyncData.status = 'sold';
+          prodSyncData.customerName = prod.customerName;
+          prodSyncData.customerPhone = prod.customerPhone;
+          prodSyncData.soldAt = prod.soldAt;
+        }
+        productStockUpdates.push(prodSyncData);
       }
     }
   }
+  setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
 
-  const localId = 'inv_' + Date.now();
-  invoiceData.id = localId;
+  // 2. Prepend invoice to local sales
   Store.salesInvoices.unshift(invoiceData);
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
 
-  await recordCashDrawerEntry({
+  // 3. Add cash to drawer locally
+  if (!Store.drawer) {
+    Store.drawer = {
+      shiftId: '#402',
+      openingCash: 0,
+      currentCash: 0,
+      history: []
+    };
+  }
+  let currentDrawer = parseFloat(Store.drawer.currentCash) || 0;
+  currentDrawer += invoiceData.totalAmount;
+  Store.drawer.currentCash = currentDrawer;
+  if (!Store.drawer.history) Store.drawer.history = [];
+  Store.drawer.history.unshift({
     type: 'in',
     amount: invoiceData.totalAmount,
-    reason: `فاتورة بيع ${invoiceNumber}`
+    reason: `فاتورة بيع ${invoiceNumber}`,
+    balanceAfter: currentDrawer,
+    timestamp: invoiceTimestamp
   });
+  setLocal(STORAGE_KEYS.DRAWER, Store.drawer);
 
+  // 4. INSTANT NOTIFICATIONS (0ms UI latency!)
   notifySubscribers("sales_updated", Store.salesInvoices);
+  notifySubscribers("products_updated", Store.products);
+  notifySubscribers("drawer_updated", Store.drawer);
 
+  // 5. ASYNC BACKGROUND FIRESTORE SYNC (Never block UI!)
   if (db) {
-    try {
-      const docRef = await addDoc(collection(db, "sales_invoices"), invoiceData);
+    productStockUpdates.forEach(syncItem => {
+      const { id, ...dataToUpdate } = syncItem;
+      updateDoc(doc(db, "products", id), dataToUpdate).catch(err => {
+        const q = query(collection(db, "products"), where("id", "==", id));
+        getDocs(q).then(snap => {
+          snap.forEach(d => updateDoc(doc(db, "products", d.id), dataToUpdate).catch(console.warn));
+        }).catch(console.warn);
+      });
+    });
+
+    setDoc(doc(db, "cash_drawer", "current_shift"), Store.drawer).catch(console.warn);
+
+    addDoc(collection(db, "sales_invoices"), invoiceData).then(docRef => {
       invoiceData.id = docRef.id;
       const idx = Store.salesInvoices.findIndex(s => s.id === localId);
       if (idx !== -1) Store.salesInvoices[idx] = invoiceData;
       setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
-    } catch (err) {
-      console.warn("Failed to save invoice to Firestore:", err);
-    }
+    }).catch(console.warn);
   }
 
   return invoiceData;
@@ -1263,7 +1376,7 @@ export async function updateSaleInvoice(invoiceId, updatedData) {
   // Adjust Cash Drawer if total amount changed
   const cashDelta = newTotal - oldTotal;
   if (cashDelta !== 0) {
-    await recordCashDrawerEntry({
+    recordCashDrawerEntry({
       type: cashDelta > 0 ? 'in' : 'out',
       amount: Math.abs(cashDelta),
       reason: `تعديل إجمالي فاتورة بيع ${invoice.invoiceNumber} (${cashDelta > 0 ? 'زيادة' : 'خصم'})`
@@ -1272,30 +1385,24 @@ export async function updateSaleInvoice(invoiceId, updatedData) {
 
   // Save to local store & localStorage
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+  notifySubscribers("sales_updated", Store.salesInvoices);
 
-  // Update Firestore
+  // Update Firestore in background
   if (db) {
-    try {
-      await updateDoc(doc(db, "sales_invoices", invoiceId), {
-        items: invoice.items,
-        subtotal: invoice.subtotal,
-        discount: invoice.discount,
-        totalAmount: invoice.totalAmount,
-        customerName: invoice.customerName,
-        customerPhone: invoice.customerPhone,
-        timestamp: invoice.timestamp,
-        updatedAt: invoice.updatedAt
-      });
-    } catch (err) {
-      try {
-        await setDoc(doc(db, "sales_invoices", invoiceId), invoice, { merge: true });
-      } catch (e2) {
-        console.warn("Error updating sale invoice in Firestore:", e2);
-      }
-    }
+    updateDoc(doc(db, "sales_invoices", invoiceId), {
+      items: invoice.items,
+      subtotal: invoice.subtotal,
+      discount: invoice.discount,
+      totalAmount: invoice.totalAmount,
+      customerName: invoice.customerName,
+      customerPhone: invoice.customerPhone,
+      timestamp: invoice.timestamp,
+      updatedAt: invoice.updatedAt
+    }).catch(err => {
+      setDoc(doc(db, "sales_invoices", invoiceId), invoice, { merge: true }).catch(console.warn);
+    });
   }
 
-  notifySubscribers("sales_updated", Store.salesInvoices);
   return invoice;
 }
 
@@ -1305,7 +1412,7 @@ export async function deleteSaleInvoice(invoiceId) {
 
   const invoice = Store.salesInvoices[invIdx];
 
-  // 1. Revert product stock for each sold item
+  // 1. Revert product stock for each sold item immediately
   if (invoice.items && Array.isArray(invoice.items)) {
     for (const item of invoice.items) {
       if (item.productId) {
@@ -1321,11 +1428,7 @@ export async function deleteSaleInvoice(invoiceId) {
           }
           prod.updatedAt = new Date().toISOString();
           if (db) {
-            try {
-              await setDoc(doc(db, "products", prod.id), prod, { merge: true });
-            } catch (err) {
-              console.warn("Error updating product stock in Firestore upon sale deletion:", err);
-            }
+            setDoc(doc(db, "products", prod.id), prod, { merge: true }).catch(console.warn);
           }
         }
       }
@@ -1337,7 +1440,7 @@ export async function deleteSaleInvoice(invoiceId) {
   // 2. Adjust Cash Drawer (remove the cash that came in from this sale)
   const amountToDeduct = parseFloat(invoice.totalAmount) || 0;
   if (amountToDeduct > 0) {
-    await recordCashDrawerEntry({
+    recordCashDrawerEntry({
       type: 'out',
       amount: amountToDeduct,
       reason: `إلغاء وحذف نهائي لفاتورة بيع ${invoice.invoiceNumber || ''}`
@@ -1350,27 +1453,21 @@ export async function deleteSaleInvoice(invoiceId) {
   // 3. Remove permanently from local store & localStorage
   Store.salesInvoices.splice(invIdx, 1);
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+  notifySubscribers("sales_updated", Store.salesInvoices);
 
-  // 4. Delete permanently from Firestore
+  // 4. Delete permanently from Firestore in background
   if (db) {
-    try {
-      await deleteDoc(doc(db, "sales_invoices", invoiceId));
-    } catch (err) {
-      console.warn("Error permanently deleting sale from Firestore:", err);
-    }
+    deleteDoc(doc(db, "sales_invoices", invoiceId)).catch(console.warn);
     if (invoice.invoiceNumber) {
-      try {
-        const q = query(collection(db, "sales_invoices"), where("invoiceNumber", "==", invoice.invoiceNumber));
-        const snap = await getDocs(q);
+      const q = query(collection(db, "sales_invoices"), where("invoiceNumber", "==", invoice.invoiceNumber));
+      getDocs(q).then(snap => {
         snap.forEach(d => {
           deleteDoc(doc(db, "sales_invoices", d.id)).catch(console.warn);
         });
-      } catch (err) {}
+      }).catch(console.warn);
     }
   }
 
-  // 5. Notify all listeners
-  notifySubscribers("sales_updated", Store.salesInvoices);
   return true;
 }
 
@@ -1411,11 +1508,7 @@ export async function recordCashDrawerEntry({ type, amount, reason }) {
   notifySubscribers("drawer_updated", Store.drawer);
 
   if (db) {
-    try {
-      await setDoc(doc(db, "cash_drawer", "current_shift"), Store.drawer);
-    } catch (err) {
-      console.warn("Error updating cash drawer in Firestore:", err);
-    }
+    setDoc(doc(db, "cash_drawer", "current_shift"), Store.drawer).catch(console.warn);
   }
 }
 
