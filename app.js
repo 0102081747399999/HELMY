@@ -360,7 +360,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   renderCurrentView();
   updateGlobalHeaderBadges();
-  initSystemGateLock();
 });
 
 // ==========================================
@@ -3504,9 +3503,6 @@ function getCategoryViewPath(cat) {
 
 window.navigateTo = navigateTo;
 window.formatMoney = formatMoney;
-window.isSystemUnlocked = isSystemUnlocked;
-window.getSystemPin = getSystemPin;
-window.lockSystemGate = lockSystemGate;
 
 // ==========================================
 // VODAFONE QUICK PHONE NUMBER ACTIONS
@@ -3928,179 +3924,6 @@ window.quickRestockFromShortageModal = async function(prodId, delta) {
     renderCurrentView();
   } catch (e) {
     showToast('حدث خطأ أثناء التوريد', 'error');
-  }
-};
-
-// =========================================================================
-// GLOBAL SYSTEM ENTRY GATE & PASSCODE PROTECTION (قفل بوابة الدخول للنظام)
-// =========================================================================
-
-export const DEFAULT_SYSTEM_PIN = '123456';
-
-export function getSystemPin() {
-  return localStorage.getItem('hilmy_system_pin') || DEFAULT_SYSTEM_PIN;
-}
-
-export function isSystemUnlocked() {
-  return sessionStorage.getItem('hilmy_system_unlocked') === 'true' || 
-         localStorage.getItem('hilmy_system_remember') === 'true';
-}
-
-export function getSystemLinkedGmail() {
-  return localStorage.getItem('hilmy_system_linked_gmail') || '';
-}
-
-export function initSystemGateLock() {
-  const gateEl = document.getElementById('system-gate-lock');
-  const unlocked = isSystemUnlocked();
-  
-  if (unlocked) {
-    if (gateEl) {
-      gateEl.classList.add('hidden');
-      gateEl.classList.remove('flex');
-    }
-    document.documentElement.classList.remove('system-gate-locked');
-  } else {
-    if (gateEl) {
-      gateEl.classList.remove('hidden');
-      gateEl.classList.add('flex');
-    }
-    document.documentElement.classList.add('system-gate-locked');
-    setTimeout(() => {
-      document.getElementById('system-gate-pin-input')?.focus();
-    }, 100);
-  }
-}
-
-window.submitSystemGatePin = function(e) {
-  if (e && e.preventDefault) e.preventDefault();
-  const input = document.getElementById('system-gate-pin-input');
-  const errorMsg = document.getElementById('system-gate-error-msg');
-  const rememberCheckbox = document.getElementById('system-gate-remember');
-  const entered = (input?.value || '').trim();
-  const validPin = getSystemPin();
-
-  if (entered === validPin || entered === DEFAULT_SYSTEM_PIN) {
-    sessionStorage.setItem('hilmy_system_unlocked', 'true');
-    if (rememberCheckbox && rememberCheckbox.checked) {
-      localStorage.setItem('hilmy_system_remember', 'true');
-    }
-
-    const gateEl = document.getElementById('system-gate-lock');
-    if (gateEl) {
-      gateEl.classList.add('hidden');
-      gateEl.classList.remove('flex');
-    }
-    document.documentElement.classList.remove('system-gate-locked');
-    
-    if (errorMsg) errorMsg.classList.add('hidden');
-    if (input) input.value = '';
-
-    showToast('🔓 مرحباً بك! تم تسجيل الدخول وفتح المنظومة بنجاح', 'check_circle');
-  } else {
-    if (errorMsg) errorMsg.classList.remove('hidden');
-    if (input) {
-      input.classList.add('border-rose-500');
-      input.focus();
-      input.select();
-      setTimeout(() => input.classList.remove('border-rose-500'), 1500);
-    }
-  }
-};
-
-window.appendSystemGateKey = function(key) {
-  const input = document.getElementById('system-gate-pin-input');
-  if (!input) return;
-  input.value += key;
-  const curPin = getSystemPin();
-  if (input.value.length === curPin.length) {
-    window.submitSystemGatePin();
-  }
-};
-
-window.clearSystemGateKey = function() {
-  const input = document.getElementById('system-gate-pin-input');
-  if (input) input.value = '';
-  document.getElementById('system-gate-error-msg')?.classList.add('hidden');
-};
-
-window.backspaceSystemGateKey = function() {
-  const input = document.getElementById('system-gate-pin-input');
-  if (input && input.value) {
-    input.value = input.value.slice(0, -1);
-  }
-};
-
-window.toggleSystemGatePinVisibility = function() {
-  const input = document.getElementById('system-gate-pin-input');
-  const icon = document.getElementById('system-gate-eye-icon');
-  if (!input) return;
-  if (input.type === 'password') {
-    input.type = 'text';
-    if (icon) icon.textContent = 'visibility_off';
-  } else {
-    input.type = 'password';
-    if (icon) icon.textContent = 'visibility';
-  }
-};
-
-window.lockSystemGate = function() {
-  sessionStorage.removeItem('hilmy_system_unlocked');
-  localStorage.removeItem('hilmy_system_remember');
-  document.documentElement.classList.add('system-gate-locked');
-
-  const gateEl = document.getElementById('system-gate-lock');
-  const input = document.getElementById('system-gate-pin-input');
-  const errorMsg = document.getElementById('system-gate-error-msg');
-  if (gateEl) {
-    gateEl.classList.remove('hidden');
-    gateEl.classList.add('flex');
-  }
-  if (input) {
-    input.value = '';
-    setTimeout(() => input.focus(), 150);
-  }
-  if (errorMsg) errorMsg.classList.add('hidden');
-
-  showToast('🔒 تم قفل المنظومة بنجاح', 'lock');
-};
-
-window.handleSystemGateGoogleAuth = async function() {
-  try {
-    const res = await signInWithGooglePopup();
-    if (res && res.user) {
-      const email = res.user.email;
-      localStorage.setItem('hilmy_system_linked_gmail', email);
-      sessionStorage.setItem('hilmy_system_unlocked', 'true');
-      
-      const gateEl = document.getElementById('system-gate-lock');
-      if (gateEl) {
-        gateEl.classList.add('hidden');
-        gateEl.classList.remove('flex');
-      }
-      document.documentElement.classList.remove('system-gate-locked');
-      showToast(`✅ تم توثيق Google وتسجيل الدخول: ${email}`, 'check_circle');
-      return;
-    }
-  } catch (err) {
-    console.warn('Google Popup auth fallback to manual prompt:', err);
-  }
-
-  // Fallback prompt for Gmail if offline or running via file://
-  const currentLinked = getSystemLinkedGmail();
-  const inputEmail = prompt('أدخل بريد Gmail الخاص بك للدخول والتوثيق كمالك للمنظومة:', currentLinked || '');
-  if (inputEmail && inputEmail.trim() && inputEmail.includes('@')) {
-    const cleanEmail = inputEmail.trim();
-    localStorage.setItem('hilmy_system_linked_gmail', cleanEmail);
-    sessionStorage.setItem('hilmy_system_unlocked', 'true');
-    
-    const gateEl = document.getElementById('system-gate-lock');
-    if (gateEl) {
-      gateEl.classList.add('hidden');
-      gateEl.classList.remove('flex');
-    }
-    document.documentElement.classList.remove('system-gate-locked');
-    showToast(`✅ مرحباً بك! تم تسجيل الدخول عبر بريد الجيميل: ${cleanEmail}`, 'check_circle');
   }
 };
 

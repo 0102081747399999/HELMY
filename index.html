@@ -65,127 +65,8 @@
       #app-sidebar.sidebar-open { transform: translateX(0); }
     }
   </style>
-
-  <script>
-    (function() {
-      try {
-        var unl = sessionStorage.getItem('hilmy_system_unlocked') === 'true' || localStorage.getItem('hilmy_system_remember') === 'true';
-        if (!unl) {
-          document.documentElement.classList.add('system-gate-locked');
-        }
-      } catch(e) {}
-    })();
-  </script>
-  <style>
-    html.system-gate-locked body > *:not(#system-gate-lock) {
-      filter: blur(25px);
-      pointer-events: none !important;
-      user-select: none !important;
-    }
-    html:not(.system-gate-locked) #system-gate-lock {
-      display: none !important;
-    }
-  </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased selection:bg-rose-600 selection:text-white pb-16 lg:pb-0">
-
-  <!-- ========================================================
-       MASTER SYSTEM ENTRY GATE & PASSCODE (قفل المنظومة الرئيسي من الخارج)
-       ======================================================== -->
-  <div id="system-gate-lock" class="fixed inset-0 z-[9999] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-4 select-none">
-    <div class="relative w-full max-w-md bg-navy-card/90 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-rose-950/50 flex flex-col gap-6 text-center animate-scale-up">
-      
-      <!-- Brand & Hub Identity -->
-      <div class="flex flex-col items-center gap-2">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-500 p-0.5 shadow-lg shadow-rose-600/30 flex items-center justify-center">
-          <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-            <span class="material-symbols-outlined text-rose-500 text-3xl">phonelink_ring</span>
-          </div>
-        </div>
-        <h1 class="text-xl font-black text-white tracking-wide">سنترال حلمي وموبايل</h1>
-        <p class="text-xs text-slate-400 font-medium">منظومة الإدارة والمبيعات والاتصالات المتكاملة (POS Hub)</p>
-      </div>
-
-      <!-- Security Passcode Form -->
-      <form onsubmit="window.submitSystemGatePin(event)" class="flex flex-col gap-4">
-        <div class="flex items-center justify-center gap-2 text-rose-400 font-bold text-xs bg-rose-500/10 border border-rose-500/20 py-1.5 px-3 rounded-xl mx-auto">
-          <span class="material-symbols-outlined text-base">lock</span>
-          <span>المنظومة محمية برمز مرور (1-6)</span>
-        </div>
-
-        <!-- PIN Display & Input -->
-        <div class="relative w-full">
-          <input 
-            type="password" 
-            id="system-gate-pin-input" 
-            placeholder="••••••" 
-            maxlength="20"
-            autocomplete="current-password"
-            class="w-full text-center text-3xl tracking-[0.4em] font-numeric-table font-extrabold bg-slate-900/90 text-amber-400 border-2 border-slate-700/80 rounded-2xl py-3 px-12 focus:border-rose-500 focus:outline-none transition-all shadow-inner"
-          />
-          <button 
-            type="button" 
-            onclick="window.toggleSystemGatePinVisibility()" 
-            class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-2 cursor-pointer transition-colors"
-            title="إظهار / إخفاء"
-          >
-            <span id="system-gate-eye-icon" class="material-symbols-outlined text-xl">visibility</span>
-          </button>
-        </div>
-
-        <!-- Error Msg -->
-        <div id="system-gate-error-msg" class="hidden text-rose-400 font-bold text-xs py-1">
-          ❌ رمز المرور غير صحيح، يرجى كتابة الرمز الصحيح (123456)
-        </div>
-
-        <!-- Touch / Click Numeric Keypad (1 to 6 and more) -->
-        <div class="grid grid-cols-3 gap-2">
-          <button type="button" onclick="window.appendSystemGateKey('1')" class="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-lg font-numeric-table transition-all cursor-pointer">1</button>
-          <button type="button" onclick="window.appendSystemGateKey('2')" class="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-lg font-numeric-table transition-all cursor-pointer">2</button>
-          <button type="button" onclick="window.appendSystemGateKey('3')" class="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-lg font-numeric-table transition-all cursor-pointer">3</button>
-          <button type="button" onclick="window.appendSystemGateKey('4')" class="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-lg font-numeric-table transition-all cursor-pointer">4</button>
-          <button type="button" onclick="window.appendSystemGateKey('5')" class="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-lg font-numeric-table transition-all cursor-pointer">5</button>
-          <button type="button" onclick="window.appendSystemGateKey('6')" class="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-lg font-numeric-table transition-all cursor-pointer">6</button>
-          <button type="button" onclick="window.clearSystemGateKey()" class="py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs transition-all cursor-pointer">مسح C</button>
-          <button type="button" onclick="window.appendSystemGateKey('0')" class="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-lg font-numeric-table transition-all cursor-pointer">0</button>
-          <button type="button" onclick="window.backspaceSystemGateKey()" class="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-sm transition-all flex items-center justify-center cursor-pointer">⌫</button>
-        </div>
-
-        <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" id="system-gate-remember" checked class="accent-rose-500 rounded cursor-pointer"/>
-            <span>تذكر هذا الجهاز في هذه الجلسة</span>
-          </label>
-        </div>
-
-        <button 
-          type="submit" 
-          class="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-sm shadow-lg shadow-rose-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer"
-        >
-          <span class="material-symbols-outlined text-lg">lock_open</span>
-          <span>دخول المنظومة الآن</span>
-        </button>
-      </form>
-
-      <!-- Google / Gmail Login Option -->
-      <div class="pt-3 border-t border-slate-800 flex flex-col gap-2">
-        <button 
-          type="button" 
-          onclick="window.handleSystemGateGoogleAuth()" 
-          class="w-full py-2.5 px-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-700/60 font-bold text-xs flex items-center justify-center gap-2.5 transition-all cursor-pointer"
-        >
-          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
-            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.16 0 9.98 0 12c0 2.02.45 3.84 1.25 5.42l4.03-3.15z"/>
-            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-          </svg>
-          <span>تسجيل الدخول / التأمين بحساب Google (جيميل)</span>
-        </button>
-      </div>
-
-    </div>
-  </div>
 
   <!-- Mobile Sidebar Backdrop -->
   <div id="sidebar-backdrop" onclick="window.toggleSidebar()" class="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 hidden lg:hidden"></div>
@@ -397,12 +278,6 @@
         <button onclick="window.triggerQuickPOS()" class="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 border border-rose-400/30 transition-all cursor-pointer">
           <span class="material-symbols-outlined text-sm">point_of_sale</span>
           <span class="hidden sm:inline">كاشير سريع (F2)</span>
-        </button>
-
-        <!-- Lock System Gate Button -->
-        <button onclick="window.lockSystemGate()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-600/30 text-slate-300 hover:text-rose-300 border border-slate-700/60 font-bold text-xs transition-all cursor-pointer" title="قفل السيستم والعودة لشاشة الرمز">
-          <span class="material-symbols-outlined text-sm text-rose-400">lock</span>
-          <span class="hidden sm:inline">قفل السيستم</span>
         </button>
       </div>
 
@@ -5196,7 +5071,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   renderCurrentView();
   updateGlobalHeaderBadges();
-  initSystemGateLock();
 });
 
 // ==========================================
@@ -8340,9 +8214,6 @@ function getCategoryViewPath(cat) {
 
 window.navigateTo = navigateTo;
 window.formatMoney = formatMoney;
-window.isSystemUnlocked = isSystemUnlocked;
-window.getSystemPin = getSystemPin;
-window.lockSystemGate = lockSystemGate;
 
 // ==========================================
 // VODAFONE QUICK PHONE NUMBER ACTIONS
@@ -8764,179 +8635,6 @@ window.quickRestockFromShortageModal = async function(prodId, delta) {
     renderCurrentView();
   } catch (e) {
     showToast('حدث خطأ أثناء التوريد', 'error');
-  }
-};
-
-// =========================================================================
-// GLOBAL SYSTEM ENTRY GATE & PASSCODE PROTECTION (قفل بوابة الدخول للنظام)
-// =========================================================================
-
-export const DEFAULT_SYSTEM_PIN = '123456';
-
-export function getSystemPin() {
-  return localStorage.getItem('hilmy_system_pin') || DEFAULT_SYSTEM_PIN;
-}
-
-export function isSystemUnlocked() {
-  return sessionStorage.getItem('hilmy_system_unlocked') === 'true' || 
-         localStorage.getItem('hilmy_system_remember') === 'true';
-}
-
-export function getSystemLinkedGmail() {
-  return localStorage.getItem('hilmy_system_linked_gmail') || '';
-}
-
-export function initSystemGateLock() {
-  const gateEl = document.getElementById('system-gate-lock');
-  const unlocked = isSystemUnlocked();
-  
-  if (unlocked) {
-    if (gateEl) {
-      gateEl.classList.add('hidden');
-      gateEl.classList.remove('flex');
-    }
-    document.documentElement.classList.remove('system-gate-locked');
-  } else {
-    if (gateEl) {
-      gateEl.classList.remove('hidden');
-      gateEl.classList.add('flex');
-    }
-    document.documentElement.classList.add('system-gate-locked');
-    setTimeout(() => {
-      document.getElementById('system-gate-pin-input')?.focus();
-    }, 100);
-  }
-}
-
-window.submitSystemGatePin = function(e) {
-  if (e && e.preventDefault) e.preventDefault();
-  const input = document.getElementById('system-gate-pin-input');
-  const errorMsg = document.getElementById('system-gate-error-msg');
-  const rememberCheckbox = document.getElementById('system-gate-remember');
-  const entered = (input?.value || '').trim();
-  const validPin = getSystemPin();
-
-  if (entered === validPin || entered === DEFAULT_SYSTEM_PIN) {
-    sessionStorage.setItem('hilmy_system_unlocked', 'true');
-    if (rememberCheckbox && rememberCheckbox.checked) {
-      localStorage.setItem('hilmy_system_remember', 'true');
-    }
-
-    const gateEl = document.getElementById('system-gate-lock');
-    if (gateEl) {
-      gateEl.classList.add('hidden');
-      gateEl.classList.remove('flex');
-    }
-    document.documentElement.classList.remove('system-gate-locked');
-    
-    if (errorMsg) errorMsg.classList.add('hidden');
-    if (input) input.value = '';
-
-    showToast('🔓 مرحباً بك! تم تسجيل الدخول وفتح المنظومة بنجاح', 'check_circle');
-  } else {
-    if (errorMsg) errorMsg.classList.remove('hidden');
-    if (input) {
-      input.classList.add('border-rose-500');
-      input.focus();
-      input.select();
-      setTimeout(() => input.classList.remove('border-rose-500'), 1500);
-    }
-  }
-};
-
-window.appendSystemGateKey = function(key) {
-  const input = document.getElementById('system-gate-pin-input');
-  if (!input) return;
-  input.value += key;
-  const curPin = getSystemPin();
-  if (input.value.length === curPin.length) {
-    window.submitSystemGatePin();
-  }
-};
-
-window.clearSystemGateKey = function() {
-  const input = document.getElementById('system-gate-pin-input');
-  if (input) input.value = '';
-  document.getElementById('system-gate-error-msg')?.classList.add('hidden');
-};
-
-window.backspaceSystemGateKey = function() {
-  const input = document.getElementById('system-gate-pin-input');
-  if (input && input.value) {
-    input.value = input.value.slice(0, -1);
-  }
-};
-
-window.toggleSystemGatePinVisibility = function() {
-  const input = document.getElementById('system-gate-pin-input');
-  const icon = document.getElementById('system-gate-eye-icon');
-  if (!input) return;
-  if (input.type === 'password') {
-    input.type = 'text';
-    if (icon) icon.textContent = 'visibility_off';
-  } else {
-    input.type = 'password';
-    if (icon) icon.textContent = 'visibility';
-  }
-};
-
-window.lockSystemGate = function() {
-  sessionStorage.removeItem('hilmy_system_unlocked');
-  localStorage.removeItem('hilmy_system_remember');
-  document.documentElement.classList.add('system-gate-locked');
-
-  const gateEl = document.getElementById('system-gate-lock');
-  const input = document.getElementById('system-gate-pin-input');
-  const errorMsg = document.getElementById('system-gate-error-msg');
-  if (gateEl) {
-    gateEl.classList.remove('hidden');
-    gateEl.classList.add('flex');
-  }
-  if (input) {
-    input.value = '';
-    setTimeout(() => input.focus(), 150);
-  }
-  if (errorMsg) errorMsg.classList.add('hidden');
-
-  showToast('🔒 تم قفل المنظومة بنجاح', 'lock');
-};
-
-window.handleSystemGateGoogleAuth = async function() {
-  try {
-    const res = await signInWithGooglePopup();
-    if (res && res.user) {
-      const email = res.user.email;
-      localStorage.setItem('hilmy_system_linked_gmail', email);
-      sessionStorage.setItem('hilmy_system_unlocked', 'true');
-      
-      const gateEl = document.getElementById('system-gate-lock');
-      if (gateEl) {
-        gateEl.classList.add('hidden');
-        gateEl.classList.remove('flex');
-      }
-      document.documentElement.classList.remove('system-gate-locked');
-      showToast(`✅ تم توثيق Google وتسجيل الدخول: ${email}`, 'check_circle');
-      return;
-    }
-  } catch (err) {
-    console.warn('Google Popup auth fallback to manual prompt:', err);
-  }
-
-  // Fallback prompt for Gmail if offline or running via file://
-  const currentLinked = getSystemLinkedGmail();
-  const inputEmail = prompt('أدخل بريد Gmail الخاص بك للدخول والتوثيق كمالك للمنظومة:', currentLinked || '');
-  if (inputEmail && inputEmail.trim() && inputEmail.includes('@')) {
-    const cleanEmail = inputEmail.trim();
-    localStorage.setItem('hilmy_system_linked_gmail', cleanEmail);
-    sessionStorage.setItem('hilmy_system_unlocked', 'true');
-    
-    const gateEl = document.getElementById('system-gate-lock');
-    if (gateEl) {
-      gateEl.classList.add('hidden');
-      gateEl.classList.remove('flex');
-    }
-    document.documentElement.classList.remove('system-gate-locked');
-    showToast(`✅ مرحباً بك! تم تسجيل الدخول عبر بريد الجيميل: ${cleanEmail}`, 'check_circle');
   }
 };
 
