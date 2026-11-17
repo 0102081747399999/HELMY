@@ -80,37 +80,44 @@ function setLocal(key, val) {
 }
 
 // Permanent Blacklist Management (Prevents deleted products, sales, vodafone txs and sms from EVER resurrecting)
+
 export function getDeletedBlacklist() {
   const list = getLocal(STORAGE_KEYS.DELETED_PRODUCTS_BLACKLIST, []);
-  return new Set(Array.isArray(list) ? list : []);
+  // Only keep document IDs (strings that are not raw barcodes) so duplicate items are never accidentally blacklisted
+  const set = new Set();
+  if (Array.isArray(list)) {
+    list.forEach(item => {
+      if (item && typeof item === 'string') {
+        const clean = item.trim();
+        if (clean.startsWith('prod_') || clean.length >= 15) {
+          set.add(clean);
+        }
+      }
+    });
+  }
+  return set;
 }
 
 export function saveDeletedBlacklist(set) {
   setLocal(STORAGE_KEYS.DELETED_PRODUCTS_BLACKLIST, Array.from(set));
 }
 
-export function blacklistProduct(id, barcode) {
+export function blacklistProduct(id) {
+  if (!id) return;
   const set = getDeletedBlacklist();
-  if (id) set.add(String(id).trim());
-  if (barcode) {
-    const cleanBar = String(barcode).trim();
-    if (cleanBar) {
-      set.add(cleanBar);
-      set.add(cleanBar.toLowerCase());
-    }
+  const cleanId = String(id).trim();
+  if (cleanId) {
+    set.add(cleanId);
   }
   saveDeletedBlacklist(set);
 }
 
-export function unblacklistProduct(barcode, id) {
+export function unblacklistProduct(id) {
+  if (!id) return;
   const set = getDeletedBlacklist();
-  if (id) set.delete(String(id).trim());
-  if (barcode) {
-    const cleanBar = String(barcode).trim();
-    if (cleanBar) {
-      set.delete(cleanBar);
-      set.delete(cleanBar.toLowerCase());
-    }
+  const cleanId = String(id).trim();
+  if (cleanId) {
+    set.delete(cleanId);
   }
   saveDeletedBlacklist(set);
 }
@@ -158,11 +165,7 @@ function getInitialCleanProducts() {
   return rawList.filter(p => {
     if (!p) return false;
     const pid = p.id || '';
-    const pbar = (p.barcode || '').trim();
-    const pimei = (p.imei || '').trim();
-    if (blacklist.has(pid)) return false;
-    if (pbar && (blacklist.has(pbar) || blacklist.has(pbar.toLowerCase()))) return false;
-    if (pimei && (blacklist.has(pimei) || blacklist.has(pimei.toLowerCase()))) return false;
+    if (pid && blacklist.has(pid)) return false;
     return true;
   });
 }
@@ -330,11 +333,9 @@ export async function initRealtimeSync() {
         const barcode = (data.barcode || '').trim();
         const imei = (data.imei || '').trim();
 
-        // Check if this product was permanently deleted by the user
-        const isDeleted = blacklist.has(docId) ||
-                          (internalId && blacklist.has(internalId)) ||
-                          (barcode && (blacklist.has(barcode) || blacklist.has(barcode.toLowerCase()))) ||
-                          (imei && (blacklist.has(imei) || blacklist.has(imei.toLowerCase())));
+        // Check if this product was permanently deleted by the user (only by unique document ID, preserving duplicate rows)
+        const isDeleted = (docId && blacklist.has(docId)) ||
+                          (internalId && blacklist.has(internalId));
 
         if (isDeleted) {
           // Permanently purge this zombie document from Firestore in the cloud
@@ -534,7 +535,7 @@ export async function addProduct(productData) {
     id: finalId,
     barcode: cleanBarcode, // Serves as code (e.g. "70") or barcode
     name: (productData.name || '').trim(),
-    category: productData.category || 'chargers', // 'chargers' | 'cables' | 'headphones' | 'speakers' | 'phones' | 'covers' | 'accessories'
+    category: productData.category || 'chargers', // 'chargers' | 'cables' | 'headphones' | 'speakers' | 'phones' | 'covers' | 'accessories' | 'manual'
     subcategory: productData.subcategory || '',
     buyPrice: parseFloat(productData.buyPrice) || 0,
     sellPrice: parseFloat(productData.sellPrice) || 0,
@@ -545,6 +546,8 @@ export async function addProduct(productData) {
     storage: productData.storage || '',
     color: productData.color || '',
     status: productData.status || 'available',
+    linkedPhoneNumber: (productData.linkedPhoneNumber || productData.phone || '').trim(),
+    notes: (productData.notes || '').trim(),
     customerName: productData.customerName || '',
     customerPhone: productData.customerPhone || '',
     createdAt: productData.createdAt || now,
@@ -602,23 +605,18 @@ export async function updateProduct(id, updateData) {
 export async function deleteProduct(id) {
   if (!id) return;
 
-  // 1. Find product to extract its barcode and IMEI
-  const prod = Store.products.find(p => p.id === id || p.barcode === id);
-  const barcode = prod ? (prod.barcode || '').trim() : (String(id).trim());
-  const imei = prod ? (prod.imei || '').trim() : '';
-  const targetId = prod ? prod.id : id;
+  const targetId = String(id).trim();
 
-  // 2. Add to permanent blacklist so Firestore onSnapshot NEVER resurrects it!
-  blacklistProduct(targetId, barcode);
-  if (id !== targetId) blacklistProduct(id);
-  if (imei) blacklistProduct(null, imei);
+  // 1. Add specific targetId ONLY to permanent blacklist (never blacklists barcode or duplicates)
+  blacklistProduct(targetId);
 
-  // 3. Remove immediately from local Store.products and localStorage
-  Store.products = Store.products.filter(p => p.id !== targetId && p.id !== id && (!barcode || (p.barcode || '').trim() !== barcode));
+  // 2. Remove ONLY this single item from local Store.products and localStorage
+  // Duplicate items or items sharing code/barcode/name are 100% PRESERVED!
+  Store.products = Store.products.filter(p => p.id !== targetId);
   setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
   notifySubscribers("products_updated", Store.products);
 
-  // 4. Permanently delete from Firestore (by direct doc ID, and by query on barcode/id)
+  // 3. Permanently delete ONLY this specific document from Firestore
   if (db) {
     try {
       await deleteDoc(doc(db, "products", targetId));
@@ -626,26 +624,6 @@ export async function deleteProduct(id) {
       console.warn("Error deleting product doc directly from Firestore:", err);
     }
 
-    if (id !== targetId) {
-      try {
-        await deleteDoc(doc(db, "products", id));
-      } catch (err) {}
-    }
-
-    // Query Firestore to delete any orphaned, duplicate, or residual documents with this barcode!
-    if (barcode) {
-      try {
-        const q = query(collection(db, "products"), where("barcode", "==", barcode));
-        const snap = await getDocs(q);
-        snap.forEach(d => {
-          deleteDoc(doc(db, "products", d.id)).catch(console.warn);
-        });
-      } catch (err) {
-        console.warn("Error querying barcode for deletion in Firestore:", err);
-      }
-    }
-
-    // Query by internal id if different
     try {
       const qId = query(collection(db, "products"), where("id", "==", targetId));
       const snapId = await getDocs(qId);
@@ -675,14 +653,22 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
   const timestamp = saleDate || new Date().toISOString();
 
   // 1. Deduct stock from product
-  let prod = Store.products.find(p => p.id === productId || (p.barcode && p.barcode.trim().toLowerCase() === (barcode || '').trim().toLowerCase()));
+  let prod = null;
+  if (productId) {
+    prod = Store.products.find(p => p.id === productId);
+  }
+  if (!prod && barcode) {
+    const cleanBar = String(barcode).trim().toLowerCase();
+    prod = Store.products.find(p => (p.barcode && p.barcode.trim().toLowerCase() === cleanBar) || (p.imei && p.imei.trim().toLowerCase() === cleanBar));
+  }
+
   if (prod) {
     await adjustProductStock(prod.id, -numQty);
     if (prod.category === 'phones') {
       await updateProduct(prod.id, {
         status: 'sold',
         customerName: customerName || 'عميل نقدي',
-        customerPhone: customerPhone || '',
+        customerPhone: customerPhone || prod.linkedPhoneNumber || '',
         soldAt: timestamp
       });
     }

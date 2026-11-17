@@ -45,7 +45,8 @@ const AppState = {
     speakers: 'inventory',
     phones: 'inventory',
     covers: 'inventory',
-    accessories: 'inventory'
+    accessories: 'inventory',
+    manual: 'inventory'
   },
   activeChargerTab: 'all',
   activeCablesTab: 'all',
@@ -59,6 +60,14 @@ const AppState = {
   vodafoneMonitorFilterType: 'all',
   vodafoneMonitorFilterDate: 'today',
   vodafoneMonitorSearch: '',
+  allSalesCategoryFilter: 'all',
+  allSalesDateFilter: 'today',
+  allSalesSearch: '',
+  allSalesMasterTab: 'sales',
+  masterCatalogCategory: 'all',
+  masterCatalogSearch: '',
+  manualInventorySearch: '',
+  lowStockModalFilter: 'all',
   posCatalogCategory: 'all',
   posCatalogSearch: '',
   sidebarCollapsed: false,
@@ -359,6 +368,8 @@ const ALL_VIEWS = [
   'dashboard-overview',
   'vodafone-monitor',
   'vodafone-cash-wallets',
+  'all-sales-master',
+  'manual-inventory',
   'chargers-inventory',
   'cables-inventory',
   'headphones-audio',
@@ -431,6 +442,12 @@ function renderCurrentView() {
     case 'dashboard-overview':
       renderDashboard();
       break;
+    case 'all-sales-master':
+      renderAllSalesMasterPage();
+      break;
+    case 'manual-inventory':
+      renderManualInventoryPage();
+      break;
     case 'vodafone-monitor':
       renderVodafoneMonitor();
       break;
@@ -475,12 +492,25 @@ function updateGlobalHeaderBadges() {
   // Calculate totals
   const totalProds = Store.products.reduce((acc, p) => acc + (p.quantity || 0), 0);
   const totalSalesVal = Store.salesInvoices.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
-  const lowStockCount = Store.products.filter(p => (p.quantity || 0) <= 2 && p.category !== 'phones').length;
+  const lowStockProducts = (Store.products || []).filter(p => (p.quantity || 0) <= 2 && p.status !== 'sold');
+  const lowStockCount = lowStockProducts.length;
 
   setElemText('stat-dash-stock-total', totalProds);
   setElemText('stat-dash-sales', formatMoney(totalSalesVal));
   setElemText('stat-dash-sales-count', `${Store.salesInvoices.length} عمليات بيع`);
   setElemText('stat-dash-low-stock', lowStockCount);
+  setElemText('header-low-stock-count', lowStockCount);
+
+  const headerLowStockBtn = document.getElementById('btn-header-low-stock');
+  if (headerLowStockBtn) {
+    if (lowStockCount > 0) {
+      headerLowStockBtn.classList.remove('opacity-50');
+      headerLowStockBtn.classList.add('ring-2', 'ring-amber-500/60');
+    } else {
+      headerLowStockBtn.classList.add('opacity-50');
+      headerLowStockBtn.classList.remove('ring-2', 'ring-amber-500/60');
+    }
+  }
 }
 
 // ==========================================
@@ -1274,7 +1304,6 @@ function renderChargersPage() {
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getChargerSubcategoryLabel(item.subcategory)}</span></td>
-          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
           <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4">
             <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
@@ -1376,7 +1405,6 @@ function renderCablesPage() {
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getCableSubcategoryLabel(item.subcategory)}</span></td>
-          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
           <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4">
             <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
@@ -1477,7 +1505,6 @@ function renderHeadphonesPage() {
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getHeadphoneSubcategoryLabel(item.subcategory)}</span></td>
-          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
           <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4">
             <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
@@ -1558,7 +1585,7 @@ function renderSpeakersPage() {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" class="py-14 text-center">
+          <td colspan="7" class="py-14 text-center">
             <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
               <span class="material-symbols-outlined text-[40px] opacity-30">speaker</span>
               <span class="font-headline-sm font-bold text-on-surface">لا توجد صبات مسجلة</span>
@@ -1575,7 +1602,6 @@ function renderSpeakersPage() {
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.subcategory || 'صب'}</span></td>
-          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
           <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4">
             <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
@@ -1674,7 +1700,20 @@ function renderPhonesPage() {
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name} (${item.brand || ''})</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.storage || ''} ${item.color ? '- ' + item.color : ''}</span></td>
-          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            ${item.linkedPhoneNumber || item.customerPhone ? `
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold font-numeric-table text-xs border border-emerald-500/20">
+                <span class="material-symbols-outlined text-[15px]">call</span>
+                <span>${item.linkedPhoneNumber || item.customerPhone}</span>
+                <button onclick="window.openLinkPhoneModal('${item.id}')" title="تغيير الرقم المرتبط" class="text-on-surface-variant hover:text-secondary underline mr-1 text-[10px]">تعديل</button>
+              </div>
+            ` : `
+              <button onclick="window.openLinkPhoneModal('${item.id}')" class="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-secondary text-xs font-bold transition-colors inline-flex items-center gap-1 border border-outline-variant/30">
+                <span class="material-symbols-outlined text-[14px]">add_call</span>
+                + ربط برقم
+              </button>
+            `}
+          </td>
           <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4">
             <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${item.status === 'available' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-slate-500/15 text-slate-400 border border-slate-500/30'}">
@@ -1752,7 +1791,7 @@ function renderCoversPage() {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" class="py-14 text-center">
+          <td colspan="7" class="py-14 text-center">
             <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
               <span class="material-symbols-outlined text-[40px] opacity-30">shield</span>
               <span class="font-headline-sm font-bold text-on-surface">لا توجد جرابات مسجلة بالمخزن</span>
@@ -1770,7 +1809,6 @@ function renderCoversPage() {
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getCoverSubcategoryLabel(item.subcategory)}</span></td>
-          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
           <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4">
             <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
@@ -1856,7 +1894,7 @@ function renderAccessoriesPage() {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" class="py-14 text-center">
+          <td colspan="7" class="py-14 text-center">
             <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
               <span class="material-symbols-outlined text-[40px] opacity-30">devices_other</span>
               <span class="font-headline-sm font-bold text-on-surface">لا توجد إكسسوارات مسجلة</span>
@@ -1873,7 +1911,6 @@ function renderAccessoriesPage() {
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.subcategory || 'إكسسوار'}</span></td>
-          <td class="py-3 px-4 font-numeric-table text-on-surface">${formatMoney(item.buyPrice)} ج.م</td>
           <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4">
             <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
@@ -1965,7 +2002,6 @@ window.openSmartCodeActionModal = function(code, defaultAction = 'choose') {
   setElemText('smart-modal-prod-name', prod.name);
   setElemText('smart-modal-stock', `${prod.quantity || 0} قطع بالمخزن`);
   setElemText('smart-modal-sell-price', `${formatMoney(prod.sellPrice)} ج.م`);
-  setElemText('smart-modal-buy-price', `${formatMoney(prod.buyPrice)} ج.م`);
   setElemText('smart-modal-last-date', formatDateArabic(prod.lastRestockedAt || prod.createdAt));
 
   // Initialize sale inputs
@@ -2059,6 +2095,14 @@ window.confirmSmartCodeSale = async function() {
     closeSmartCodeActionModal();
     playScanBeep(true);
     showToast(`✅ تم بيع [${prod.name}] ونزل فوراً في صفحة مبيعات ${getCategoryArabicName(prod.category)}!`, 'check_circle');
+
+    // Real-time shortage alert
+    const remainingStock = (prod.quantity || 0) - qty;
+    if (remainingStock <= 2) {
+      setTimeout(() => {
+        showToast(`⚠️ تنبيه نواقص: خرج [${prod.name}] من المخزن وأصبح ناقصاً! (المتبقي: ${remainingStock <= 0 ? 'نفذت الكمية تماماً (0)' : remainingStock + ' قطع'})`, remainingStock <= 0 ? 'error' : 'warning');
+      }, 1000);
+    }
 
     // Switch to category sales page
     navigateTo(getCategoryViewPath(prod.category));
@@ -2221,6 +2265,7 @@ export function handleScannedBarcode(barcode, targetField = null) {
 
 function getDefaultCategoryForCurrentView() {
   switch (AppState.currentView) {
+    case 'manual-inventory': return 'manual';
     case 'chargers-inventory': return 'chargers';
     case 'cables-inventory': return 'cables';
     case 'headphones-audio': return 'headphones';
@@ -2593,6 +2638,15 @@ function setupProductModal() {
       updateProductModalFields(catSelect.value);
     });
   }
+
+  const phoneSelect = document.getElementById('prod-phone-number-select');
+  if (phoneSelect) {
+    phoneSelect.addEventListener('change', () => {
+      if (phoneSelect.value) {
+        setElemValue('prod-phone-number', phoneSelect.value);
+      }
+    });
+  }
 }
 
 window.openAddProductModal = (category = null, subcategory = null, barcode = null) => {
@@ -2609,6 +2663,8 @@ window.openAddProductModal = (category = null, subcategory = null, barcode = nul
   setElemValue('prod-phone-imei', barcode || '');
   setElemValue('prod-phone-storage', '128GB');
   setElemValue('prod-phone-color', 'أسود');
+  setElemValue('prod-phone-number', '');
+  populatePhoneSelectOptions('prod-phone-number-select', '');
 
   const cat = category || getDefaultCategoryForCurrentView();
   setElemValue('prod-category', cat);
@@ -2653,6 +2709,8 @@ window.openEditProductModal = (id) => {
   setElemValue('prod-phone-imei', prod.imei || '');
   setElemValue('prod-phone-storage', prod.storage || '');
   setElemValue('prod-phone-color', prod.color || '');
+  setElemValue('prod-phone-number', prod.linkedPhoneNumber || prod.customerPhone || '');
+  populatePhoneSelectOptions('prod-phone-number-select', prod.linkedPhoneNumber || prod.customerPhone || '');
 
   const modal = document.getElementById('modal-product-form');
   if (modal) {
@@ -2727,6 +2785,13 @@ function updateProductModalFields(category) {
           <option value="powerbank">باور بانك</option>
           <option value="general">إكسسوار عام</option>
         `;
+      } else if (category === 'manual') {
+        subcatSelect.innerHTML = `
+          <option value="قطع غيار">قطع غيار</option>
+          <option value="شاشات وبطاريات">شاشات وبطاريات</option>
+          <option value="صيانة وخدمات">صيانة وخدمات</option>
+          <option value="أخرى ويدوي">أخرى ويدوي</option>
+        `;
       }
     }
   }
@@ -2746,6 +2811,7 @@ window.saveProductForm = async () => {
   const imei = (document.getElementById('prod-phone-imei')?.value || '').trim();
   const storage = document.getElementById('prod-phone-storage')?.value || '';
   const color = document.getElementById('prod-phone-color')?.value || '';
+  const linkedPhoneNumber = (document.getElementById('prod-phone-number')?.value || '').trim();
 
   if (!name) {
     showToast("يرجى إدخال اسم الصنف", "warning");
@@ -2764,7 +2830,8 @@ window.saveProductForm = async () => {
     model,
     imei,
     storage,
-    color
+    color,
+    linkedPhoneNumber
   };
 
   try {
@@ -3028,6 +3095,7 @@ async function executePOSCheckout() {
       customerPhone: custPhone
     });
 
+    const soldItems = [...AppState.cart];
     AppState.cart = [];
     AppState.cartDiscount = 0;
     setElemValue('pos-cash-paid', '');
@@ -3037,6 +3105,17 @@ async function executePOSCheckout() {
     closeQuickPOS();
     playScanBeep(true);
     showToast(`تم إتمام الفاتورة ${invoice.invoiceNumber} بنجاح!`, 'receipt_long');
+
+    // Real-time shortage alerts for items in invoice
+    setTimeout(() => {
+      soldItems.forEach(cartItem => {
+        const prod = Store.products.find(p => p.id === cartItem.id);
+        if (prod && (prod.quantity || 0) <= 2) {
+          showToast(`⚠️ تنبيه نواقص: خرج [${prod.name}] من المخزن وأصبح ناقصاً! (المتبقي: ${prod.quantity <= 0 ? 'نفذت الكمية 0' : prod.quantity + ' قطع'})`, prod.quantity <= 0 ? 'error' : 'warning');
+        }
+      });
+    }, 1200);
+
     window.printInvoiceReceipt(invoice.id);
   } catch (e) {
     showToast("حدث خطأ أثناء إتمام عملية البيع", "error");
@@ -3389,6 +3468,7 @@ function setElemValue(id, val) {
 
 function getCategoryArabicName(cat) {
   switch (cat) {
+    case 'manual': return 'المخزن اليدوي';
     case 'chargers': return 'قسم الشواحن';
     case 'cables': return 'قسم الوصلات';
     case 'headphones': return 'قسم السماعات والصوتيات';
@@ -3402,6 +3482,7 @@ function getCategoryArabicName(cat) {
 
 function getCategoryViewPath(cat) {
   switch (cat) {
+    case 'manual': return 'manual-inventory';
     case 'chargers': return 'chargers-inventory';
     case 'cables': return 'cables-inventory';
     case 'headphones': return 'headphones-audio';
@@ -3628,4 +3709,628 @@ window.confirmDeleteSale = async (invoiceId) => {
       showToast("تعذر حذف الفاتورة، يرجى المحاولة مرة أخرى", "error");
     }
   }
+};
+
+// =========================================================================
+// PHONE NUMBER LINKING SYSTEM (ربط كل تليفون برقمه مع إتاحة كافة الخطوط)
+// =========================================================================
+
+export function getAllAvailablePhoneNumbers() {
+  const numbers = [];
+  const lines = Store.vodafoneLines || [];
+  lines.forEach(l => {
+    const num = (l.phone || '').trim();
+    if (num) {
+      numbers.push({ number: num, label: `خط ${l.lineNum} - فودافون كاش (${num})` });
+    } else {
+      numbers.push({ number: `خط ${l.lineNum}`, label: `خط ${l.lineNum} - فودافون كاش (18 خط)` });
+    }
+  });
+
+  // Also include any previously linked numbers from phones or customer records
+  (Store.products || []).forEach(p => {
+    if (p.category === 'phones' && (p.linkedPhoneNumber || p.customerPhone)) {
+      const ph = (p.linkedPhoneNumber || p.customerPhone).trim();
+      if (ph && !numbers.some(n => n.number === ph)) {
+        numbers.push({ number: ph, label: `${ph} (${p.name || 'هاتف مسجل'})` });
+      }
+    }
+  });
+  return numbers;
+}
+
+export function populatePhoneSelectOptions(selectElemId, currentVal = '') {
+  const sel = document.getElementById(selectElemId);
+  if (!sel) return;
+  const numbers = getAllAvailablePhoneNumbers();
+  sel.innerHTML = `<option value="">-- اختر من خطوط فودافون كاش (18 خط) أو الأرقام المسجلة --</option>` +
+    numbers.map(n => `<option value="${n.number}" ${n.number === currentVal ? 'selected' : ''}>${n.label}</option>`).join('');
+}
+
+window.openLinkPhoneModal = function(productId) {
+  const prod = Store.products.find(p => p.id === productId);
+  if (!prod) return;
+  AppState.editingProductId = productId;
+  setElemText('modal-link-phone-prod-name', prod.name || 'هاتف محمول');
+  setElemText('modal-link-phone-imei', prod.imei || prod.barcode || 'بدون كود');
+
+  const currentPhone = prod.linkedPhoneNumber || prod.customerPhone || '';
+  populatePhoneSelectOptions('modal-link-phone-select', currentPhone);
+  setElemValue('modal-link-phone-input', currentPhone);
+
+  const sel = document.getElementById('modal-link-phone-select');
+  if (sel) {
+    sel.onchange = () => {
+      if (sel.value && !sel.value.startsWith('خط ')) {
+        setElemValue('modal-link-phone-input', sel.value);
+      }
+    };
+  }
+
+  const modal = document.getElementById('modal-link-phone');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closeLinkPhoneModal = function() {
+  AppState.editingProductId = null;
+  const modal = document.getElementById('modal-link-phone');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.saveLinkedPhone = async function() {
+  const prodId = AppState.editingProductId;
+  if (!prodId) return;
+  const sel = document.getElementById('modal-link-phone-select')?.value || '';
+  const typed = (document.getElementById('modal-link-phone-input')?.value || '').trim();
+  const phone = typed || sel;
+
+  try {
+    await updateProduct(prodId, { linkedPhoneNumber: phone });
+    showToast(`✅ تم ربط الهاتف بالرقم [${phone || 'إلغاء الربط'}] بنجاح!`, 'check_circle');
+    closeLinkPhoneModal();
+    renderCurrentView();
+  } catch (e) {
+    console.error(e);
+    showToast('حدث خطأ أثناء ربط الرقم بالهاتف', 'error');
+  }
+};
+
+// =========================================================================
+// LOW-STOCK SHORTAGE SYSTEM (تنبيه النواقص الفعلي ومعرفة الأصناف المنتهية)
+// =========================================================================
+
+export function getLowStockProducts() {
+  return (Store.products || []).filter(p => {
+    if (p.category === 'phones' && p.status === 'sold') return false;
+    return (p.quantity || 0) <= 2;
+  }).sort((a, b) => (a.quantity || 0) - (b.quantity || 0));
+}
+
+window.openLowStockModal = function() {
+  AppState.activeLowStockFilter = 'all';
+  renderLowStockModalContent();
+  const modal = document.getElementById('modal-low-stock-details');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+};
+
+window.closeLowStockModal = function() {
+  const modal = document.getElementById('modal-low-stock-details');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.filterLowStockModal = function(tab) {
+  AppState.activeLowStockFilter = tab;
+  document.querySelectorAll('[data-stock-filter]').forEach(btn => {
+    const isActive = btn.getAttribute('data-stock-filter') === tab;
+    btn.className = isActive 
+      ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white transition-all shadow-sm'
+      : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container hover:bg-surface-container-high text-on-surface-variant transition-all';
+  });
+  renderLowStockModalContent();
+};
+
+function renderLowStockModalContent() {
+  const allShortages = getLowStockProducts();
+  const filter = AppState.activeLowStockFilter || 'all';
+
+  let filtered = allShortages;
+  if (filter === 'depleted') {
+    filtered = allShortages.filter(p => (p.quantity || 0) <= 0);
+  } else if (filter === 'low') {
+    filtered = allShortages.filter(p => (p.quantity || 0) > 0 && (p.quantity || 0) <= 2);
+  }
+
+  setElemText('modal-low-stock-badge', `${allShortages.length} صنف بحاجة لتوريد`);
+
+  const listContainer = document.getElementById('low-stock-items-list');
+  if (!listContainer) return;
+
+  if (filtered.length === 0) {
+    listContainer.innerHTML = `
+      <div class="py-12 text-center text-on-surface-variant">
+        <span class="material-symbols-outlined text-4xl text-emerald-400 mb-2">inventory</span>
+        <p class="font-bold text-sm text-on-surface">لا توجد نواقص في هذا الفلتر حالياً!</p>
+        <p class="text-xs text-on-surface-variant mt-1">جميع الأصناف متوفرة بالمخزن بشكل سليم.</p>
+      </div>
+    `;
+    return;
+  }
+
+  listContainer.innerHTML = filtered.map(item => {
+    const isZero = (item.quantity || 0) <= 0;
+    const catName = getCategoryArabicName(item.category);
+    return `
+      <div class="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container hover:border-outline-variant/50 transition-all flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base ${isZero ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'}">
+            ${item.quantity || 0}
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="font-bold text-on-surface text-sm">${item.name}</h5>
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface-container text-on-surface-variant">${catName}</span>
+              ${item.barcode ? `<span class="font-numeric-table text-[11px] text-secondary">#${item.barcode}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-3 mt-0.5 text-xs text-on-surface-variant">
+              <span>سعر البيع: <b class="text-emerald-400 font-numeric-table">${formatMoney(item.sellPrice)} ج.م</b></span>
+              <span>•</span>
+              <span class="${isZero ? 'text-rose-400 font-bold' : 'text-amber-400 font-bold'}">
+                ${isZero ? '⚠️ نفذت الكمية تماماً (0)' : `⚠️ متبقي ${item.quantity} حبات فقط`}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button onclick="window.quickRestockFromShortageModal('${item.id}', 5)" title="توريد +5 قطع فوراً" class="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition-all">
+            +5 توريد
+          </button>
+          <button onclick="window.quickRestockFromShortageModal('${item.id}', 10)" title="توريد +10 قطع فوراً" class="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition-all">
+            +10 توريد
+          </button>
+          <button onclick="window.openSmartCodeActionModal('${item.barcode || item.imei || item.id}', 'restock')" title="تفاصيل التوريد" class="p-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant">
+            <span class="material-symbols-outlined text-[18px]">add_business</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.quickRestockFromShortageModal = async function(prodId, delta) {
+  try {
+    await quickAdjustStock(prodId, delta);
+    showToast(`📦 تم توريد +${delta} حبات للصنف بنجاح!`, 'inventory_2');
+    renderLowStockModalContent();
+    updateGlobalHeaderBadges();
+    renderCurrentView();
+  } catch (e) {
+    showToast('حدث خطأ أثناء التوريد', 'error');
+  }
+};
+
+// =========================================================================
+// VIEW: MANUAL WAREHOUSE (المخزن اليدوي المفتوح للأصناف الحرة وقطع الغيار)
+// =========================================================================
+
+export function renderManualInventoryPage() {
+  const allManual = (Store.products || []).filter(p => p.category === 'manual');
+
+  const totalQty = allManual.reduce((acc, p) => acc + (p.quantity || 0), 0);
+  const totalRetail = allManual.reduce((acc, p) => acc + ((p.sellPrice || 0) * (p.quantity || 0)), 0);
+
+  setElemText('manual-stat-total-items', allManual.length);
+  setElemText('manual-stat-total-qty', totalQty);
+  setElemText('manual-stat-total-retail', `${formatMoney(totalRetail)} ج.م`);
+  setElemText('manual-count-badge', `${allManual.length} أصناف مسجلة`);
+
+  const activeSub = AppState.activeManualSubcatFilter || 'all';
+  const search = (document.getElementById('manual-search-input')?.value || '').trim().toLowerCase();
+
+  let filtered = allManual;
+  if (activeSub !== 'all') {
+    filtered = filtered.filter(p => (p.subcategory || '').includes(activeSub) || (p.notes || '').includes(activeSub));
+  }
+  if (search) {
+    filtered = filtered.filter(p => 
+      (p.name || '').toLowerCase().includes(search) || 
+      (p.barcode || '').toLowerCase().includes(search) ||
+      (p.notes || '').toLowerCase().includes(search) ||
+      (p.subcategory || '').toLowerCase().includes(search)
+    );
+  }
+
+  const tbody = document.getElementById('manual-inventory-table-body');
+  if (tbody) {
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="py-14 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+              <span class="material-symbols-outlined text-[42px] opacity-30">inventory_2</span>
+              <span class="font-headline-sm font-bold text-on-surface">المخزن اليدوي فارغ حالياً</span>
+              <p class="text-xs">اكتب اسم الصنف وسعره وكميته في الشريط السريع بالأعلى واضغط (تسجيل وحفظ فوراً) لإضافته مباشرة.</p>
+            </div>
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = filtered.map(item => `
+        <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+          <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode || item.id}')">${item.barcode || 'يدوي بدون كود'}</span>
+          </td>
+          <td class="py-3 px-4 font-bold text-on-surface text-sm">
+            ${item.name}
+            ${item.notes ? `<div class="text-[11px] text-on-surface-variant font-normal mt-0.5">${item.notes}</div>` : ''}
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2.5 py-1 rounded-lg text-xs bg-surface-container text-on-surface-variant font-medium">${item.subcategory || 'أصناف متنوعة'}</span>
+          </td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400 text-sm">${formatMoney(item.sellPrice)} ج.م</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
+              <span class="${item.quantity <= 2 ? 'text-rose-400 font-extrabold' : 'text-on-surface'}">${item.quantity}</span>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">-</button>
+            </div>
+          </td>
+          <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
+          <td class="py-3 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.openSmartCodeActionModal('${item.barcode || item.id}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode || item.id}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+  }
+}
+
+window.setManualSubcategoryFilter = function(sub) {
+  AppState.activeManualSubcatFilter = sub;
+  document.querySelectorAll('[data-manual-sub]').forEach(btn => {
+    const isActive = btn.getAttribute('data-manual-sub') === sub;
+    btn.className = isActive 
+      ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-3 py-1.5 rounded-xl text-xs font-bold bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderManualInventoryPage();
+};
+
+window.submitManualQuickAdd = async function(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const name = (document.getElementById('manual-quick-name')?.value || '').trim();
+  const barcode = (document.getElementById('manual-quick-code')?.value || '').trim() || `MAN-${Date.now().toString().slice(-6)}`;
+  const subcategory = document.getElementById('manual-quick-subcat')?.value || 'قطع غيار';
+  const sellPrice = parseFloat(document.getElementById('manual-quick-sell-price')?.value) || 0;
+  const quantity = parseInt(document.getElementById('manual-quick-qty')?.value, 10) || 1;
+  const notes = (document.getElementById('manual-quick-notes')?.value || '').trim();
+
+  if (!name) {
+    showToast('يرجى إدخال اسم الصنف / القطعة اليدوية', 'warning');
+    return;
+  }
+
+  try {
+    await addProduct({
+      barcode,
+      name,
+      category: 'manual',
+      subcategory,
+      sellPrice,
+      buyPrice: 0,
+      quantity,
+      notes
+    });
+
+    setElemValue('manual-quick-name', '');
+    setElemValue('manual-quick-code', '');
+    setElemValue('manual-quick-sell-price', '');
+    setElemValue('manual-quick-qty', '1');
+    setElemValue('manual-quick-notes', '');
+
+    showToast(`✅ تم تسجيل [${name}] في المخزن اليدوي بنجاح!`, 'check_circle');
+    renderManualInventoryPage();
+    updateGlobalHeaderBadges();
+  } catch (err) {
+    console.error(err);
+    showToast('حدث خطأ أثناء حفظ الصنف اليدوي', 'error');
+  }
+};
+
+// =========================================================================
+// VIEW: ALL-SALES MASTER & COMPLETE SELLABLE CATALOG
+// (شاشة المبيعات الشاملة والبيع الكلي)
+// =========================================================================
+
+export function getAllSalesUnified() {
+  const allSales = [];
+  (Store.salesInvoices || []).forEach(inv => {
+    (inv.items || []).forEach((item, itemIdx) => {
+      allSales.push({
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        timestamp: inv.timestamp,
+        customerName: inv.customerName || 'عميل نقدي',
+        customerPhone: inv.customerPhone || '',
+        itemIndex: itemIdx,
+        ...item
+      });
+    });
+  });
+  return allSales.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+}
+
+export function renderAllSalesMasterPage() {
+  const allSales = getAllSalesUnified();
+  const allProducts = Store.products || [];
+
+  const totalSalesVal = allSales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
+  const totalProfitVal = allSales.reduce((acc, s) => acc + (s.profit || 0), 0);
+
+  setElemText('all-sales-kpi-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('all-sales-kpi-count', `${allSales.length} عمليات بيع`);
+  setElemText('all-sales-kpi-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
+  setElemText('all-sales-kpi-unique-items', `${allProducts.length} صنف مسجل`);
+
+  const activeTab = AppState.activeAllSalesTab || 'sales';
+  if (activeTab === 'sales') {
+    renderMasterSalesTable(allSales);
+  } else {
+    renderMasterCatalog();
+  }
+}
+
+window.switchAllSalesMasterTab = function(tab) {
+  AppState.activeAllSalesTab = tab;
+  const isSales = (tab === 'sales');
+  
+  const tabBtnSales = document.getElementById('all-sales-tab-sales');
+  const tabBtnCatalog = document.getElementById('all-sales-tab-catalog');
+  const salesContainer = document.getElementById('master-tab-sales-container');
+  const catalogContainer = document.getElementById('master-tab-catalog-container');
+
+  if (tabBtnSales) {
+    tabBtnSales.className = isSales 
+      ? 'px-5 py-2.5 rounded-xl font-bold text-xs bg-primary text-white shadow-md'
+      : 'px-5 py-2.5 rounded-xl font-bold text-xs bg-surface-container-low hover:bg-surface-container text-on-surface-variant';
+  }
+  if (tabBtnCatalog) {
+    tabBtnCatalog.className = !isSales 
+      ? 'px-5 py-2.5 rounded-xl font-bold text-xs bg-primary text-white shadow-md'
+      : 'px-5 py-2.5 rounded-xl font-bold text-xs bg-surface-container-low hover:bg-surface-container text-on-surface-variant';
+  }
+
+  if (salesContainer) salesContainer.classList.toggle('hidden', !isSales);
+  if (catalogContainer) catalogContainer.classList.toggle('hidden', isSales);
+
+  renderAllSalesMasterPage();
+};
+
+window.setAllSalesCategoryFilter = function(cat) {
+  AppState.activeAllSalesCategoryFilter = cat;
+  document.querySelectorAll('[data-sales-cat]').forEach(btn => {
+    const isActive = btn.getAttribute('data-sales-cat') === cat;
+    btn.className = isActive 
+      ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-3 py-1.5 rounded-xl text-xs font-bold bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderAllSalesMasterPage();
+};
+
+window.setAllSalesDateFilter = function(period) {
+  AppState.activeAllSalesDateFilter = period;
+  document.querySelectorAll('[data-sales-date]').forEach(btn => {
+    const isActive = btn.getAttribute('data-sales-date') === period;
+    btn.className = isActive 
+      ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-secondary text-white shadow-sm ring-1 ring-emerald-500/40 cursor-pointer'
+      : 'px-3 py-1.5 rounded-xl text-xs font-bold bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderAllSalesMasterPage();
+};
+
+window.setAllSalesSearch = function(query) {
+  AppState.allSalesSearch = (query || '').trim().toLowerCase();
+  renderAllSalesMasterPage();
+};
+
+function renderMasterSalesTable(allSales) {
+  const catFilter = AppState.activeAllSalesCategoryFilter || 'all';
+  const dateFilter = AppState.activeAllSalesDateFilter || 'all';
+  const search = AppState.allSalesSearch || '';
+
+  let filtered = allSales;
+
+  if (catFilter !== 'all') {
+    filtered = filtered.filter(s => {
+      if (catFilter === 'chargers' && (s.category === 'chargers' || s.category === 'chargers-cables')) return true;
+      if (catFilter === 'cables' && (s.category === 'cables' || s.category === 'chargers-cables')) return true;
+      return s.category === catFilter;
+    });
+  }
+
+  if (dateFilter === 'today') {
+    filtered = filtered.filter(s => isToday(s.timestamp));
+  } else if (dateFilter === 'month') {
+    filtered = filtered.filter(s => isThisMonth(s.timestamp));
+  }
+
+  if (search) {
+    filtered = filtered.filter(s => 
+      (s.name || '').toLowerCase().includes(search) ||
+      (s.invoiceNumber || '').toLowerCase().includes(search) ||
+      (s.customerName || '').toLowerCase().includes(search) ||
+      (s.customerPhone || '').toLowerCase().includes(search) ||
+      (s.barcode || '').toLowerCase().includes(search)
+    );
+  }
+
+  const tbody = document.getElementById('all-sales-master-table-body');
+  if (!tbody) return;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" class="py-14 text-center">
+          <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+            <span class="material-symbols-outlined text-[42px] opacity-30">receipt_long</span>
+            <span class="font-headline-sm font-bold text-on-surface">لا توجد عمليات بيع تطابق الفلاتر</span>
+            <p class="text-xs">جرب تغيير الفلتر أو كتابة كلمة بحث أخرى.</p>
+          </div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(item => {
+    const totalRow = (item.price || 0) * (item.quantity || 1);
+    const catName = getCategoryArabicName(item.category);
+    return `
+      <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
+        <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
+          ${item.invoiceNumber || 'INV-DIRECT'}
+        </td>
+        <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">
+          ${formatDateArabic(item.timestamp)}
+        </td>
+        <td class="py-3 px-4">
+          <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-surface-container text-on-surface-variant">${catName}</span>
+        </td>
+        <td class="py-3 px-4 font-bold text-on-surface text-sm">
+          ${item.name}
+          ${item.barcode ? `<span class="text-[11px] text-on-surface-variant font-numeric-table mr-1.5">#${item.barcode}</span>` : ''}
+        </td>
+        <td class="py-3 px-4">
+          <div class="font-bold text-on-surface">${item.customerName || 'عميل نقدي'}</div>
+          ${item.customerPhone ? `<div class="text-[11px] font-numeric-table text-on-surface-variant">${item.customerPhone}</div>` : ''}
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-bold text-on-surface text-center">
+          ${item.quantity || 1}
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400 text-sm">
+          ${formatMoney(item.price)} ج.م
+        </td>
+        <td class="py-3 px-4 font-numeric-table font-extrabold text-emerald-400 text-sm">
+          ${formatMoney(totalRow)} ج.م
+        </td>
+        <td class="py-3 px-4 text-center">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة وعرض الفاتورة" class="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary">
+              <span class="material-symbols-outlined text-[17px]">receipt_long</span>
+            </button>
+            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant">
+              <span class="material-symbols-outlined text-[17px]">edit</span>
+            </button>
+            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف عملية البيع نهائياً" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400">
+              <span class="material-symbols-outlined text-[17px]">delete</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.renderMasterCatalog = function() {
+  const cat = AppState.activeMasterCatalogCat || 'all';
+  const search = (AppState.masterCatalogSearch || '').trim().toLowerCase();
+
+  let products = Store.products || [];
+  if (cat !== 'all') {
+    products = products.filter(p => p.category === cat);
+  }
+  if (search) {
+    products = products.filter(p => 
+      (p.name || '').toLowerCase().includes(search) ||
+      (p.barcode || '').toLowerCase().includes(search) ||
+      (p.imei || '').toLowerCase().includes(search) ||
+      (p.brand || '').toLowerCase().includes(search)
+    );
+  }
+
+  const grid = document.getElementById('master-catalog-grid');
+  if (!grid) return;
+
+  if (products.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full py-16 text-center text-on-surface-variant">
+        <span class="material-symbols-outlined text-4xl mb-2 opacity-30">inventory</span>
+        <p class="font-bold text-sm text-on-surface">لا توجد أصناف في الكتالوج تطابق البحث</p>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = products.map(prod => {
+    const isOutOfStock = (prod.quantity || 0) <= 0;
+    const isLow = (prod.quantity || 0) <= 2;
+    const catName = getCategoryArabicName(prod.category);
+    return `
+      <div class="p-4 rounded-2xl bg-surface-container-low border border-surface-container hover:border-outline-variant/60 transition-all flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-surface-container text-on-surface-variant">${catName}</span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold font-numeric-table ${isOutOfStock ? 'bg-rose-500/20 text-rose-400' : isLow ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}">
+              ${isOutOfStock ? 'نفذت الكمية (0)' : `${prod.quantity} حبات بالمخزن`}
+            </span>
+          </div>
+          <h4 class="font-bold text-on-surface text-sm line-clamp-2 mb-1">${prod.name}</h4>
+          ${prod.linkedPhoneNumber ? `
+            <div class="text-[11px] text-emerald-400 font-bold mb-1 flex items-center gap-1">
+              <span class="material-symbols-outlined text-[13px]">call</span>
+              ${prod.linkedPhoneNumber}
+            </div>
+          ` : ''}
+          ${prod.barcode ? `<div class="text-[11px] font-numeric-table text-secondary mb-2">#${prod.barcode}</div>` : ''}
+        </div>
+
+        <div class="pt-3 border-t border-surface-container-high mt-2">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs text-on-surface-variant">سعر البيع:</span>
+            <span class="font-bold text-base text-emerald-400 font-numeric-table">${formatMoney(prod.sellPrice)} ج.م</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="window.openSmartCodeActionModal('${prod.barcode || prod.imei || prod.id}', 'sale')" class="w-full py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white font-bold text-xs transition-colors flex items-center justify-center gap-1">
+              <span>💰</span> بيع فوري
+            </button>
+            <button onclick="window.addProdToCartById('${prod.id}')" class="w-full py-2 rounded-xl bg-secondary/20 hover:bg-secondary text-secondary hover:text-white font-bold text-xs transition-colors flex items-center justify-center gap-1">
+              <span>🛒</span> للسلة
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.setMasterCatalogCategory = function(cat) {
+  AppState.activeMasterCatalogCat = cat;
+  document.querySelectorAll('[data-catalog-cat]').forEach(btn => {
+    const isActive = btn.getAttribute('data-catalog-cat') === cat;
+    btn.className = isActive 
+      ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer'
+      : 'px-3 py-1.5 rounded-xl text-xs font-bold bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 cursor-pointer';
+  });
+  renderMasterCatalog();
+};
+
+window.setMasterCatalogSearch = function(query) {
+  AppState.masterCatalogSearch = (query || '').trim().toLowerCase();
+  renderMasterCatalog();
 };
