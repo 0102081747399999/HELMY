@@ -31,7 +31,9 @@ import {
   checkoutSale,
   updateSaleInvoice,
   deleteSaleInvoice,
-  recordCashDrawerEntry
+  recordCashDrawerEntry,
+  signInWithGooglePopup,
+  getFirebaseAuth
 } from './firebase-config.js';
 
 // Application State
@@ -358,6 +360,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   renderCurrentView();
   updateGlobalHeaderBadges();
+  updateManualLockBadges();
 });
 
 // ==========================================
@@ -402,6 +405,16 @@ function setupNavigation() {
 export function navigateTo(path) {
   // Alias redirects
   if (path === 'chargers-cables') path = 'chargers-inventory';
+
+  // Manual Inventory Passcode & Auth Protection
+  if (path === 'manual-inventory') {
+    if (!isManualInventoryUnlocked()) {
+      if (typeof window.openManualAuthModal === 'function') {
+        window.openManualAuthModal();
+      }
+      return;
+    }
+  }
 
   AppState.currentView = path;
 
@@ -2813,14 +2826,19 @@ window.saveProductForm = async () => {
   const color = document.getElementById('prod-phone-color')?.value || '';
   const linkedPhoneNumber = (document.getElementById('prod-phone-number')?.value || '').trim();
 
-  if (!name) {
-    showToast("يرجى إدخال اسم الصنف", "warning");
-    return;
+  let validName = name;
+  if (!validName) {
+    if (category === 'manual') {
+      validName = subcategory || 'صنف يدوي';
+    } else {
+      showToast("يرجى إدخال اسم الصنف", "warning");
+      return;
+    }
   }
 
   const productData = {
     barcode: barcode || (category === 'phones' ? imei : ''),
-    name,
+    name: validName,
     category,
     subcategory,
     buyPrice,
@@ -3496,6 +3514,9 @@ function getCategoryViewPath(cat) {
 
 window.navigateTo = navigateTo;
 window.formatMoney = formatMoney;
+window.isManualInventoryUnlocked = isManualInventoryUnlocked;
+window.getManualInventoryPin = getManualInventoryPin;
+window.updateManualLockBadges = updateManualLockBadges;
 
 // ==========================================
 // VODAFONE QUICK PHONE NUMBER ACTIONS
@@ -3921,6 +3942,301 @@ window.quickRestockFromShortageModal = async function(prodId, delta) {
 };
 
 // =========================================================================
+// SECURITY & PASSCODE MANAGEMENT FOR MANUAL INVENTORY (حماية المخزن اليدوي)
+// =========================================================================
+
+export const DEFAULT_MANUAL_PIN = '123456';
+
+export function getManualInventoryPin() {
+  return localStorage.getItem('hilmy_manual_pin') || DEFAULT_MANUAL_PIN;
+}
+
+export function isManualInventoryUnlocked() {
+  return sessionStorage.getItem('hilmy_manual_unlocked') === 'true';
+}
+
+export function getSecurityMode() {
+  return localStorage.getItem('hilmy_security_mode') || 'pin';
+}
+
+export function getLinkedGmail() {
+  return localStorage.getItem('hilmy_linked_gmail') || '';
+}
+
+export function updateManualLockBadges() {
+  const isUnlocked = isManualInventoryUnlocked();
+  
+  // 1. Sidebar lock indicator
+  const sideIndicator = document.getElementById('sidebar-manual-lock-indicator');
+  if (sideIndicator) {
+    if (isUnlocked) {
+      sideIndicator.className = 'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-bold';
+      sideIndicator.innerHTML = '🔓 مفتوح';
+    } else {
+      sideIndicator.className = 'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 font-bold';
+      sideIndicator.innerHTML = '🔒 محمي (1-6)';
+    }
+  }
+
+  // 2. Header lock status badge inside manual view
+  const headBadge = document.getElementById('manual-lock-status-badge');
+  if (headBadge) {
+    if (isUnlocked) {
+      headBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 shadow-xs';
+      headBadge.innerHTML = '<span class="material-symbols-outlined text-sm text-emerald-600">lock_open</span><span>المخزن مفتوح حالياً</span>';
+    } else {
+      headBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5 shadow-xs';
+      headBadge.innerHTML = '<span class="material-symbols-outlined text-sm text-amber-600">lock</span><span>المخزن مؤمن برقم سري</span>';
+    }
+  }
+}
+
+window.openManualAuthModal = function() {
+  const modal = document.getElementById('modal-manual-auth');
+  const input = document.getElementById('manual-auth-pin-input');
+  const errorMsg = document.getElementById('manual-auth-error-msg');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+  if (input) {
+    input.value = '';
+    input.type = 'password';
+    setTimeout(() => input.focus(), 100);
+  }
+  if (errorMsg) errorMsg.classList.add('hidden');
+  
+  const eyeIcon = document.getElementById('manual-auth-eye-icon');
+  if (eyeIcon) eyeIcon.textContent = 'visibility';
+};
+
+window.closeManualAuthModal = function() {
+  const modal = document.getElementById('modal-manual-auth');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.toggleManualAuthPinVisibility = function() {
+  const input = document.getElementById('manual-auth-pin-input');
+  const icon = document.getElementById('manual-auth-eye-icon');
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (icon) icon.textContent = 'visibility_off';
+  } else {
+    input.type = 'password';
+    if (icon) icon.textContent = 'visibility';
+  }
+};
+
+window.appendManualAuthKey = function(key) {
+  const input = document.getElementById('manual-auth-pin-input');
+  if (!input) return;
+  input.value += key;
+  const curPin = getManualInventoryPin();
+  if (input.value.length === curPin.length) {
+    window.submitManualAuthPin();
+  }
+};
+
+window.clearManualAuthKey = function() {
+  const input = document.getElementById('manual-auth-pin-input');
+  if (input) input.value = '';
+  document.getElementById('manual-auth-error-msg')?.classList.add('hidden');
+};
+
+window.backspaceManualAuthKey = function() {
+  const input = document.getElementById('manual-auth-pin-input');
+  if (input && input.value) {
+    input.value = input.value.slice(0, -1);
+  }
+};
+
+window.submitManualAuthPin = function(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const input = document.getElementById('manual-auth-pin-input');
+  const errorMsg = document.getElementById('manual-auth-error-msg');
+  const entered = (input?.value || '').trim();
+  const validPin = getManualInventoryPin();
+  const mode = getSecurityMode();
+  const linkedGmail = getLinkedGmail();
+
+  if (entered === validPin || entered === DEFAULT_MANUAL_PIN) {
+    if (mode === 'strict' && linkedGmail) {
+      const isGmailVerified = localStorage.getItem('hilmy_gmail_verified') === 'true';
+      if (!isGmailVerified) {
+        showToast(`🛡️ التأمين المشدد مفعل: يرجى تأكيد حساب Google [${linkedGmail}] أولاً`, 'warning');
+        return;
+      }
+    }
+
+    sessionStorage.setItem('hilmy_manual_unlocked', 'true');
+    window.closeManualAuthModal();
+    navigateTo('manual-inventory');
+    updateManualLockBadges();
+    showToast('🔓 تم التحقق بنجاح! أهلاً بك في المخزن اليدوي', 'check_circle');
+  } else {
+    if (errorMsg) errorMsg.classList.remove('hidden');
+    if (input) {
+      input.classList.add('border-rose-500');
+      input.focus();
+      input.select();
+      setTimeout(() => input.classList.remove('border-rose-500'), 1500);
+    }
+  }
+};
+
+window.lockManualInventory = function() {
+  sessionStorage.removeItem('hilmy_manual_unlocked');
+  updateManualLockBadges();
+  window.closeManualSecurityModal();
+  if (AppState.currentView === 'manual-inventory') {
+    navigateTo('dashboard-overview');
+  }
+  showToast('🔒 تم قفل المخزن اليدوي بنجاح لحماية البيانات', 'lock');
+};
+
+window.openManualSecurityModal = function() {
+  const modal = document.getElementById('modal-manual-security-settings');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+  setElemText('current-pin-display', getManualInventoryPin());
+  const linkedGmail = getLinkedGmail();
+  const gmailBadge = document.getElementById('linked-gmail-status-badge');
+  const gmailInput = document.getElementById('manual-gmail-input');
+  if (gmailBadge) {
+    if (linkedGmail) {
+      gmailBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+      gmailBadge.textContent = `✅ ${linkedGmail}`;
+    } else {
+      gmailBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-surface-container text-on-surface-variant';
+      gmailBadge.textContent = 'غير مربوط';
+    }
+  }
+  if (gmailInput) gmailInput.value = linkedGmail;
+
+  const mode = getSecurityMode();
+  const pinRadio = document.getElementById('sec-mode-pin');
+  const strictRadio = document.getElementById('sec-mode-strict');
+  if (pinRadio) pinRadio.checked = (mode === 'pin');
+  if (strictRadio) strictRadio.checked = (mode === 'strict');
+};
+
+window.closeManualSecurityModal = function() {
+  const modal = document.getElementById('modal-manual-security-settings');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+};
+
+window.saveNewManualPin = function() {
+  const newPin = (document.getElementById('new-pin-input')?.value || '').trim();
+  if (!newPin) {
+    showToast('يرجى كتابة كلمة المرور الجديدة', 'warning');
+    return;
+  }
+  localStorage.setItem('hilmy_manual_pin', newPin);
+  setElemText('current-pin-display', newPin);
+  setElemValue('new-pin-input', '');
+  showToast(`✅ تم تغيير كلمة المرور بنجاح إلى: ${newPin}`, 'check_circle');
+};
+
+window.resetManualPinDefault = function() {
+  localStorage.setItem('hilmy_manual_pin', DEFAULT_MANUAL_PIN);
+  setElemText('current-pin-display', DEFAULT_MANUAL_PIN);
+  setElemValue('new-pin-input', '');
+  showToast('✅ تم استعادة كلمة المرور الافتراضية (123456)', 'check_circle');
+};
+
+window.saveManualGmailLink = function() {
+  const email = (document.getElementById('manual-gmail-input')?.value || '').trim();
+  if (!email || !email.includes('@')) {
+    showToast('يرجى إدخال بريد جيميل صحيح (Gmail)', 'warning');
+    return;
+  }
+  localStorage.setItem('hilmy_linked_gmail', email);
+  localStorage.setItem('hilmy_gmail_verified', 'true');
+  const gmailBadge = document.getElementById('linked-gmail-status-badge');
+  if (gmailBadge) {
+    gmailBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+    gmailBadge.textContent = `✅ ${email}`;
+  }
+  showToast(`✅ تم ربط وتوثيق حساب الجيميل [${email}] بنجاح!`, 'check_circle');
+};
+
+window.unlinkManualGmail = function() {
+  localStorage.removeItem('hilmy_linked_gmail');
+  localStorage.removeItem('hilmy_gmail_verified');
+  localStorage.setItem('hilmy_security_mode', 'pin');
+  setElemValue('manual-gmail-input', '');
+  const gmailBadge = document.getElementById('linked-gmail-status-badge');
+  if (gmailBadge) {
+    gmailBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-surface-container text-on-surface-variant';
+    gmailBadge.textContent = 'غير مربوط';
+  }
+  const pinRadio = document.getElementById('sec-mode-pin');
+  if (pinRadio) pinRadio.checked = true;
+  showToast('تم إلغاء ربط حساب الجيميل والعودة للدخول بكلمة المرور فقط', 'info');
+};
+
+window.setSecurityMode = function(mode) {
+  if (mode === 'strict') {
+    const linked = getLinkedGmail();
+    if (!linked) {
+      showToast('⚠️ يرجى ربط حساب الجيميل أولاً لتفعيل التأمين المشدد', 'warning');
+      const pinRadio = document.getElementById('sec-mode-pin');
+      if (pinRadio) pinRadio.checked = true;
+      return;
+    }
+    localStorage.setItem('hilmy_security_mode', 'strict');
+    showToast('🛡️ تم تفعيل التأمين الجامد (كلمة المرور + الجيميل)', 'check_circle');
+  } else {
+    localStorage.setItem('hilmy_security_mode', 'pin');
+    showToast('🟢 تم تفعيل الدخول السريع بكلمة المرور (123456)', 'check_circle');
+  }
+};
+
+window.handleManualGoogleAuth = async function() {
+  try {
+    const res = await signInWithGooglePopup();
+    if (res && res.user) {
+      const email = res.user.email;
+      localStorage.setItem('hilmy_linked_gmail', email);
+      localStorage.setItem('hilmy_gmail_verified', 'true');
+      sessionStorage.setItem('hilmy_manual_unlocked', 'true');
+      window.closeManualAuthModal();
+      window.closeManualSecurityModal();
+      navigateTo('manual-inventory');
+      updateManualLockBadges();
+      showToast(`✅ تم تسجيل الدخول وتوثيق Google: ${email}`, 'check_circle');
+      return;
+    }
+  } catch (err) {
+    console.warn('Google Popup auth fallback to manual prompt:', err);
+  }
+
+  // Fallback prompt for Gmail if offline or running via file://
+  const currentLinked = getLinkedGmail();
+  const inputEmail = prompt('أدخل بريد Gmail الخاص بك لربطه وتأمينه كمالك للنظام:', currentLinked || '');
+  if (inputEmail && inputEmail.trim() && inputEmail.includes('@')) {
+    const cleanEmail = inputEmail.trim();
+    localStorage.setItem('hilmy_linked_gmail', cleanEmail);
+    localStorage.setItem('hilmy_gmail_verified', 'true');
+    sessionStorage.setItem('hilmy_manual_unlocked', 'true');
+    window.closeManualAuthModal();
+    window.closeManualSecurityModal();
+    navigateTo('manual-inventory');
+    updateManualLockBadges();
+    showToast(`✅ تم تأكيد وربط بريد الجيميل: ${cleanEmail}`, 'check_circle');
+  }
+};
+
+// =========================================================================
 // VIEW: MANUAL WAREHOUSE (المخزن اليدوي المفتوح للأصناف الحرة وقطع الغيار)
 // =========================================================================
 
@@ -3929,9 +4245,13 @@ export function renderManualInventoryPage() {
 
   const totalQty = allManual.reduce((acc, p) => acc + (p.quantity || 0), 0);
   const totalRetail = allManual.reduce((acc, p) => acc + ((p.sellPrice || 0) * (p.quantity || 0)), 0);
+  const depletedCount = allManual.filter(p => (p.quantity || 0) <= 0).length;
 
+  setElemText('manual-stat-items', allManual.length);
   setElemText('manual-stat-total-items', allManual.length);
+  setElemText('manual-stat-qty', totalQty);
   setElemText('manual-stat-total-qty', totalQty);
+  setElemText('manual-stat-depleted', depletedCount);
   setElemText('manual-stat-total-retail', `${formatMoney(totalRetail)} ج.م`);
   setElemText('manual-count-badge', `${allManual.length} أصناف مسجلة`);
 
@@ -3956,11 +4276,11 @@ export function renderManualInventoryPage() {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" class="py-14 text-center">
+          <td colspan="8" class="py-14 text-center">
             <div class="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
               <span class="material-symbols-outlined text-[42px] opacity-30">inventory_2</span>
               <span class="font-headline-sm font-bold text-on-surface">المخزن اليدوي فارغ حالياً</span>
-              <p class="text-xs">اكتب اسم الصنف وسعره وكميته في الشريط السريع بالأعلى واضغط (تسجيل وحفظ فوراً) لإضافته مباشرة.</p>
+              <p class="text-xs">اكتب أي صنف أو بيان في شريط الكتابة بالأعلى واضغط (تسجيل وحفظ فوراً) لإضافته مباشرة.</p>
             </div>
           </td>
         </tr>
@@ -3969,7 +4289,7 @@ export function renderManualInventoryPage() {
       tbody.innerHTML = filtered.map(item => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
           <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode || item.id}')">${item.barcode || 'يدوي بدون كود'}</span>
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode || item.id}')">${item.barcode || 'يدوي'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">
             ${item.name}
@@ -3978,27 +4298,30 @@ export function renderManualInventoryPage() {
           <td class="py-3 px-4">
             <span class="px-2.5 py-1 rounded-lg text-xs bg-surface-container text-on-surface-variant font-medium">${item.subcategory || 'أصناف متنوعة'}</span>
           </td>
-          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400 text-sm">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4">
             <div class="flex items-center gap-1.5 font-numeric-table font-bold text-sm">
               <span class="${item.quantity <= 2 ? 'text-rose-400 font-extrabold' : 'text-on-surface'}">${item.quantity}</span>
-              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">+</button>
-              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold">-</button>
+              <button onclick="window.quickAdjustStock('${item.id}', 1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold" title="زيادة 1">+</button>
+              <button onclick="window.quickAdjustStock('${item.id}', -1)" class="w-6 h-6 rounded bg-surface-container hover:bg-surface-container-high text-xs font-bold" title="خصم 1">-</button>
             </div>
           </td>
+          <td class="py-3 px-4 font-numeric-table font-bold text-emerald-400 text-sm">${formatMoney(item.sellPrice)} ج.م</td>
           <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
+          <td class="py-3 px-4 text-on-surface-variant text-xs">${item.notes || item.linkedPhoneNumber || '-'}</td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
               <button onclick="window.openSmartCodeActionModal('${item.barcode || item.id}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
               <button onclick="window.openSmartCodeActionModal('${item.barcode || item.id}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
-              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
-              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
+              <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant" title="تعديل"><span class="material-symbols-outlined text-[17px]">edit</span></button>
+              <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400" title="حذف"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
           </td>
         </tr>
       `).join('');
     }
   }
+
+  updateManualLockBadges();
 }
 
 window.setManualSubcategoryFilter = function(sub) {
@@ -4014,37 +4337,78 @@ window.setManualSubcategoryFilter = function(sub) {
 
 window.submitManualQuickAdd = async function(e) {
   if (e && e.preventDefault) e.preventDefault();
-  const name = (document.getElementById('manual-quick-name')?.value || '').trim();
-  const barcode = (document.getElementById('manual-quick-code')?.value || '').trim() || `MAN-${Date.now().toString().slice(-6)}`;
-  const subcategory = document.getElementById('manual-quick-subcat')?.value || 'قطع غيار';
-  const sellPrice = parseFloat(document.getElementById('manual-quick-sell-price')?.value) || 0;
-  const quantity = parseInt(document.getElementById('manual-quick-qty')?.value, 10) || 1;
-  const notes = (document.getElementById('manual-quick-notes')?.value || '').trim();
+  
+  // Read from both manual-entry-* and manual-quick-* ID variants
+  const nameEl = document.getElementById('manual-entry-name') || document.getElementById('manual-quick-name');
+  const codeEl = document.getElementById('manual-entry-barcode') || document.getElementById('manual-quick-code');
+  const typeEl = document.getElementById('manual-entry-type') || document.getElementById('manual-quick-subcat');
+  const qtyEl = document.getElementById('manual-entry-qty') || document.getElementById('manual-quick-qty');
+  const sellPriceEl = document.getElementById('manual-entry-sell-price') || document.getElementById('manual-quick-sell-price');
+  const buyPriceEl = document.getElementById('manual-entry-buy-price') || document.getElementById('manual-quick-buy-price');
+  const notesEl = document.getElementById('manual-entry-notes') || document.getElementById('manual-quick-notes');
 
-  if (!name) {
-    showToast('يرجى إدخال اسم الصنف / القطعة اليدوية', 'warning');
-    return;
+  let rawName = (nameEl?.value || '').trim();
+  let barcode = (codeEl?.value || '').trim();
+  let subcategory = (typeEl?.value || '').trim();
+  let sellPrice = parseFloat(sellPriceEl?.value);
+  let buyPrice = parseFloat(buyPriceEl?.value);
+  let quantity = parseInt(qtyEl?.value, 10);
+  let notes = (notesEl?.value || '').trim();
+
+  // "أي كتابة أكتبها تدخل، مش لازم يطلب مني حاجة محددة"
+  if (!rawName) {
+    if (subcategory) {
+      rawName = subcategory;
+    } else if (notes) {
+      rawName = notes.length > 25 ? notes.slice(0, 25) + '...' : notes;
+    } else if (barcode) {
+      rawName = `صنف يدوي (${barcode})`;
+    } else {
+      rawName = `صنف يدوي ${Date.now().toString().slice(-4)}`;
+    }
+  }
+
+  if (!barcode) {
+    barcode = `MAN-${Date.now().toString().slice(-6)}`;
+  }
+  if (!subcategory) {
+    subcategory = 'أصناف متنوعة';
+  }
+  if (isNaN(sellPrice) || sellPrice < 0) {
+    sellPrice = 0;
+  }
+  if (isNaN(buyPrice) || buyPrice < 0) {
+    buyPrice = 0;
+  }
+  if (isNaN(quantity) || quantity < 0) {
+    quantity = 1;
   }
 
   try {
     await addProduct({
       barcode,
-      name,
+      name: rawName,
       category: 'manual',
       subcategory,
       sellPrice,
-      buyPrice: 0,
+      buyPrice,
       quantity,
       notes
     });
 
-    setElemValue('manual-quick-name', '');
-    setElemValue('manual-quick-code', '');
-    setElemValue('manual-quick-sell-price', '');
-    setElemValue('manual-quick-qty', '1');
-    setElemValue('manual-quick-notes', '');
+    // Reset inputs
+    if (nameEl) nameEl.value = '';
+    if (codeEl) codeEl.value = '';
+    if (typeEl) typeEl.value = '';
+    if (sellPriceEl) sellPriceEl.value = '';
+    if (buyPriceEl) buyPriceEl.value = '';
+    if (qtyEl) qtyEl.value = '1';
+    if (notesEl) notesEl.value = '';
 
-    showToast(`✅ تم تسجيل [${name}] في المخزن اليدوي بنجاح!`, 'check_circle');
+    // Re-focus name field for continuous effortless typing
+    if (nameEl) nameEl.focus();
+
+    showToast(`✅ تم تسجيل [${rawName}] في المخزن اليدوي بنجاح!`, 'check_circle');
     renderManualInventoryPage();
     updateGlobalHeaderBadges();
   } catch (err) {

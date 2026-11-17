@@ -17,6 +17,13 @@ import {
   limit,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut as fbSignOut, 
+  onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // Your exact web app's Firebase configuration
 export const firebaseConfig = {
@@ -42,6 +49,31 @@ try {
 } catch (e) {
   console.warn("⚠️ Firebase direct init warning, falling back to local mode:", e);
   isOnline = false;
+}
+
+// Initialize Firebase Auth
+let auth = null;
+let googleProvider = null;
+
+try {
+  if (app) {
+    auth = getAuth(app);
+    googleProvider = new GoogleAuthProvider();
+    console.log("🔐 Firebase Auth initialized successfully for Hilmy Telecom POS");
+  }
+} catch (e) {
+  console.warn("⚠️ Firebase Auth direct init warning:", e);
+}
+
+export async function signInWithGooglePopup() {
+  if (!auth || !googleProvider) {
+    throw new Error('Firebase Auth is not available');
+  }
+  return await signInWithPopup(auth, googleProvider);
+}
+
+export function getFirebaseAuth() {
+  return auth;
 }
 
 // LocalStorage Persistence Keys
