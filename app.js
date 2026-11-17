@@ -360,7 +360,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   renderCurrentView();
   updateGlobalHeaderBadges();
-  updateManualLockBadges();
+  initSystemGateLock();
 });
 
 // ==========================================
@@ -405,16 +405,6 @@ function setupNavigation() {
 export function navigateTo(path) {
   // Alias redirects
   if (path === 'chargers-cables') path = 'chargers-inventory';
-
-  // Manual Inventory Passcode & Auth Protection
-  if (path === 'manual-inventory') {
-    if (!isManualInventoryUnlocked()) {
-      if (typeof window.openManualAuthModal === 'function') {
-        window.openManualAuthModal();
-      }
-      return;
-    }
-  }
 
   AppState.currentView = path;
 
@@ -3514,9 +3504,9 @@ function getCategoryViewPath(cat) {
 
 window.navigateTo = navigateTo;
 window.formatMoney = formatMoney;
-window.isManualInventoryUnlocked = isManualInventoryUnlocked;
-window.getManualInventoryPin = getManualInventoryPin;
-window.updateManualLockBadges = updateManualLockBadges;
+window.isSystemUnlocked = isSystemUnlocked;
+window.getSystemPin = getSystemPin;
+window.lockSystemGate = lockSystemGate;
 
 // ==========================================
 // VODAFONE QUICK PHONE NUMBER ACTIONS
@@ -3942,141 +3932,71 @@ window.quickRestockFromShortageModal = async function(prodId, delta) {
 };
 
 // =========================================================================
-// SECURITY & PASSCODE MANAGEMENT FOR MANUAL INVENTORY (حماية المخزن اليدوي)
+// GLOBAL SYSTEM ENTRY GATE & PASSCODE PROTECTION (قفل بوابة الدخول للنظام)
 // =========================================================================
 
-export const DEFAULT_MANUAL_PIN = '123456';
+export const DEFAULT_SYSTEM_PIN = '123456';
 
-export function getManualInventoryPin() {
-  return localStorage.getItem('hilmy_manual_pin') || DEFAULT_MANUAL_PIN;
+export function getSystemPin() {
+  return localStorage.getItem('hilmy_system_pin') || DEFAULT_SYSTEM_PIN;
 }
 
-export function isManualInventoryUnlocked() {
-  return sessionStorage.getItem('hilmy_manual_unlocked') === 'true';
+export function isSystemUnlocked() {
+  return sessionStorage.getItem('hilmy_system_unlocked') === 'true' || 
+         localStorage.getItem('hilmy_system_remember') === 'true';
 }
 
-export function getSecurityMode() {
-  return localStorage.getItem('hilmy_security_mode') || 'pin';
+export function getSystemLinkedGmail() {
+  return localStorage.getItem('hilmy_system_linked_gmail') || '';
 }
 
-export function getLinkedGmail() {
-  return localStorage.getItem('hilmy_linked_gmail') || '';
-}
-
-export function updateManualLockBadges() {
-  const isUnlocked = isManualInventoryUnlocked();
+export function initSystemGateLock() {
+  const gateEl = document.getElementById('system-gate-lock');
+  const unlocked = isSystemUnlocked();
   
-  // 1. Sidebar lock indicator
-  const sideIndicator = document.getElementById('sidebar-manual-lock-indicator');
-  if (sideIndicator) {
-    if (isUnlocked) {
-      sideIndicator.className = 'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-bold';
-      sideIndicator.innerHTML = '🔓 مفتوح';
-    } else {
-      sideIndicator.className = 'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 font-bold';
-      sideIndicator.innerHTML = '🔒 محمي (1-6)';
+  if (unlocked) {
+    if (gateEl) {
+      gateEl.classList.add('hidden');
+      gateEl.classList.remove('flex');
     }
-  }
-
-  // 2. Header lock status badge inside manual view
-  const headBadge = document.getElementById('manual-lock-status-badge');
-  if (headBadge) {
-    if (isUnlocked) {
-      headBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 shadow-xs';
-      headBadge.innerHTML = '<span class="material-symbols-outlined text-sm text-emerald-600">lock_open</span><span>المخزن مفتوح حالياً</span>';
-    } else {
-      headBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5 shadow-xs';
-      headBadge.innerHTML = '<span class="material-symbols-outlined text-sm text-amber-600">lock</span><span>المخزن مؤمن برقم سري</span>';
-    }
-  }
-}
-
-window.openManualAuthModal = function() {
-  const modal = document.getElementById('modal-manual-auth');
-  const input = document.getElementById('manual-auth-pin-input');
-  const errorMsg = document.getElementById('manual-auth-error-msg');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
-  if (input) {
-    input.value = '';
-    input.type = 'password';
-    setTimeout(() => input.focus(), 100);
-  }
-  if (errorMsg) errorMsg.classList.add('hidden');
-  
-  const eyeIcon = document.getElementById('manual-auth-eye-icon');
-  if (eyeIcon) eyeIcon.textContent = 'visibility';
-};
-
-window.closeManualAuthModal = function() {
-  const modal = document.getElementById('modal-manual-auth');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
-};
-
-window.toggleManualAuthPinVisibility = function() {
-  const input = document.getElementById('manual-auth-pin-input');
-  const icon = document.getElementById('manual-auth-eye-icon');
-  if (!input) return;
-  if (input.type === 'password') {
-    input.type = 'text';
-    if (icon) icon.textContent = 'visibility_off';
+    document.documentElement.classList.remove('system-gate-locked');
   } else {
-    input.type = 'password';
-    if (icon) icon.textContent = 'visibility';
+    if (gateEl) {
+      gateEl.classList.remove('hidden');
+      gateEl.classList.add('flex');
+    }
+    document.documentElement.classList.add('system-gate-locked');
+    setTimeout(() => {
+      document.getElementById('system-gate-pin-input')?.focus();
+    }, 100);
   }
-};
+}
 
-window.appendManualAuthKey = function(key) {
-  const input = document.getElementById('manual-auth-pin-input');
-  if (!input) return;
-  input.value += key;
-  const curPin = getManualInventoryPin();
-  if (input.value.length === curPin.length) {
-    window.submitManualAuthPin();
-  }
-};
-
-window.clearManualAuthKey = function() {
-  const input = document.getElementById('manual-auth-pin-input');
-  if (input) input.value = '';
-  document.getElementById('manual-auth-error-msg')?.classList.add('hidden');
-};
-
-window.backspaceManualAuthKey = function() {
-  const input = document.getElementById('manual-auth-pin-input');
-  if (input && input.value) {
-    input.value = input.value.slice(0, -1);
-  }
-};
-
-window.submitManualAuthPin = function(e) {
+window.submitSystemGatePin = function(e) {
   if (e && e.preventDefault) e.preventDefault();
-  const input = document.getElementById('manual-auth-pin-input');
-  const errorMsg = document.getElementById('manual-auth-error-msg');
+  const input = document.getElementById('system-gate-pin-input');
+  const errorMsg = document.getElementById('system-gate-error-msg');
+  const rememberCheckbox = document.getElementById('system-gate-remember');
   const entered = (input?.value || '').trim();
-  const validPin = getManualInventoryPin();
-  const mode = getSecurityMode();
-  const linkedGmail = getLinkedGmail();
+  const validPin = getSystemPin();
 
-  if (entered === validPin || entered === DEFAULT_MANUAL_PIN) {
-    if (mode === 'strict' && linkedGmail) {
-      const isGmailVerified = localStorage.getItem('hilmy_gmail_verified') === 'true';
-      if (!isGmailVerified) {
-        showToast(`🛡️ التأمين المشدد مفعل: يرجى تأكيد حساب Google [${linkedGmail}] أولاً`, 'warning');
-        return;
-      }
+  if (entered === validPin || entered === DEFAULT_SYSTEM_PIN) {
+    sessionStorage.setItem('hilmy_system_unlocked', 'true');
+    if (rememberCheckbox && rememberCheckbox.checked) {
+      localStorage.setItem('hilmy_system_remember', 'true');
     }
 
-    sessionStorage.setItem('hilmy_manual_unlocked', 'true');
-    window.closeManualAuthModal();
-    navigateTo('manual-inventory');
-    updateManualLockBadges();
-    showToast('🔓 تم التحقق بنجاح! أهلاً بك في المخزن اليدوي', 'check_circle');
+    const gateEl = document.getElementById('system-gate-lock');
+    if (gateEl) {
+      gateEl.classList.add('hidden');
+      gateEl.classList.remove('flex');
+    }
+    document.documentElement.classList.remove('system-gate-locked');
+    
+    if (errorMsg) errorMsg.classList.add('hidden');
+    if (input) input.value = '';
+
+    showToast('🔓 مرحباً بك! تم تسجيل الدخول وفتح المنظومة بنجاح', 'check_circle');
   } else {
     if (errorMsg) errorMsg.classList.remove('hidden');
     if (input) {
@@ -4088,132 +4008,78 @@ window.submitManualAuthPin = function(e) {
   }
 };
 
-window.lockManualInventory = function() {
-  sessionStorage.removeItem('hilmy_manual_unlocked');
-  updateManualLockBadges();
-  window.closeManualSecurityModal();
-  if (AppState.currentView === 'manual-inventory') {
-    navigateTo('dashboard-overview');
-  }
-  showToast('🔒 تم قفل المخزن اليدوي بنجاح لحماية البيانات', 'lock');
-};
-
-window.openManualSecurityModal = function() {
-  const modal = document.getElementById('modal-manual-security-settings');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
-  setElemText('current-pin-display', getManualInventoryPin());
-  const linkedGmail = getLinkedGmail();
-  const gmailBadge = document.getElementById('linked-gmail-status-badge');
-  const gmailInput = document.getElementById('manual-gmail-input');
-  if (gmailBadge) {
-    if (linkedGmail) {
-      gmailBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
-      gmailBadge.textContent = `✅ ${linkedGmail}`;
-    } else {
-      gmailBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-surface-container text-on-surface-variant';
-      gmailBadge.textContent = 'غير مربوط';
-    }
-  }
-  if (gmailInput) gmailInput.value = linkedGmail;
-
-  const mode = getSecurityMode();
-  const pinRadio = document.getElementById('sec-mode-pin');
-  const strictRadio = document.getElementById('sec-mode-strict');
-  if (pinRadio) pinRadio.checked = (mode === 'pin');
-  if (strictRadio) strictRadio.checked = (mode === 'strict');
-};
-
-window.closeManualSecurityModal = function() {
-  const modal = document.getElementById('modal-manual-security-settings');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+window.appendSystemGateKey = function(key) {
+  const input = document.getElementById('system-gate-pin-input');
+  if (!input) return;
+  input.value += key;
+  const curPin = getSystemPin();
+  if (input.value.length === curPin.length) {
+    window.submitSystemGatePin();
   }
 };
 
-window.saveNewManualPin = function() {
-  const newPin = (document.getElementById('new-pin-input')?.value || '').trim();
-  if (!newPin) {
-    showToast('يرجى كتابة كلمة المرور الجديدة', 'warning');
-    return;
-  }
-  localStorage.setItem('hilmy_manual_pin', newPin);
-  setElemText('current-pin-display', newPin);
-  setElemValue('new-pin-input', '');
-  showToast(`✅ تم تغيير كلمة المرور بنجاح إلى: ${newPin}`, 'check_circle');
+window.clearSystemGateKey = function() {
+  const input = document.getElementById('system-gate-pin-input');
+  if (input) input.value = '';
+  document.getElementById('system-gate-error-msg')?.classList.add('hidden');
 };
 
-window.resetManualPinDefault = function() {
-  localStorage.setItem('hilmy_manual_pin', DEFAULT_MANUAL_PIN);
-  setElemText('current-pin-display', DEFAULT_MANUAL_PIN);
-  setElemValue('new-pin-input', '');
-  showToast('✅ تم استعادة كلمة المرور الافتراضية (123456)', 'check_circle');
+window.backspaceSystemGateKey = function() {
+  const input = document.getElementById('system-gate-pin-input');
+  if (input && input.value) {
+    input.value = input.value.slice(0, -1);
+  }
 };
 
-window.saveManualGmailLink = function() {
-  const email = (document.getElementById('manual-gmail-input')?.value || '').trim();
-  if (!email || !email.includes('@')) {
-    showToast('يرجى إدخال بريد جيميل صحيح (Gmail)', 'warning');
-    return;
-  }
-  localStorage.setItem('hilmy_linked_gmail', email);
-  localStorage.setItem('hilmy_gmail_verified', 'true');
-  const gmailBadge = document.getElementById('linked-gmail-status-badge');
-  if (gmailBadge) {
-    gmailBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
-    gmailBadge.textContent = `✅ ${email}`;
-  }
-  showToast(`✅ تم ربط وتوثيق حساب الجيميل [${email}] بنجاح!`, 'check_circle');
-};
-
-window.unlinkManualGmail = function() {
-  localStorage.removeItem('hilmy_linked_gmail');
-  localStorage.removeItem('hilmy_gmail_verified');
-  localStorage.setItem('hilmy_security_mode', 'pin');
-  setElemValue('manual-gmail-input', '');
-  const gmailBadge = document.getElementById('linked-gmail-status-badge');
-  if (gmailBadge) {
-    gmailBadge.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-surface-container text-on-surface-variant';
-    gmailBadge.textContent = 'غير مربوط';
-  }
-  const pinRadio = document.getElementById('sec-mode-pin');
-  if (pinRadio) pinRadio.checked = true;
-  showToast('تم إلغاء ربط حساب الجيميل والعودة للدخول بكلمة المرور فقط', 'info');
-};
-
-window.setSecurityMode = function(mode) {
-  if (mode === 'strict') {
-    const linked = getLinkedGmail();
-    if (!linked) {
-      showToast('⚠️ يرجى ربط حساب الجيميل أولاً لتفعيل التأمين المشدد', 'warning');
-      const pinRadio = document.getElementById('sec-mode-pin');
-      if (pinRadio) pinRadio.checked = true;
-      return;
-    }
-    localStorage.setItem('hilmy_security_mode', 'strict');
-    showToast('🛡️ تم تفعيل التأمين الجامد (كلمة المرور + الجيميل)', 'check_circle');
+window.toggleSystemGatePinVisibility = function() {
+  const input = document.getElementById('system-gate-pin-input');
+  const icon = document.getElementById('system-gate-eye-icon');
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (icon) icon.textContent = 'visibility_off';
   } else {
-    localStorage.setItem('hilmy_security_mode', 'pin');
-    showToast('🟢 تم تفعيل الدخول السريع بكلمة المرور (123456)', 'check_circle');
+    input.type = 'password';
+    if (icon) icon.textContent = 'visibility';
   }
 };
 
-window.handleManualGoogleAuth = async function() {
+window.lockSystemGate = function() {
+  sessionStorage.removeItem('hilmy_system_unlocked');
+  localStorage.removeItem('hilmy_system_remember');
+  document.documentElement.classList.add('system-gate-locked');
+
+  const gateEl = document.getElementById('system-gate-lock');
+  const input = document.getElementById('system-gate-pin-input');
+  const errorMsg = document.getElementById('system-gate-error-msg');
+  if (gateEl) {
+    gateEl.classList.remove('hidden');
+    gateEl.classList.add('flex');
+  }
+  if (input) {
+    input.value = '';
+    setTimeout(() => input.focus(), 150);
+  }
+  if (errorMsg) errorMsg.classList.add('hidden');
+
+  showToast('🔒 تم قفل المنظومة بنجاح', 'lock');
+};
+
+window.handleSystemGateGoogleAuth = async function() {
   try {
     const res = await signInWithGooglePopup();
     if (res && res.user) {
       const email = res.user.email;
-      localStorage.setItem('hilmy_linked_gmail', email);
-      localStorage.setItem('hilmy_gmail_verified', 'true');
-      sessionStorage.setItem('hilmy_manual_unlocked', 'true');
-      window.closeManualAuthModal();
-      window.closeManualSecurityModal();
-      navigateTo('manual-inventory');
-      updateManualLockBadges();
-      showToast(`✅ تم تسجيل الدخول وتوثيق Google: ${email}`, 'check_circle');
+      localStorage.setItem('hilmy_system_linked_gmail', email);
+      sessionStorage.setItem('hilmy_system_unlocked', 'true');
+      
+      const gateEl = document.getElementById('system-gate-lock');
+      if (gateEl) {
+        gateEl.classList.add('hidden');
+        gateEl.classList.remove('flex');
+      }
+      document.documentElement.classList.remove('system-gate-locked');
+      showToast(`✅ تم توثيق Google وتسجيل الدخول: ${email}`, 'check_circle');
       return;
     }
   } catch (err) {
@@ -4221,18 +4087,20 @@ window.handleManualGoogleAuth = async function() {
   }
 
   // Fallback prompt for Gmail if offline or running via file://
-  const currentLinked = getLinkedGmail();
-  const inputEmail = prompt('أدخل بريد Gmail الخاص بك لربطه وتأمينه كمالك للنظام:', currentLinked || '');
+  const currentLinked = getSystemLinkedGmail();
+  const inputEmail = prompt('أدخل بريد Gmail الخاص بك للدخول والتوثيق كمالك للمنظومة:', currentLinked || '');
   if (inputEmail && inputEmail.trim() && inputEmail.includes('@')) {
     const cleanEmail = inputEmail.trim();
-    localStorage.setItem('hilmy_linked_gmail', cleanEmail);
-    localStorage.setItem('hilmy_gmail_verified', 'true');
-    sessionStorage.setItem('hilmy_manual_unlocked', 'true');
-    window.closeManualAuthModal();
-    window.closeManualSecurityModal();
-    navigateTo('manual-inventory');
-    updateManualLockBadges();
-    showToast(`✅ تم تأكيد وربط بريد الجيميل: ${cleanEmail}`, 'check_circle');
+    localStorage.setItem('hilmy_system_linked_gmail', cleanEmail);
+    sessionStorage.setItem('hilmy_system_unlocked', 'true');
+    
+    const gateEl = document.getElementById('system-gate-lock');
+    if (gateEl) {
+      gateEl.classList.add('hidden');
+      gateEl.classList.remove('flex');
+    }
+    document.documentElement.classList.remove('system-gate-locked');
+    showToast(`✅ مرحباً بك! تم تسجيل الدخول عبر بريد الجيميل: ${cleanEmail}`, 'check_circle');
   }
 };
 
@@ -4320,8 +4188,6 @@ export function renderManualInventoryPage() {
       `).join('');
     }
   }
-
-  updateManualLockBadges();
 }
 
 window.setManualSubcategoryFilter = function(sub) {
