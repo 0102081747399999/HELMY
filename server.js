@@ -19,6 +19,45 @@ const MIME_TYPES = {
 // In-memory SMS queue for real-time mobile sync
 let receivedSmsQueue = [];
 const SMS_LOG_FILE = path.join(__dirname, 'sms_inbox_log.json');
+const POS_DATA_FILE = path.join(__dirname, 'pos_data.json');
+
+// In-memory cache for POS data
+let localPosData = {
+  products: [],
+  salesInvoices: [],
+  drawer: null,
+  vodafoneLines: [],
+  vodafoneTransactions: [],
+  lastUpdated: null
+};
+
+// Load existing POS data if present on disk
+try {
+  if (fs.existsSync(POS_DATA_FILE)) {
+    const rawData = fs.readFileSync(POS_DATA_FILE, 'utf8');
+    localPosData = JSON.parse(rawData);
+    console.log(`📦 تم تحميل بيانات المخزن والمبيعات من القرص (${(localPosData.products || []).length} صنف بالمخزن، ${(localPosData.salesInvoices || []).length} فاتورة مبيعات)`);
+  }
+} catch (e) {
+  console.warn('⚠️ يتعذر قراءة pos_data.json، سيتم إنشاء ملف جديد عند الحفظ:', e.message);
+}
+
+function savePosData(data) {
+  try {
+    if (!data || typeof data !== 'object') return;
+    localPosData = {
+      ...localPosData,
+      ...data,
+      lastUpdated: new Date().toISOString()
+    };
+    // Safe write
+    const tempFile = POS_DATA_FILE + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(localPosData, null, 2), 'utf8');
+    fs.renameSync(tempFile, POS_DATA_FILE);
+  } catch (err) {
+    console.error('Failed to save POS data to disk:', err);
+  }
+}
 
 // Load existing SMS log if present
 try {
@@ -140,6 +179,36 @@ const server = http.createServer((req, res) => {
     saveSmsLog();
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ success: true, message: 'SMS log cleared' }));
+    return;
+  }
+
+  // ==========================================
+  // API ENDPOINT: POS Data Storage (Products, Sales, Drawer, Lines)
+  // ==========================================
+  if (pathname === '/api/pos-data' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      success: true,
+      shop: 'سنترال حلمي',
+      data: localPosData
+    }));
+    return;
+  }
+
+  if (pathname === '/api/pos-data' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body);
+        savePosData(payload);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: true, message: 'POS data saved successfully to disk' }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
     return;
   }
 

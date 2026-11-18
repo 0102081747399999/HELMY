@@ -63,7 +63,8 @@ const AppState = {
   vodafoneMonitorFilterDate: 'today',
   vodafoneMonitorSearch: '',
   allSalesCategoryFilter: 'all',
-  allSalesDateFilter: 'today',
+  allSalesDateFilter: 'all',
+  activeAllSalesDateFilter: 'all',
   allSalesSearch: '',
   allSalesMasterTab: 'sales',
   masterCatalogCategory: 'all',
@@ -271,13 +272,14 @@ window.toggleSidebar = () => {
 // BANNER SLIDESHOW CONTROLLER (أشكال متعددة + لوجو حلمي)
 // ==========================================
 let currentBannerIndex = 0;
-const totalBannerSlides = 5;
 let bannerTimer = null;
 
 window.goToBannerSlide = (idx) => {
-  currentBannerIndex = (idx + totalBannerSlides) % totalBannerSlides;
   const slides = document.querySelectorAll('.banner-slide');
   const dots = document.querySelectorAll('.banner-dot');
+  if (!slides || slides.length === 0) return;
+  const total = slides.length;
+  currentBannerIndex = ((idx % total) + total) % total;
 
   slides.forEach((slide, i) => {
     if (i === currentBannerIndex) {
@@ -535,34 +537,64 @@ window.switchCategoryTab = function(category, tab) {
   // Toggle containers
   const invCont = document.getElementById(`${category}-inventory-container`);
   const salesCont = document.getElementById(`${category}-sales-container`);
-  if (invCont && salesCont) {
-    if (tab === 'inventory') {
+  if (invCont) {
+    if (!salesCont || tab === 'inventory') {
       invCont.classList.remove('hidden');
-      salesCont.classList.add('hidden');
     } else {
       invCont.classList.add('hidden');
+    }
+  }
+  if (salesCont) {
+    if (tab === 'sales') {
       salesCont.classList.remove('hidden');
+    } else {
+      salesCont.classList.add('hidden');
     }
   }
 
   renderCurrentView();
 };
 
-// Helper: Extract sales for a given category
+// Helper: Extract sales for a given category (100% resilient category resolution)
 function getCategorySales(cat) {
   const sales = [];
   (Store.salesInvoices || []).forEach(inv => {
     (inv.items || []).forEach((item, itemIdx) => {
-      // Find matching product if category is missing or general
-      const itemProd = item.productId 
-        ? Store.products.find(p => p.id === item.productId) 
-        : (item.barcode ? Store.products.find(p => p.barcode === item.barcode || p.imei === item.barcode) : null);
-      
-      const itemCat = item.category || (itemProd ? itemProd.category : 'general');
+      const cleanBar = item.barcode ? String(item.barcode).trim().toLowerCase() : '';
+      const cleanProdId = item.productId ? String(item.productId).trim() : '';
+      const cleanName = item.name ? String(item.name).trim().toLowerCase() : '';
 
-      let matches = (itemCat === cat);
-      if (!matches && cat === 'chargers' && (itemCat === 'chargers' || itemCat === 'chargers-cables')) matches = true;
-      if (!matches && cat === 'cables' && (itemCat === 'cables' || itemCat === 'chargers-cables')) matches = true;
+      const itemProd = (Store.products || []).find(p => {
+        if (cleanProdId && p.id && String(p.id).trim() === cleanProdId) return true;
+        if (cleanBar && p.barcode && String(p.barcode).trim().toLowerCase() === cleanBar) return true;
+        if (cleanBar && p.imei && String(p.imei).trim().toLowerCase() === cleanBar) return true;
+        if (cleanName && p.name && String(p.name).trim().toLowerCase() === cleanName) return true;
+        return false;
+      });
+      
+      const rawCat = (item.category || (itemProd ? itemProd.category : '') || '').toLowerCase().trim();
+      let matches = false;
+      if (cat === 'all') {
+        matches = true;
+      } else if (rawCat === cat) {
+        matches = true;
+      } else if (cat === 'chargers' && (rawCat.includes('charger') || rawCat.includes('شاحن') || rawCat.includes('شواحن'))) {
+        matches = true;
+      } else if (cat === 'cables' && (rawCat.includes('cable') || rawCat.includes('وصل') || rawCat.includes('سلك'))) {
+        matches = true;
+      } else if (cat === 'headphones' && (rawCat.includes('headphone') || rawCat.includes('earphone') || rawCat.includes('سماع') || rawCat.includes('صوت'))) {
+        matches = true;
+      } else if (cat === 'speakers' && (rawCat.includes('speaker') || rawCat.includes('صب') || rawCat.includes('مكبر'))) {
+        matches = true;
+      } else if (cat === 'phones' && (rawCat.includes('phone') || rawCat.includes('هاتف') || rawCat.includes('تليفون') || rawCat.includes('موبايل'))) {
+        matches = true;
+      } else if (cat === 'covers' && (rawCat.includes('cover') || rawCat.includes('case') || rawCat.includes('جراب') || rawCat.includes('كفر') || rawCat.includes('اسكرين'))) {
+        matches = true;
+      } else if (cat === 'accessories' && (rawCat.includes('acc') || rawCat.includes('إكسسوار') || rawCat.includes('اكسسوار'))) {
+        matches = true;
+      } else if (cat === 'manual' && (rawCat.includes('manual') || rawCat.includes('يدوي') || rawCat === 'general' || !rawCat)) {
+        matches = true;
+      }
 
       if (matches) {
         const buyP = (item.buyPrice !== undefined && item.buyPrice !== null && !isNaN(parseFloat(item.buyPrice))) 
@@ -582,7 +614,7 @@ function getCategorySales(cat) {
           customerPhone: inv.customerPhone || '',
           itemIndex: itemIdx,
           ...item,
-          category: itemCat,
+          category: rawCat || cat,
           buyPrice: buyP,
           price: sellP,
           quantity: q,
@@ -1291,8 +1323,8 @@ function renderChargersPage() {
   setElemText('chargers-count-badge', `${allChargers.length} أصناف`);
 
   // Sales KPIs
-  setElemText('chargers-sales-total-val', formatMoney(totalSalesVal));
-  setElemText('chargers-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('chargers-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('chargers-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('chargers-sales-count-badge', `${sales.length} مبيعات`);
 
   // Subcategory filter & search
@@ -1394,8 +1426,8 @@ function renderCablesPage() {
   setElemText('cables-stat-retail', formatMoney(retailVal));
   setElemText('cables-count-badge', `${allCables.length} أصناف`);
 
-  setElemText('cables-sales-total-val', formatMoney(totalSalesVal));
-  setElemText('cables-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('cables-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('cables-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('cables-sales-count-badge', `${sales.length} مبيعات`);
 
   const activeTab = AppState.activeCablesTab;
@@ -1494,8 +1526,8 @@ function renderHeadphonesPage() {
   setElemText('headphones-total-cost', formatMoney(totalCost));
   setElemText('headphones-count-badge', `${allHeadphones.length} أصناف`);
 
-  setElemText('headphones-sales-total-val', formatMoney(totalSalesVal));
-  setElemText('headphones-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('headphones-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('headphones-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('headphones-sales-count-badge', `${sales.length} مبيعات`);
 
   const activeTab = AppState.activeHeadphoneTab;
@@ -1591,8 +1623,8 @@ function renderSpeakersPage() {
   setElemText('kpiTotalCost', formatMoney(totalCost));
   setElemText('speakers-count-badge', `${allSpeakers.length} صبات`);
 
-  setElemText('speakers-sales-total-val', formatMoney(totalSalesVal));
-  setElemText('speakers-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('speakers-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('speakers-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('speakers-sales-count-badge', `${sales.length} مبيعات`);
 
   const activeTab = AppState.activeSpeakerTab;
@@ -1681,8 +1713,8 @@ function renderPhonesPage() {
   setElemText('phones-stat-cost', formatMoney(totalCost));
   setElemText('phones-stat-retail', formatMoney(totalRetail));
 
-  setElemText('phones-sales-total-val', formatMoney(totalSalesVal));
-  setElemText('phones-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('phones-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('phones-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('phones-sales-count-badge', `${sales.length} هواتف مباعة`);
 
   const activeBrand = AppState.activePhoneBrand;
@@ -1797,8 +1829,8 @@ function renderCoversPage() {
   setElemText('covers-stat-retail', formatMoney(retailVal));
   setElemText('covers-count-badge', `${allCovers.length} جرابات`);
 
-  setElemText('covers-sales-total-val', formatMoney(totalSalesVal));
-  setElemText('covers-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('covers-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('covers-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('covers-sales-count-badge', `${sales.length} مبيعات`);
 
   const activeTab = AppState.activeCoversTab;
@@ -1900,8 +1932,8 @@ function renderAccessoriesPage() {
   setElemText('accessories-stat-retail', formatMoney(retailVal));
   setElemText('accessories-count-badge', `${allAcc.length} إكسسوارات`);
 
-  setElemText('accessories-sales-total-val', formatMoney(totalSalesVal));
-  setElemText('accessories-sales-profit-val', formatMoney(totalProfitVal));
+  setElemText('accessories-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
+  setElemText('accessories-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('accessories-sales-count-badge', `${sales.length} مبيعات`);
 
   const activeTab = AppState.activeAccessoriesTab;
@@ -1986,6 +2018,18 @@ function setupSmartCodeEvents() {
     });
   }
 }
+
+window.triggerCloudSyncManual = async function() {
+  showToast("⏳ جاري مزامنة ورفع كافة بيانات المحل إلى سحابة فيربيز (helmy-10237)...", "info", 3000);
+  if (typeof window.pushAllLocalDataToFirestore === 'function') {
+    const success = await window.pushAllLocalDataToFirestore();
+    if (success) {
+      showToast("🔥 تم بنجاح رفع وتأكيد كافة الأصناف والفواتير والخطوط في سحابة فيربيز!", "check_circle", 5000);
+    } else {
+      showToast("⚠️ تعذّر الاتصال السحابي حالياً - البيانات محفوظة بأمان محلياً على الهارد ديسك", "warning", 5000);
+    }
+  }
+};
 
 window.triggerManualCodeSearch = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
@@ -2097,9 +2141,7 @@ window.confirmSmartCodeSale = async function() {
 
   const prevQty = parseInt(prod.quantity, 10) || 0;
   if (prevQty < qty) {
-    if (!confirm(`تنبيه: الكمية المتوفرة بالمخزن (${prevQty}) أقل من الكمية المطلوبة (${qty}). هل تريد إتمام البيع بالسالب؟`)) {
-      return;
-    }
+    showToast(`⚠️ الكمية المتوفرة بالمخزن (${prevQty}) أقل من المطلوب (${qty}) - تم البيع وتحديث الرصيد`, 'warning', 3500);
   }
 
   try {
@@ -2143,10 +2185,10 @@ window.confirmSmartCodeSale = async function() {
     // 3. Immediately refresh current view & header badges
     updateGlobalHeaderBadges();
 
-    // Switch to category sales page and re-render instantly
-    navigateTo(getCategoryViewPath(prod.category));
-    window.switchCategoryTab(prod.category, 'sales');
-    renderCurrentView();
+    // Switch to master sales page and re-render instantly
+    navigateTo('all-sales-master');
+    window.setAllSalesDateFilter('all');
+    renderAllSalesMasterPage();
   } catch (e) {
     console.error(e);
     showToast('حدث خطأ أثناء تسجيل عملية البيع', 'error');
@@ -2666,6 +2708,7 @@ window.confirmDeleteVodafoneTx = async (txId) => {
 function setupProductModal() {
   const form = document.getElementById('form-product');
   if (form) {
+    form.setAttribute('novalidate', 'true');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       await window.saveProductForm();
@@ -2842,9 +2885,13 @@ window.saveProductForm = async () => {
   const name = (document.getElementById('prod-name')?.value || '').trim();
   const category = document.getElementById('prod-category')?.value || 'chargers';
   const subcategory = document.getElementById('prod-subcategory')?.value || '';
-  const buyPrice = parseFloat(document.getElementById('prod-buy-price')?.value) || 0;
-  const sellPrice = parseFloat(document.getElementById('prod-sell-price')?.value) || 0;
-  const quantity = parseInt(document.getElementById('prod-quantity')?.value, 10) || 0;
+  const buyPriceInput = document.getElementById('prod-buy-price')?.value;
+  const sellPriceInput = document.getElementById('prod-sell-price')?.value;
+  const qtyInput = document.getElementById('prod-quantity')?.value;
+
+  const buyPrice = (buyPriceInput !== undefined && buyPriceInput !== '' && !isNaN(parseFloat(buyPriceInput))) ? Math.max(0, parseFloat(buyPriceInput)) : 0;
+  const sellPrice = (sellPriceInput !== undefined && sellPriceInput !== '' && !isNaN(parseFloat(sellPriceInput))) ? Math.max(0, parseFloat(sellPriceInput)) : 0;
+  const quantity = (qtyInput !== undefined && qtyInput !== '' && !isNaN(parseInt(qtyInput, 10))) ? Math.max(0, parseInt(qtyInput, 10)) : 1;
 
   const brand = (document.getElementById('prod-brand')?.value || '').trim();
   const model = (document.getElementById('prod-model')?.value || '').trim();
@@ -2853,18 +2900,28 @@ window.saveProductForm = async () => {
   const color = document.getElementById('prod-phone-color')?.value || '';
   const linkedPhoneNumber = (document.getElementById('prod-phone-number')?.value || '').trim();
 
+  let finalBarcode = barcode;
+  if (!finalBarcode) {
+    if (category === 'phones' && imei) {
+      finalBarcode = imei;
+    } else {
+      finalBarcode = generateNextProductCode(category);
+    }
+  }
+
   let validName = name;
   if (!validName) {
-    if (category === 'manual') {
+    if (category === 'phones') {
+      validName = `${brand || 'هاتف'} ${model || finalBarcode}`.trim();
+    } else if (category === 'manual') {
       validName = subcategory || 'صنف يدوي';
     } else {
-      showToast("يرجى إدخال اسم الصنف", "warning");
-      return;
+      validName = `${getCategoryArabicName(category)} (${finalBarcode})`;
     }
   }
 
   const productData = {
-    barcode: barcode || (category === 'phones' ? imei : ''),
+    barcode: finalBarcode,
     name: validName,
     category,
     subcategory,
@@ -2873,7 +2930,7 @@ window.saveProductForm = async () => {
     quantity,
     brand,
     model,
-    imei,
+    imei: imei || (category === 'phones' ? finalBarcode : ''),
     storage,
     color,
     linkedPhoneNumber
@@ -2882,15 +2939,17 @@ window.saveProductForm = async () => {
   try {
     if (AppState.editingProductId) {
       await updateProduct(AppState.editingProductId, productData);
-      showToast(`تم تعديل بيانات [${name}] بنجاح`, 'check_circle');
+      showToast(`✅ تم تعديل بيانات [${validName}] بنجاح`, 'check_circle');
     } else {
       await addProduct(productData);
-      showToast(`تم تسجيل [${name}] في مخزون ${getCategoryArabicName(category)} بنجاح!`, 'check_circle');
+      showToast(`✅ تم تسجيل [${validName}] بكود [${finalBarcode}] في مخزون ${getCategoryArabicName(category)} بنجاح!`, 'check_circle');
     }
 
     closeProductModal();
     renderCurrentView();
+    updateGlobalHeaderBadges();
   } catch (e) {
+    console.error("Save product error:", e);
     showToast("حدث خطأ أثناء حفظ الصنف", "error");
   }
 };

@@ -25,15 +25,15 @@ import {
   onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// Your exact web app's Firebase configuration
+// Your exact web app's Firebase configuration (helmy-10237)
 export const firebaseConfig = {
-  apiKey: "AIzaSyDFOcL78EElDCtO21PGV3brHmWsLQXuab0",
-  authDomain: "mnmn-daadf.firebaseapp.com",
-  projectId: "mnmn-daadf",
-  storageBucket: "mnmn-daadf.firebasestorage.app",
-  messagingSenderId: "183889326185",
-  appId: "1:183889326185:web:3d289c90e69e0975f7b2f8",
-  measurementId: "G-MZGC8V6ZRG"
+  apiKey: "AIzaSyD6eTVkZHX0sBSUUO7xaS4vqOsdk5T08YI",
+  authDomain: "helmy-10237.firebaseapp.com",
+  projectId: "helmy-10237",
+  storageBucket: "helmy-10237.firebasestorage.app",
+  messagingSenderId: "711437937828",
+  appId: "1:711437937828:web:3822db5c405e89dc98ca31",
+  measurementId: "G-TCLXH8MVFY"
 };
 
 // Initialize Firebase App & Firestore
@@ -45,7 +45,7 @@ try {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   isOnline = true;
-  console.log("🔥 Firebase initialized successfully for project: mnmn-daadf (سنترال حلمي)");
+  console.log("🔥 Firebase initialized successfully for project: helmy-10237 (سنترال حلمي)");
 } catch (e) {
   console.warn("⚠️ Firebase direct init warning, falling back to local mode:", e);
   isOnline = false;
@@ -115,13 +115,14 @@ function setLocal(key, val) {
 
 export function getDeletedBlacklist() {
   const list = getLocal(STORAGE_KEYS.DELETED_PRODUCTS_BLACKLIST, []);
-  // Only keep document IDs (strings that are not raw barcodes) so duplicate items are never accidentally blacklisted
+  // Only keep document IDs (strings that are not raw barcodes or numeric IMEIs) so items are never accidentally blacklisted
   const set = new Set();
   if (Array.isArray(list)) {
     list.forEach(item => {
       if (item && typeof item === 'string') {
         const clean = item.trim();
-        if (clean.startsWith('prod_') || clean.length >= 15) {
+        // Never blacklist pure numeric strings (which are barcodes or IMEIs)
+        if (clean && !/^\d+$/.test(clean) && (clean.startsWith('prod_') || clean.length >= 20)) {
           set.add(clean);
         }
       }
@@ -138,7 +139,8 @@ export function blacklistProduct(id) {
   if (!id) return;
   const set = getDeletedBlacklist();
   const cleanId = String(id).trim();
-  if (cleanId) {
+  // Don't blacklist raw numeric barcodes/IMEIs
+  if (cleanId && !/^\d+$/.test(cleanId) && (cleanId.startsWith('prod_') || cleanId.length >= 20)) {
     set.add(cleanId);
   }
   saveDeletedBlacklist(set);
@@ -156,13 +158,33 @@ export function unblacklistProduct(id) {
 
 export function getDeletedSalesBlacklist() {
   const list = getLocal(STORAGE_KEYS.DELETED_SALES_BLACKLIST, []);
-  return new Set(Array.isArray(list) ? list : []);
+  // Filter out any sequential invoice numbers (e.g. INV-1001) so they never block new sales
+  const cleanList = (Array.isArray(list) ? list : []).filter(item => {
+    if (!item) return false;
+    if (typeof item === 'string' && item.startsWith('INV-')) return false;
+    return true;
+  });
+  setLocal(STORAGE_KEYS.DELETED_SALES_BLACKLIST, cleanList);
+  return new Set(cleanList);
 }
 
-export function blacklistSale(invoiceId, invoiceNumber) {
+export function blacklistSale(invoiceId) {
+  if (!invoiceId) return;
   const set = getDeletedSalesBlacklist();
-  if (invoiceId) set.add(String(invoiceId).trim());
-  if (invoiceNumber) set.add(String(invoiceNumber).trim());
+  const cleanId = String(invoiceId).trim();
+  if (cleanId && !cleanId.startsWith('INV-')) {
+    set.add(cleanId);
+  }
+  setLocal(STORAGE_KEYS.DELETED_SALES_BLACKLIST, Array.from(set));
+}
+
+export function unblacklistSale(invoiceId) {
+  if (!invoiceId) return;
+  const set = getDeletedSalesBlacklist();
+  const cleanId = String(invoiceId).trim();
+  if (cleanId) {
+    set.delete(cleanId);
+  }
   setLocal(STORAGE_KEYS.DELETED_SALES_BLACKLIST, Array.from(set));
 }
 
@@ -209,8 +231,7 @@ function getInitialCleanSales() {
   return rawList.filter(s => {
     if (!s) return false;
     const sid = s.id || '';
-    const snum = s.invoiceNumber || '';
-    if (blacklist.has(sid) || blacklist.has(snum)) return false;
+    if (sid && blacklist.has(sid)) return false;
     return true;
   });
 }
@@ -266,6 +287,133 @@ export function notifySubscribers(event, data) {
   subscribers.forEach(cb => {
     try { cb(event, data, Store); } catch(err) { console.error("Subscriber error:", err); }
   });
+}
+
+// Clean object payload for Firestore (removes private _ fields and undefined values)
+export function sanitizeForFirestore(obj) {
+  if (obj === null || obj === undefined) return null;
+  return JSON.parse(JSON.stringify(obj, (key, value) => {
+    if (key && typeof key === 'string' && key.startsWith('_')) return undefined;
+    if (value === undefined) return null;
+    return value;
+  }));
+}
+
+// Generate unique next product code
+export function generateNextProductCode(category = 'chargers') {
+  let maxCode = 100;
+  (Store.products || []).forEach(p => {
+    if (p && p.barcode) {
+      const num = parseInt(String(p.barcode).trim(), 10);
+      if (!isNaN(num) && num >= maxCode && num < 999999) {
+        maxCode = num;
+      }
+    }
+  });
+  return String(maxCode + 1);
+}
+
+// Local Disk Persistence Sync (Zero Data Loss)
+let _localServerSyncTimer = null;
+export function syncToLocalServer() {
+  if (typeof fetch === 'undefined') return;
+  clearTimeout(_localServerSyncTimer);
+  _localServerSyncTimer = setTimeout(() => {
+    try {
+      fetch('/api/pos-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          products: Store.products || [],
+          salesInvoices: Store.salesInvoices || [],
+          drawer: Store.drawer || null,
+          vodafoneLines: Store.vodafoneLines || [],
+          vodafoneTransactions: Store.vodafoneTransactions || []
+        })
+      }).catch(() => {});
+    } catch (e) {}
+  }, 300);
+}
+
+export async function loadFromLocalServer() {
+  if (typeof fetch === 'undefined') return;
+  try {
+    const res = await fetch('/api/pos-data');
+    if (!res.ok) return;
+    const json = await res.json();
+    if (!json || !json.success || !json.data) return;
+
+    let prodsChanged = false;
+    const blacklist = getDeletedBlacklist();
+    if (Array.isArray(json.data.products) && json.data.products.length > 0) {
+      const curProds = Store.products || [];
+      json.data.products.forEach(p => {
+        if (!p || !p.id || blacklist.has(p.id)) return;
+        const exists = curProds.some(cp => cp.id === p.id || (p.barcode && cp.barcode && cp.barcode.trim() === p.barcode.trim()));
+        if (!exists) {
+          curProds.push(p);
+          prodsChanged = true;
+        }
+      });
+      if (prodsChanged) {
+        Store.products = curProds;
+        setLocal(STORAGE_KEYS.PRODUCTS, curProds);
+        notifySubscribers("products_updated", curProds);
+      }
+    }
+
+    let salesChanged = false;
+    const salesBlacklist = getDeletedSalesBlacklist();
+    if (Array.isArray(json.data.salesInvoices) && json.data.salesInvoices.length > 0) {
+      const curSales = Store.salesInvoices || [];
+      json.data.salesInvoices.forEach(s => {
+        if (!s || !s.id || salesBlacklist.has(s.id)) return;
+        const exists = curSales.some(cs => cs.id === s.id || (s.invoiceNumber && cs.invoiceNumber === s.invoiceNumber && Math.abs(new Date(cs.timestamp || 0) - new Date(s.timestamp || 0)) < 60000));
+        if (!exists) {
+          curSales.push(s);
+          salesChanged = true;
+        }
+      });
+      if (salesChanged) {
+        curSales.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        Store.salesInvoices = curSales;
+        setLocal(STORAGE_KEYS.SALES, curSales);
+        notifySubscribers("sales_updated", curSales);
+      }
+    }
+
+    if (json.data.drawer && (!Store.drawer || (Store.drawer.history || []).length < (json.data.drawer.history || []).length)) {
+      Store.drawer = json.data.drawer;
+      setLocal(STORAGE_KEYS.DRAWER, Store.drawer);
+      notifySubscribers("drawer_updated", Store.drawer);
+    }
+  } catch (err) {}
+}
+
+// Generate collision-proof next invoice number
+export function generateNextInvoiceNumber() {
+  let maxNum = 1000;
+  (Store.salesInvoices || []).forEach(inv => {
+    if (inv && inv.invoiceNumber) {
+      const m = String(inv.invoiceNumber).match(/\d+/);
+      if (m) {
+        const n = parseInt(m[0], 10);
+        if (n > maxNum) maxNum = n;
+      }
+    }
+  });
+  if (Store.drawer && Store.drawer.history) {
+    Store.drawer.history.forEach(h => {
+      if (h && h.reason) {
+        const m = String(h.reason).match(/INV-(\d+)/i);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (n > maxNum) maxNum = n;
+        }
+      }
+    });
+  }
+  return 'INV-' + (maxNum + 1);
 }
 
 // Ensure 18 Vodafone Lines exist (Zero money default per user request: "عايز الخطوط مفيش فيها فلوس")
@@ -343,13 +491,16 @@ export function resetAllVodafoneLines() {
 // ==========================================
 
 export async function initRealtimeSync() {
+  // First, load persistent data from local disk server if available
+  await loadFromLocalServer();
+
   if (!db) {
     updateConnectionUI(false, "غير متصل (يعمل محلياً)");
     return;
   }
 
   try {
-    // 1. Sync Products (Filtered with permanent deleted blacklist)
+    // 1. Sync Products (Filtered with permanent deleted blacklist & Local merge protection)
     const productsCol = collection(db, "products");
     onSnapshot(productsCol, (snapshot) => {
       Store.isFirebaseConnected = true;
@@ -378,9 +529,33 @@ export async function initRealtimeSync() {
         prods.push({ ...data, id: docId });
       });
 
-      Store.products = prods;
-      setLocal(STORAGE_KEYS.PRODUCTS, prods);
-      notifySubscribers("products_updated", prods);
+      // Preserve local products that are not yet in remote snapshot (Zero inventory data loss!)
+      const currentLocal = Store.products || [];
+      const pendingLocal = currentLocal.filter(loc => {
+        if (!loc || !loc.id) return false;
+        if (blacklist.has(loc.id)) return false;
+        const exists = prods.some(rem => rem.id === loc.id || (loc.barcode && rem.barcode && loc.barcode.trim().toLowerCase() === rem.barcode.trim().toLowerCase()) || (loc.imei && rem.imei && loc.imei.trim().toLowerCase() === rem.imei.trim().toLowerCase()));
+        return !exists;
+      });
+
+      // Automatically sync pending local products to Firestore in background
+      pendingLocal.forEach(p => {
+        if (db && !p._isSyncing) {
+          p._isSyncing = true;
+          const cleanProd = sanitizeForFirestore(p);
+          const targetDocRef = p.id ? doc(db, "products", p.id) : doc(collection(db, "products"));
+          p.id = targetDocRef.id;
+          setDoc(targetDocRef, cleanProd).then(() => {
+            delete p._isSyncing;
+          }).catch(console.warn);
+        }
+      });
+
+      const mergedProducts = [...prods, ...pendingLocal];
+      Store.products = mergedProducts;
+      setLocal(STORAGE_KEYS.PRODUCTS, mergedProducts);
+      syncToLocalServer();
+      notifySubscribers("products_updated", mergedProducts);
     }, (error) => {
       console.warn("Products sync error:", error);
       Store.isFirebaseConnected = false;
@@ -415,12 +590,19 @@ export async function initRealtimeSync() {
         Store.vodafoneLines = lines;
         setLocal(STORAGE_KEYS.VODAFONE_LINES, lines);
         notifySubscribers("vodafone_lines_updated", lines);
+      } else {
+        // Initial setup on fresh Firebase project: push local 18 lines to Firestore
+        (Store.vodafoneLines || []).forEach(l => {
+          if (l && l.lineNum) {
+            setDoc(doc(db, "vodafone_lines", l.id || `line_${l.lineNum}`), sanitizeForFirestore(l), { merge: true }).catch(console.warn);
+          }
+        });
       }
     }, (error) => {
       console.warn("Vodafone lines sync error:", error);
     });
 
-    // 3. Sync Vodafone Transactions (Filtered with permanent deleted blacklist)
+    // 3. Sync Vodafone Transactions (Filtered with permanent deleted blacklist & Local merge protection)
     const txCol = collection(db, "vodafone_transactions");
     onSnapshot(txCol, (snapshot) => {
       const blacklist = getDeletedVodaTxsBlacklist();
@@ -438,39 +620,86 @@ export async function initRealtimeSync() {
 
         txs.push({ id: docId, ...d });
       });
-      txs.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-      Store.vodafoneTransactions = txs;
-      setLocal(STORAGE_KEYS.VODAFONE_TXS, txs);
-      notifySubscribers("vodafone_txs_updated", txs);
+
+      // Preserve any pending local transactions that haven't been saved in Firestore yet
+      const currentLocal = Store.vodafoneTransactions || [];
+      const pendingLocal = currentLocal.filter(loc => {
+        if (!loc || !loc.id) return false;
+        if (blacklist.has(loc.id) || (loc.transactionId && blacklist.has(loc.transactionId))) return false;
+        const exists = txs.some(rem => rem.id === loc.id || (loc.transactionId && rem.transactionId === loc.transactionId));
+        return !exists;
+      });
+
+      pendingLocal.forEach(t => {
+        if (db && !t._isSyncing) {
+          t._isSyncing = true;
+          const cleanTx = sanitizeForFirestore(t);
+          const targetDoc = t.id ? doc(db, "vodafone_transactions", t.id) : doc(collection(db, "vodafone_transactions"));
+          t.id = targetDoc.id;
+          setDoc(targetDoc, cleanTx).then(() => {
+            delete t._isSyncing;
+          }).catch(console.warn);
+        }
+      });
+
+      const mergedTxs = [...txs, ...pendingLocal];
+      mergedTxs.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      Store.vodafoneTransactions = mergedTxs;
+      setLocal(STORAGE_KEYS.VODAFONE_TXS, mergedTxs);
+      notifySubscribers("vodafone_txs_updated", mergedTxs);
     }, (error) => {
       console.warn("Vodafone tx sync error:", error);
     });
 
-    // 4. Sync Sales Invoices (Filtered with permanent deleted blacklist)
+    // 4. Sync Sales Invoices (Filtered with permanent deleted blacklist & Local merge protection)
     const salesCol = collection(db, "sales_invoices");
     onSnapshot(salesCol, (snapshot) => {
       const salesBlacklist = getDeletedSalesBlacklist();
-      const invoices = [];
+      const remoteInvoices = [];
       
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
         const docId = docSnap.id;
-        const invNum = data.invoiceNumber || '';
         const internalId = data.id || '';
 
-        // Check if invoice was permanently deleted
-        if (salesBlacklist.has(docId) || (internalId && salesBlacklist.has(internalId)) || (invNum && salesBlacklist.has(invNum))) {
+        // Check if invoice was permanently deleted by docId
+        if (salesBlacklist.has(docId) || (internalId && salesBlacklist.has(internalId))) {
           deleteDoc(doc(db, "sales_invoices", docId)).catch(console.warn);
           return;
         }
 
-        invoices.push({ ...data, id: docId });
+        remoteInvoices.push({ ...data, id: docId });
       });
 
-      invoices.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-      Store.salesInvoices = invoices;
-      setLocal(STORAGE_KEYS.SALES, invoices);
-      notifySubscribers("sales_updated", invoices);
+      // Preserve any pending local invoices that haven't been saved in Firestore yet
+      const currentLocal = Store.salesInvoices || [];
+      const pendingLocal = currentLocal.filter(loc => {
+        if (!loc || !loc.id) return false;
+        if (salesBlacklist.has(loc.id)) return false;
+        const exists = remoteInvoices.some(rem => rem.id === loc.id || (loc.invoiceNumber && rem.invoiceNumber === loc.invoiceNumber && Math.abs(new Date(rem.timestamp || 0) - new Date(loc.timestamp || 0)) < 60000));
+        return !exists;
+      });
+
+      // Automatically sync pending local invoices to Firestore in background
+      pendingLocal.forEach(p => {
+        if (db && !p._isSyncing) {
+          p._isSyncing = true;
+          const cleanInv = sanitizeForFirestore(p);
+          const targetDoc = p.id ? doc(db, "sales_invoices", p.id) : doc(collection(db, "sales_invoices"));
+          p.id = targetDoc.id;
+          setDoc(targetDoc, cleanInv).then(() => {
+            delete p._isSyncing;
+          }).catch(console.warn);
+        }
+      });
+
+      const mergedInvoices = [...remoteInvoices, ...pendingLocal];
+      mergedInvoices.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+      Store.salesInvoices = mergedInvoices;
+      setLocal(STORAGE_KEYS.SALES, mergedInvoices);
+      syncToLocalServer();
+      notifySubscribers("sales_updated", mergedInvoices);
     }, (error) => {
       console.warn("Sales sync error:", error);
     });
@@ -481,7 +710,10 @@ export async function initRealtimeSync() {
       if (docSnap.exists()) {
         Store.drawer = docSnap.data();
         setLocal(STORAGE_KEYS.DRAWER, Store.drawer);
+        syncToLocalServer();
         notifySubscribers("drawer_updated", Store.drawer);
+      } else if (Store.drawer) {
+        setDoc(drawerDoc, sanitizeForFirestore(Store.drawer), { merge: true }).catch(console.warn);
       }
     }, (error) => {
       console.warn("Drawer sync error:", error);
@@ -524,16 +756,16 @@ function updateConnectionUI(online, message) {
   if (badge && text) {
     text.innerText = message;
     if (online) {
-      badge.classList.remove("bg-amber-500/10", "text-amber-600", "border-amber-200");
-      badge.classList.add("bg-emerald-500/10", "text-emerald-700", "border-emerald-300");
+      badge.classList.remove("bg-amber-500/10", "text-amber-400", "border-amber-500/40");
+      badge.classList.add("bg-emerald-500/10", "text-emerald-300", "border-emerald-500/40");
       if (dot) {
-        dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
       }
     } else {
-      badge.classList.remove("bg-emerald-500/10", "text-emerald-700", "border-emerald-300");
-      badge.classList.add("bg-amber-500/10", "text-amber-600", "border-amber-200");
+      badge.classList.remove("bg-emerald-500/10", "text-emerald-300", "border-emerald-500/40");
+      badge.classList.add("bg-amber-500/10", "text-amber-400", "border-amber-500/40");
       if (dot) {
-        dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
+        dot.className = "w-2 h-2 rounded-full bg-amber-400";
       }
     }
   }
@@ -546,16 +778,26 @@ function updateConnectionUI(online, message) {
 // --- PRODUCTS CRUD ---
 export async function addProduct(productData) {
   const now = new Date().toISOString();
-  const cleanBarcode = (productData.barcode || '').trim();
+  let cleanBarcode = (productData.barcode || '').trim();
   const cleanImei = (productData.imei || '').trim();
 
-  // If this barcode / imei was previously in the deleted blacklist, remove it now because user is deliberately adding it as a new product!
+  // If no barcode provided, handle intelligently so product is ALWAYS saved and searchable
+  if (!cleanBarcode) {
+    if (productData.category === 'phones' && cleanImei) {
+      cleanBarcode = cleanImei;
+    } else {
+      cleanBarcode = generateNextProductCode(productData.category);
+    }
+  }
+
+  // Clear from blacklist so this product is never blocked
   unblacklistProduct(cleanBarcode);
   if (cleanImei) unblacklistProduct(cleanImei);
+  if (productData.id) unblacklistProduct(productData.id);
 
   // Generate Firestore document reference FIRST so local and remote IDs are 100% identical!
   let docRef = null;
-  let finalId = 'prod_' + Date.now();
+  let finalId = 'prod_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
   if (db) {
     try {
       docRef = doc(collection(db, "products"));
@@ -563,18 +805,22 @@ export async function addProduct(productData) {
     } catch (e) {}
   }
 
+  const buyP = !isNaN(parseFloat(productData.buyPrice)) ? Math.max(0, parseFloat(productData.buyPrice)) : 0;
+  const sellP = !isNaN(parseFloat(productData.sellPrice)) ? Math.max(0, parseFloat(productData.sellPrice)) : 0;
+  const qty = !isNaN(parseInt(productData.quantity, 10)) ? Math.max(0, parseInt(productData.quantity, 10)) : 1;
+
   const newProduct = {
     id: finalId,
     barcode: cleanBarcode, // Serves as code (e.g. "70") or barcode
-    name: (productData.name || '').trim(),
+    name: (productData.name || '').trim() || (productData.category === 'phones' ? 'هاتف محمول' : 'صنف جديد'),
     category: productData.category || 'chargers', // 'chargers' | 'cables' | 'headphones' | 'speakers' | 'phones' | 'covers' | 'accessories' | 'manual'
     subcategory: productData.subcategory || '',
-    buyPrice: parseFloat(productData.buyPrice) || 0,
-    sellPrice: parseFloat(productData.sellPrice) || 0,
-    quantity: parseInt(productData.quantity, 10) || 0,
+    buyPrice: buyP,
+    sellPrice: sellP,
+    quantity: qty,
     brand: productData.brand || '',
     model: productData.model || '',
-    imei: cleanImei,
+    imei: cleanImei || (productData.category === 'phones' ? cleanBarcode : ''),
     storage: productData.storage || '',
     color: productData.color || '',
     status: productData.status || 'available',
@@ -590,11 +836,12 @@ export async function addProduct(productData) {
   // Local optimistic update
   Store.products.unshift(newProduct);
   setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
+  syncToLocalServer();
   notifySubscribers("products_updated", Store.products);
 
-  // Firestore sync using setDoc on the predefined docRef in background (0ms delay)
+  // Firestore sync using setDoc with sanitizeForFirestore
   if (db && docRef) {
-    setDoc(docRef, newProduct).catch(err => {
+    setDoc(docRef, sanitizeForFirestore(newProduct)).catch(err => {
       console.warn("Failed to write product to Firestore, saved locally:", err);
     });
   }
@@ -610,16 +857,17 @@ export async function updateProduct(id, updateData) {
   if (idx !== -1) {
     Store.products[idx] = { ...Store.products[idx], ...updateData };
     setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
+    syncToLocalServer();
     notifySubscribers("products_updated", Store.products);
   }
 
-  // Firestore update in background (Async, 0ms lag for user)
+  // Firestore update in background
   if (db) {
-    updateDoc(doc(db, "products", id), updateData).catch(err => {
+    updateDoc(doc(db, "products", id), sanitizeForFirestore(updateData)).catch(err => {
       const q = query(collection(db, "products"), where("id", "==", id));
       getDocs(q).then(snap => {
         snap.forEach(d => {
-          updateDoc(doc(db, "products", d.id), updateData).catch(console.warn);
+          updateDoc(doc(db, "products", d.id), sanitizeForFirestore(updateData)).catch(console.warn);
         });
       }).catch(console.warn);
     });
@@ -637,6 +885,7 @@ export async function deleteProduct(id) {
   // 2. Remove immediately from local Store.products and localStorage
   Store.products = Store.products.filter(p => p.id !== targetId);
   setLocal(STORAGE_KEYS.PRODUCTS, Store.products);
+  syncToLocalServer();
   notifySubscribers("products_updated", Store.products);
 
   // 3. Permanently delete from Firestore in background
@@ -708,7 +957,7 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
   }
 
   // 2. Create Sale Record
-  const invoiceNumber = 'INV-' + (1000 + Store.salesInvoices.length + 1);
+  const invoiceNumber = generateNextInvoiceNumber();
   const localId = 'inv_' + Date.now();
   const saleItem = {
     productId: prod ? prod.id : (productId || ''),
@@ -739,6 +988,7 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
 
   Store.salesInvoices.unshift(invoiceData);
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+  syncToLocalServer();
 
   // 3. Add cash to drawer locally
   if (!Store.drawer) {
@@ -756,11 +1006,12 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
   Store.drawer.history.unshift({
     type: 'in',
     amount: totalAmount,
-    reason: `بيع مباشر بالكود (${saleItem.barcode || '-'}) - ${saleItem.name}`,
+    reason: `فاتورة بيع ${invoiceNumber} - بيع مباشر بالكود (${saleItem.barcode || '-'}) - ${saleItem.name}`,
     balanceAfter: currentDrawer,
     timestamp
   });
   setLocal(STORAGE_KEYS.DRAWER, Store.drawer);
+  syncToLocalServer();
 
   // 4. INSTANT LOCAL-FIRST NOTIFICATIONS (0ms UI latency!)
   notifySubscribers("sales_updated", Store.salesInvoices);
@@ -780,27 +1031,26 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
         prodUpdates.customerPhone = prod.customerPhone;
         prodUpdates.soldAt = prod.soldAt;
       }
-      updateDoc(doc(db, "products", prod.id), prodUpdates).catch(err => {
+      updateDoc(doc(db, "products", prod.id), sanitizeForFirestore(prodUpdates)).catch(err => {
         const q = query(collection(db, "products"), where("id", "==", prod.id));
         getDocs(q).then(snap => {
-          snap.forEach(d => updateDoc(doc(db, "products", d.id), prodUpdates).catch(console.warn));
+          snap.forEach(d => updateDoc(doc(db, "products", d.id), sanitizeForFirestore(prodUpdates)).catch(console.warn));
         }).catch(console.warn);
       });
     }
 
-    setDoc(doc(db, "cash_drawer", "current_shift"), Store.drawer).catch(console.warn);
+    setDoc(doc(db, "cash_drawer", "current_shift"), sanitizeForFirestore(Store.drawer)).catch(console.warn);
 
-    addDoc(collection(db, "sales_invoices"), invoiceData).then(docRef => {
-      invoiceData.id = docRef.id;
-      const idx = Store.salesInvoices.findIndex(s => s.id === localId);
-      if (idx !== -1) Store.salesInvoices[idx] = invoiceData;
-      setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
-    }).catch(console.warn);
+    setDoc(doc(db, "sales_invoices", localId), sanitizeForFirestore(invoiceData)).catch(err => {
+      console.warn("Failed to write sale invoice to Firestore, saved locally:", err);
+    });
   }
 
-  invoiceData._remainingStock = remainingQty;
-  invoiceData._soldProduct = prod;
-  return invoiceData;
+  return {
+    ...invoiceData,
+    _remainingStock: remainingQty,
+    _soldProduct: prod
+  };
 }
 
 // Direct Category Restock (Fast stock intake by Code or Table action)
@@ -1202,23 +1452,33 @@ export async function resetVodafoneLine(lineNum) {
 // --- SALES INVOICE / QUICK POS CHECKOUT ---
 
 export async function checkoutSale({ items, subtotal, discount, totalAmount, cashPaid, change, customerName, customerPhone, cashier }) {
-  const invoiceNumber = 'INV-' + (1000 + Store.salesInvoices.length + 1);
+  const invoiceNumber = generateNextInvoiceNumber();
   const localId = 'inv_' + Date.now();
   const invoiceTimestamp = new Date().toISOString();
 
   const invoiceData = {
     id: localId,
     invoiceNumber,
-    items: items.map(item => ({
-      productId: item.id,
-      barcode: item.barcode || '',
-      name: item.name,
-      category: item.category || '',
-      price: item.price,
-      buyPrice: item.buyPrice || 0,
-      quantity: item.quantity,
-      total: item.price * item.quantity
-    })),
+    items: items.map(item => {
+      const p = Store.products.find(prod => prod.id === item.id || (item.barcode && prod.barcode === item.barcode));
+      const sellP = parseFloat(item.price) || 0;
+      const buyP = (item.buyPrice !== undefined && item.buyPrice !== null) ? parseFloat(item.buyPrice) : (p ? parseFloat(p.buyPrice) || 0 : 0);
+      const q = parseInt(item.quantity, 10) || 1;
+      const tot = sellP * q;
+      const prof = tot - (buyP * q);
+      const cat = item.category || (p ? p.category : 'chargers');
+      return {
+        productId: item.id || (p ? p.id : ''),
+        barcode: item.barcode || (p ? p.barcode : ''),
+        name: item.name || (p ? p.name : 'منتج'),
+        category: cat,
+        price: sellP,
+        buyPrice: buyP,
+        profit: prof,
+        quantity: q,
+        total: tot
+      };
+    }),
     subtotal: parseFloat(subtotal) || 0,
     discount: parseFloat(discount) || 0,
     totalAmount: parseFloat(totalAmount) || 0,
@@ -1262,6 +1522,7 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
   // 2. Prepend invoice to local sales
   Store.salesInvoices.unshift(invoiceData);
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+  syncToLocalServer();
 
   // 3. Add cash to drawer locally
   if (!Store.drawer) {
@@ -1284,6 +1545,7 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
     timestamp: invoiceTimestamp
   });
   setLocal(STORAGE_KEYS.DRAWER, Store.drawer);
+  syncToLocalServer();
 
   // 4. INSTANT NOTIFICATIONS (0ms UI latency!)
   notifySubscribers("sales_updated", Store.salesInvoices);
@@ -1294,22 +1556,19 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
   if (db) {
     productStockUpdates.forEach(syncItem => {
       const { id, ...dataToUpdate } = syncItem;
-      updateDoc(doc(db, "products", id), dataToUpdate).catch(err => {
+      updateDoc(doc(db, "products", id), sanitizeForFirestore(dataToUpdate)).catch(err => {
         const q = query(collection(db, "products"), where("id", "==", id));
         getDocs(q).then(snap => {
-          snap.forEach(d => updateDoc(doc(db, "products", d.id), dataToUpdate).catch(console.warn));
+          snap.forEach(d => updateDoc(doc(db, "products", d.id), sanitizeForFirestore(dataToUpdate)).catch(console.warn));
         }).catch(console.warn);
       });
     });
 
-    setDoc(doc(db, "cash_drawer", "current_shift"), Store.drawer).catch(console.warn);
+    setDoc(doc(db, "cash_drawer", "current_shift"), sanitizeForFirestore(Store.drawer)).catch(console.warn);
 
-    addDoc(collection(db, "sales_invoices"), invoiceData).then(docRef => {
-      invoiceData.id = docRef.id;
-      const idx = Store.salesInvoices.findIndex(s => s.id === localId);
-      if (idx !== -1) Store.salesInvoices[idx] = invoiceData;
-      setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
-    }).catch(console.warn);
+    setDoc(doc(db, "sales_invoices", localId), sanitizeForFirestore(invoiceData)).catch(err => {
+      console.warn("Failed to write checkout sale to Firestore, saved locally:", err);
+    });
   }
 
   return invoiceData;
@@ -1385,6 +1644,7 @@ export async function updateSaleInvoice(invoiceId, updatedData) {
 
   // Save to local store & localStorage
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+  syncToLocalServer();
   notifySubscribers("sales_updated", Store.salesInvoices);
 
   // Update Firestore in background
@@ -1447,25 +1707,18 @@ export async function deleteSaleInvoice(invoiceId) {
     });
   }
 
-  // Add to permanent deleted sales blacklist
-  blacklistSale(invoiceId, invoice.invoiceNumber);
+  // Add to permanent deleted sales blacklist (by unique ID only)
+  blacklistSale(invoiceId);
 
   // 3. Remove permanently from local store & localStorage
   Store.salesInvoices.splice(invIdx, 1);
   setLocal(STORAGE_KEYS.SALES, Store.salesInvoices);
+  syncToLocalServer();
   notifySubscribers("sales_updated", Store.salesInvoices);
 
   // 4. Delete permanently from Firestore in background
   if (db) {
     deleteDoc(doc(db, "sales_invoices", invoiceId)).catch(console.warn);
-    if (invoice.invoiceNumber) {
-      const q = query(collection(db, "sales_invoices"), where("invoiceNumber", "==", invoice.invoiceNumber));
-      getDocs(q).then(snap => {
-        snap.forEach(d => {
-          deleteDoc(doc(db, "sales_invoices", d.id)).catch(console.warn);
-        });
-      }).catch(console.warn);
-    }
   }
 
   return true;
@@ -1663,4 +1916,63 @@ export async function processIncomingSMS({ sender, body, simPhone, slot, timesta
 
   notifySubscribers("sms_received", smsRecord);
   return smsRecord;
+}
+
+// Complete push of all local data to Firebase Cloud Firestore
+export async function pushAllLocalDataToFirestore() {
+  if (!db) {
+    console.warn("Firestore not connected, cannot push data");
+    return false;
+  }
+  try {
+    console.log("🚀 Starting complete push of all local data to Firebase project: helmy-10237...");
+    const blacklist = getDeletedBlacklist();
+    const salesBlacklist = getDeletedSalesBlacklist();
+    const txBlacklist = getDeletedVodaTxsBlacklist();
+
+    // 1. Products
+    const prods = (Store.products || []).filter(p => p && p.id && !blacklist.has(p.id));
+    for (const p of prods) {
+      const clean = sanitizeForFirestore(p);
+      await setDoc(doc(db, "products", p.id), clean, { merge: true });
+    }
+
+    // 2. Sales Invoices
+    const sales = (Store.salesInvoices || []).filter(s => s && s.id && !salesBlacklist.has(s.id));
+    for (const s of sales) {
+      const clean = sanitizeForFirestore(s);
+      await setDoc(doc(db, "sales_invoices", s.id), clean, { merge: true });
+    }
+
+    // 3. Vodafone Lines
+    const lines = Store.vodafoneLines || [];
+    for (const l of lines) {
+      if (l && l.lineNum) {
+        const clean = sanitizeForFirestore(l);
+        await setDoc(doc(db, "vodafone_lines", l.id || `line_${l.lineNum}`), clean, { merge: true });
+      }
+    }
+
+    // 4. Vodafone Transactions
+    const txs = (Store.vodafoneTransactions || []).filter(t => t && t.id && !txBlacklist.has(t.id));
+    for (const t of txs) {
+      const clean = sanitizeForFirestore(t);
+      await setDoc(doc(db, "vodafone_transactions", t.id), clean, { merge: true });
+    }
+
+    // 5. Cash Drawer
+    if (Store.drawer) {
+      await setDoc(doc(db, "cash_drawer", "current_shift"), sanitizeForFirestore(Store.drawer), { merge: true });
+    }
+
+    console.log(`✅ All local data pushed to Firebase successfully: ${prods.length} products, ${sales.length} invoices, ${lines.length} lines, ${txs.length} transactions.`);
+    return true;
+  } catch (err) {
+    console.error("Error during pushAllLocalDataToFirestore:", err);
+    return false;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.pushAllLocalDataToFirestore = pushAllLocalDataToFirestore;
 }
