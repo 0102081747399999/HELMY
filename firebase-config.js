@@ -349,7 +349,7 @@ export async function loadFromLocalServer() {
       const curProds = Store.products || [];
       json.data.products.forEach(p => {
         if (!p || !p.id || blacklist.has(p.id)) return;
-        const exists = curProds.some(cp => cp.id === p.id || (p.barcode && cp.barcode && cp.barcode.trim() === p.barcode.trim()));
+        const exists = curProds.some(cp => cp.id === p.id);
         if (!exists) {
           curProds.push(p);
           prodsChanged = true;
@@ -513,8 +513,8 @@ export async function initRealtimeSync() {
         const data = docSnap.data();
         const docId = docSnap.id;
         const internalId = data.id || '';
-        const barcode = (data.barcode || '').trim();
-        const imei = (data.imei || '').trim();
+        const barcode = String(data.barcode != null ? data.barcode : '').trim();
+        const imei = String(data.imei != null ? data.imei : '').trim();
 
         // Check if this product was permanently deleted by the user (only by unique document ID, preserving duplicate rows)
         const isDeleted = (docId && blacklist.has(docId)) ||
@@ -534,7 +534,7 @@ export async function initRealtimeSync() {
       const pendingLocal = currentLocal.filter(loc => {
         if (!loc || !loc.id) return false;
         if (blacklist.has(loc.id)) return false;
-        const exists = prods.some(rem => rem.id === loc.id || (loc.barcode && rem.barcode && loc.barcode.trim().toLowerCase() === rem.barcode.trim().toLowerCase()) || (loc.imei && rem.imei && loc.imei.trim().toLowerCase() === rem.imei.trim().toLowerCase()));
+        const exists = prods.some(rem => rem.id === loc.id);
         return !exists;
       });
 
@@ -676,7 +676,7 @@ export async function initRealtimeSync() {
       const pendingLocal = currentLocal.filter(loc => {
         if (!loc || !loc.id) return false;
         if (salesBlacklist.has(loc.id)) return false;
-        const exists = remoteInvoices.some(rem => rem.id === loc.id || (loc.invoiceNumber && rem.invoiceNumber === loc.invoiceNumber && Math.abs(new Date(rem.timestamp || 0) - new Date(loc.timestamp || 0)) < 60000));
+        const exists = remoteInvoices.some(rem => rem.id === loc.id);
         return !exists;
       });
 
@@ -778,8 +778,8 @@ function updateConnectionUI(online, message) {
 // --- PRODUCTS CRUD ---
 export async function addProduct(productData) {
   const now = new Date().toISOString();
-  let cleanBarcode = (productData.barcode || '').trim();
-  const cleanImei = (productData.imei || '').trim();
+  let cleanBarcode = String(productData.barcode != null ? productData.barcode : '').trim();
+  const cleanImei = String(productData.imei != null ? productData.imei : '').trim();
 
   // If no barcode provided, handle intelligently so product is ALWAYS saved and searchable
   if (!cleanBarcode) {
@@ -939,7 +939,10 @@ export async function recordDirectCategorySale({ productId, barcode, name, categ
   }
   if (!prod && barcode) {
     const cleanBar = String(barcode).trim().toLowerCase();
-    prod = Store.products.find(p => (p.barcode && p.barcode.trim().toLowerCase() === cleanBar) || (p.imei && p.imei.trim().toLowerCase() === cleanBar));
+    prod = Store.products.find(p => 
+      (p.barcode != null && String(p.barcode).trim().toLowerCase() === cleanBar) || 
+      (p.imei != null && String(p.imei).trim().toLowerCase() === cleanBar)
+    );
   }
 
   let remainingQty = 0;
@@ -1493,8 +1496,12 @@ export async function checkoutSale({ items, subtotal, discount, totalAmount, cas
   // 1. Immediately deduct stock locally from all items
   const productStockUpdates = [];
   for (const item of items) {
-    if (item.id) {
-      const prod = Store.products.find(p => p.id === item.id);
+    if (item.id || item.barcode) {
+      const itemBar = String(item.barcode != null ? item.barcode : '').trim().toLowerCase();
+      const prod = Store.products.find(p => 
+        (item.id && p.id === item.id) || 
+        (itemBar && p.barcode != null && String(p.barcode).trim().toLowerCase() === itemBar)
+      );
       if (prod) {
         prod.quantity = Math.max(0, (prod.quantity || 0) - item.quantity);
         prod.updatedAt = invoiceTimestamp;

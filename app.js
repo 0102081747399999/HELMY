@@ -95,8 +95,8 @@ const THEME_OPTIONS = {
   },
   'red-magic': {
     id: 'red-magic',
-    name: 'ريد ماجيك القرمزي (Red Magic Crimson)',
-    desc: 'طابع رياضي فخم باللون القرمزي والأسود الملكي (سنترال حلمي)',
+    name: 'سنترال حلمي الفاخر (Helmy Luxury Black & Crimson)',
+    desc: 'طابع فاخر ملكي باللون القرمزي والأسود الداكن (سنترال حلمي)',
     badge: 'الخيار الافتراضي ★',
     previewHex: ['#0d090d', '#20131d', '#f43f5e']
   },
@@ -269,66 +269,10 @@ window.toggleSidebar = () => {
 };
 
 // ==========================================
-// BANNER SLIDESHOW CONTROLLER (أشكال متعددة + لوجو حلمي)
+// FIXED STORE HERO BANNER (بانر سنترال حلمي الثابت الرسمي)
 // ==========================================
-let currentBannerIndex = 0;
-let bannerTimer = null;
-
-window.goToBannerSlide = (idx) => {
-  const slides = document.querySelectorAll('.banner-slide');
-  const dots = document.querySelectorAll('.banner-dot');
-  if (!slides || slides.length === 0) return;
-  const total = slides.length;
-  currentBannerIndex = ((idx % total) + total) % total;
-
-  slides.forEach((slide, i) => {
-    if (i === currentBannerIndex) {
-      slide.classList.remove('opacity-0', 'z-0', 'pointer-events-none');
-      slide.classList.add('opacity-100', 'z-10');
-    } else {
-      slide.classList.remove('opacity-100', 'z-10');
-      slide.classList.add('opacity-0', 'z-0', 'pointer-events-none');
-    }
-  });
-
-  dots.forEach((dot, i) => {
-    if (i === currentBannerIndex) {
-      dot.className = 'banner-dot w-6 h-2 rounded-full bg-rose-500 transition-all cursor-pointer shadow-xs';
-    } else {
-      dot.className = 'banner-dot w-2 h-2 rounded-full bg-slate-600 hover:bg-slate-400 transition-all cursor-pointer';
-    }
-  });
-};
-
-window.nextBannerSlide = () => {
-  window.goToBannerSlide(currentBannerIndex + 1);
-};
-
-window.prevBannerSlide = () => {
-  window.goToBannerSlide(currentBannerIndex - 1);
-};
-
-function startBannerAutoPlay() {
-  if (bannerTimer) clearInterval(bannerTimer);
-  bannerTimer = setInterval(() => {
-    window.nextBannerSlide();
-  }, 4000); // Changes automatically every 4 seconds
-}
-
-function pauseBannerAutoPlay() {
-  if (bannerTimer) {
-    clearInterval(bannerTimer);
-    bannerTimer = null;
-  }
-}
-
 function setupBannerSlider() {
-  const slider = document.getElementById('store-banner-slider');
-  if (slider) {
-    slider.addEventListener('mouseenter', pauseBannerAutoPlay);
-    slider.addEventListener('mouseleave', startBannerAutoPlay);
-    startBannerAutoPlay();
-  }
+  // Static banner - no autoplay per user request
 }
 
 // ==========================================
@@ -1322,10 +1266,7 @@ function renderChargersPage() {
   setElemText('chargers-stat-profit', `أرباح تقديرية: ${formatMoney(retailVal - costVal)} ج.م`);
   setElemText('chargers-count-badge', `${allChargers.length} أصناف`);
 
-  // Sales KPIs
-  setElemText('chargers-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
-  setElemText('chargers-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
-  setElemText('chargers-sales-count-badge', `${sales.length} مبيعات`);
+  // Warehouse only: No sales badges
 
   // Subcategory filter & search
   const activeTab = AppState.activeChargerTab;
@@ -1354,7 +1295,7 @@ function renderChargersPage() {
       tbody.innerHTML = filtered.map(item => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
           <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.id}')">${item.barcode || 'بدون كود'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getChargerSubcategoryLabel(item.subcategory)}</span></td>
@@ -1369,8 +1310,7 @@ function renderChargersPage() {
           <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors" title="بيع فوري">💰 بيع</button>
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors" title="توريد مخزون">+ توريد</button>
+              <button onclick="window.openSmartCodeActionModal('${item.id}', 'restock')" class="px-3 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors" title="توريد مخزون">+ توريد</button>
               <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
               <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
@@ -1455,7 +1395,7 @@ function renderCablesPage() {
       tbody.innerHTML = filtered.map(item => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
           <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.id}')">${item.barcode || 'بدون كود'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getCableSubcategoryLabel(item.subcategory)}</span></td>
@@ -1470,8 +1410,7 @@ function renderCablesPage() {
           <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openSmartCodeActionModal('${item.id}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
               <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
               <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
@@ -1555,7 +1494,7 @@ function renderHeadphonesPage() {
       tbody.innerHTML = filtered.map(item => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
           <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.id}')">${item.barcode || 'بدون كود'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getHeadphoneSubcategoryLabel(item.subcategory)}</span></td>
@@ -1570,8 +1509,7 @@ function renderHeadphonesPage() {
           <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openSmartCodeActionModal('${item.id}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
               <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
               <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
@@ -1652,7 +1590,7 @@ function renderSpeakersPage() {
       tbody.innerHTML = filtered.map(item => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
           <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.id}')">${item.barcode || 'بدون كود'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.subcategory || 'صب'}</span></td>
@@ -1667,8 +1605,7 @@ function renderSpeakersPage() {
           <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openSmartCodeActionModal('${item.id}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
               <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
               <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
@@ -1750,7 +1687,7 @@ function renderPhonesPage() {
       tbody.innerHTML = filtered.map(item => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
           <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.imei || item.barcode}')">${item.imei || item.barcode || 'بدون كود'}</span>
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.id}')">${item.imei || item.barcode || 'بدون كود'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name} (${item.brand || ''})</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.storage || ''} ${item.color ? '- ' + item.color : ''}</span></td>
@@ -1778,7 +1715,7 @@ function renderPhonesPage() {
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
               ${item.status === 'available' ? `
-                <button onclick="window.openSmartCodeActionModal('${item.imei || item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
+                <span class="px-2 py-0.5 rounded text-[11px] bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">متوفر</span>
               ` : ''}
               <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
               <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
@@ -1859,7 +1796,7 @@ function renderCoversPage() {
       tbody.innerHTML = filtered.map(item => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
           <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.id}')">${item.barcode || 'بدون كود'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${getCoverSubcategoryLabel(item.subcategory)}</span></td>
@@ -1874,8 +1811,7 @@ function renderCoversPage() {
           <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openSmartCodeActionModal('${item.id}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
               <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
               <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
@@ -1961,7 +1897,7 @@ function renderAccessoriesPage() {
       tbody.innerHTML = filtered.map(item => `
         <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
           <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm">
-            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.barcode}')">${item.barcode || 'بدون كود'}</span>
+            <span class="cursor-pointer hover:underline" onclick="window.openSmartCodeActionModal('${item.id}')">${item.barcode || 'بدون كود'}</span>
           </td>
           <td class="py-3 px-4 font-bold text-on-surface text-sm">${item.name}</td>
           <td class="py-3 px-4"><span class="px-2 py-0.5 rounded-lg text-xs bg-surface-container text-on-surface-variant">${item.subcategory || 'إكسسوار'}</span></td>
@@ -1976,8 +1912,7 @@ function renderAccessoriesPage() {
           <td class="py-3 px-4 font-numeric-table text-on-surface-variant text-[11px]">${formatDateArabic(item.lastRestockedAt || item.createdAt)}</td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
-              <button onclick="window.openSmartCodeActionModal('${item.barcode}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openSmartCodeActionModal('${item.id}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
               <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant"><span class="material-symbols-outlined text-[17px]">edit</span></button>
               <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
@@ -2009,187 +1944,34 @@ window.setAccessoriesTab = (tab) => {
 
 function setupSmartCodeEvents() {
   const codeInput = document.getElementById('quickCodeManualInput');
+  const clearBtn = document.getElementById('quickCodeClearBtn');
+
   if (codeInput) {
+    codeInput.addEventListener('input', (e) => {
+      const val = (e.target.value || '').trim();
+      if (clearBtn) {
+        if (val.length > 0) clearBtn.classList.remove('hidden');
+        else clearBtn.classList.add('hidden');
+      }
+    });
+
     codeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         window.triggerManualCodeSearch();
-      } else if (e.key === 'Escape') {
-        const dropdown = document.getElementById('quick-code-live-dropdown');
-        if (dropdown) dropdown.classList.add('hidden');
       }
     });
   }
-
-  // Close live dropdown when clicking outside
-  document.addEventListener('click', (e) => {
-    const dropdown = document.getElementById('quick-code-live-dropdown');
-    const input = document.getElementById('quickCodeManualInput');
-    if (!dropdown || dropdown.classList.contains('hidden')) return;
-    if (input && input.contains(e.target)) return;
-    if (dropdown.contains(e.target)) return;
-    dropdown.classList.add('hidden');
-  });
 }
 
 window.clearQuickCodeInput = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
   const clearBtn = document.getElementById('quickCodeClearBtn');
-  const dropdown = document.getElementById('quick-code-live-dropdown');
   if (codeInput) {
     codeInput.value = '';
     codeInput.focus();
   }
   if (clearBtn) clearBtn.classList.add('hidden');
-  if (dropdown) dropdown.classList.add('hidden');
-};
-
-window.handleQuickCodeLiveSearch = function(rawVal) {
-  const clearBtn = document.getElementById('quickCodeClearBtn');
-  const dropdown = document.getElementById('quick-code-live-dropdown');
-  if (!dropdown) return;
-
-  const val = String(rawVal || '').trim();
-  if (clearBtn) {
-    if (val.length > 0) clearBtn.classList.remove('hidden');
-    else clearBtn.classList.add('hidden');
-  }
-
-  if (!val) {
-    dropdown.classList.add('hidden');
-    dropdown.innerHTML = '';
-    return;
-  }
-
-  const q = val.toLowerCase();
-  const qNum = parseInt(val, 10);
-
-  // Search matching products in Store.products
-  const matches = (Store.products || []).filter(p => {
-    const bStr = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
-    const imeiStr = String(p.imei != null ? p.imei : '').trim().toLowerCase();
-    const nameStr = String(p.name != null ? p.name : '').trim().toLowerCase();
-    const idStr = String(p.id != null ? p.id : '').trim().toLowerCase();
-
-    // 1. Direct code/barcode/IMEI matches
-    if (bStr === q || imeiStr === q || idStr === q) return true;
-    if (!isNaN(qNum)) {
-      const bNum = parseInt(bStr, 10);
-      if (!isNaN(bNum) && bNum === qNum) return true;
-    }
-    // 2. Partial matches on barcode or IMEI
-    if (bStr.includes(q) || imeiStr.includes(q)) return true;
-    // 3. Name matches
-    if (nameStr.includes(q)) return true;
-    return false;
-  });
-
-  // Sort: exact code match first, then barcode startswith, then in-stock
-  matches.sort((a, b) => {
-    const aBar = String(a.barcode != null ? a.barcode : '').trim().toLowerCase();
-    const bBar = String(b.barcode != null ? b.barcode : '').trim().toLowerCase();
-    if (aBar === q && bBar !== q) return -1;
-    if (bBar === q && aBar !== q) return 1;
-    if (aBar.startsWith(q) && !bBar.startsWith(q)) return -1;
-    if (bBar.startsWith(q) && !aBar.startsWith(q)) return 1;
-    return (b.quantity || 0) - (a.quantity || 0);
-  });
-
-  const topMatches = matches.slice(0, 8);
-
-  if (topMatches.length === 0) {
-    dropdown.innerHTML = `
-      <div class="p-4 text-center">
-        <div class="flex items-center justify-center gap-2 text-rose-400 font-bold text-sm mb-1">
-          <span class="material-symbols-outlined text-lg">search_off</span>
-          <span>لا يوجد صنف مسجل بالكود أو الاسم: <span class="text-white underline font-numeric-table font-black">"${val}"</span></span>
-        </div>
-        <p class="text-xs text-slate-400 mb-3">يمكنك تسجيل هذا الكود كصنف جديد فوراً وإدخاله بالمخزن الآن</p>
-        <button 
-          type="button" 
-          onclick="window.quickAddNewProductFromSearch('${val.replace(/'/g, "\\'")}')" 
-          class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 mx-auto cursor-pointer">
-          <span class="material-symbols-outlined text-sm">add_circle</span>
-          <span>+ تسجيل صنف جديد بكود [${val}]</span>
-        </button>
-      </div>
-    `;
-    dropdown.classList.remove('hidden');
-    return;
-  }
-
-  // Render matching products
-  dropdown.innerHTML = `
-    <div class="p-2.5 bg-slate-950/90 text-xs font-bold text-slate-300 flex items-center justify-between border-b border-slate-800">
-      <span class="flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span>نتائج البحث الفوري (${matches.length} صنف مطابق)</span>
-      </span>
-      <span class="text-[11px] text-rose-400">اضغط للبيع أو التوريد</span>
-    </div>
-    <div class="divide-y divide-slate-800/80">
-      ${topMatches.map(p => {
-        const pCode = p.barcode || p.imei || p.id || 'بدون كود';
-        const inStock = (p.quantity || 0) > 0;
-        const safeCode = String(pCode).replace(/'/g, "\\'");
-        return `
-          <div class="p-2.5 sm:p-3 hover:bg-slate-800/90 transition-colors flex items-center justify-between gap-3 cursor-pointer group" onclick="window.selectQuickSearchResult('${safeCode}', 'choose')">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <span class="px-2.5 py-1 rounded-lg bg-rose-600/20 border border-rose-500/40 text-rose-300 font-numeric-table font-black text-xs shrink-0 shadow-xs">
-                #${pCode}
-              </span>
-              <div class="min-w-0">
-                <div class="font-bold text-white text-xs sm:text-sm group-hover:text-rose-400 transition-colors truncate">
-                  ${p.name}
-                </div>
-                <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5 flex-wrap">
-                  <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">${getCategoryArabicName(p.category)}</span>
-                  <span>المخزن: <b class="${inStock ? 'text-emerald-400' : 'text-rose-400 font-black'}">${p.quantity || 0}</b> قطع</span>
-                  <span>السعر: <b class="text-amber-300 font-numeric-table font-bold">${formatMoney(p.sellPrice)} ج.م</b></span>
-                </div>
-              </div>
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0" onclick="event.stopPropagation()">
-              <button 
-                type="button" 
-                onclick="window.selectQuickSearchResult('${safeCode}', 'sale')" 
-                class="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm flex items-center gap-1 cursor-pointer transition-colors"
-                title="بيع فوري">
-                <span>💰</span>
-                <span>بيع</span>
-              </button>
-              <button 
-                type="button" 
-                onclick="window.selectQuickSearchResult('${safeCode}', 'restock')" 
-                class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm flex items-center gap-1 cursor-pointer transition-colors"
-                title="توريد مخزون">
-                <span>+</span>
-                <span>توريد</span>
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('')}
-    </div>
-    ${matches.length > topMatches.length ? `
-      <div class="p-2 bg-slate-950/60 text-center text-[11px] text-slate-400 font-bold">
-        يوجد ${matches.length - topMatches.length} نتائج إضافية... اكتب الكود كاملاً أو اضغط تنفيذ
-      </div>
-    ` : ''}
-  `;
-  dropdown.classList.remove('hidden');
-};
-
-window.selectQuickSearchResult = function(code, action = 'choose') {
-  const dropdown = document.getElementById('quick-code-live-dropdown');
-  if (dropdown) dropdown.classList.add('hidden');
-  window.openSmartCodeActionModal(code, action);
-};
-
-window.quickAddNewProductFromSearch = function(code) {
-  const dropdown = document.getElementById('quick-code-live-dropdown');
-  if (dropdown) dropdown.classList.add('hidden');
-  window.openAddProductModal(getDefaultCategoryForCurrentView(), null, code);
 };
 
 window.triggerCloudSyncManual = async function() {
@@ -2206,14 +1988,12 @@ window.triggerCloudSyncManual = async function() {
 
 window.triggerManualCodeSearch = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
-  const dropdown = document.getElementById('quick-code-live-dropdown');
   if (!codeInput) return;
   const val = codeInput.value.trim();
   if (!val) {
     showToast("يرجى كتابة رقم الكود أو الباركود أولاً", "warning");
     return;
   }
-  if (dropdown) dropdown.classList.add('hidden');
   handleScannedBarcode(val);
 };
 
@@ -4367,10 +4147,7 @@ export function renderManualInventoryPage() {
   const totalSalesVal = sales.reduce((acc, s) => acc + ((s.price || 0) * (s.quantity || 1)), 0);
   const totalProfitVal = sales.reduce((acc, s) => acc + (s.profit || 0), 0);
 
-  setElemText('manual-sales-total-val', `${formatMoney(totalSalesVal)} ج.م`);
-  setElemText('manual-sales-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
-  setElemText('manual-sales-count-badge', `${sales.length} مبيعات`);
-  setElemText('manual-sales-operations-count', `${sales.length} عملية بيع`);
+  // Warehouse only: No sales badges
 
   const salesSearch = (document.getElementById('manual-sales-search-input')?.value || '').trim().toLowerCase();
   let filteredSales = sales;
@@ -4443,8 +4220,7 @@ export function renderManualInventoryPage() {
           <td class="py-3 px-4 text-on-surface-variant text-xs">${item.notes || item.linkedPhoneNumber || '-'}</td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.openSmartCodeActionModal('${item.barcode || item.id}', 'sale')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white font-bold transition-colors">💰 بيع</button>
-              <button onclick="window.openSmartCodeActionModal('${item.barcode || item.id}', 'restock')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
+              <button onclick="window.openSmartCodeActionModal('${item.barcode || item.id}', 'restock')" class="px-3 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white font-bold transition-colors">+ توريد</button>
               <button onclick="window.openEditProductModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant" title="تعديل"><span class="material-symbols-outlined text-[17px]">edit</span></button>
               <button onclick="window.confirmDeleteProduct('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-500/20 text-on-surface-variant hover:text-rose-400" title="حذف"><span class="material-symbols-outlined text-[17px]">delete</span></button>
             </div>
