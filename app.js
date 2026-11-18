@@ -4548,45 +4548,45 @@ function renderMasterSalesTable(allSales) {
       : (totalRow - ((item.buyPrice || 0) * (item.quantity || 1)));
     const catName = getCategoryArabicName(item.category);
     return `
-      <tr class="border-b border-slate-800/80 hover:bg-slate-800/40 transition-colors text-[11px] leading-tight">
-        <td class="py-2 px-2 text-slate-300 font-numeric-table">
-          <div class="font-bold text-white text-[11px] leading-none mb-0.5 truncate">${formatDateArabic(item.timestamp)}</div>
-          <span class="text-[10px] text-slate-400 font-mono">${formatTime(item.timestamp)}</span>
+      <tr class="border-b border-slate-800/80 hover:bg-slate-800/40 transition-colors text-[10px] leading-tight">
+        <td class="py-1.5 px-1.5 text-slate-300 font-numeric-table">
+          <div class="font-bold text-white text-[10px] leading-none mb-0.5 truncate">${formatDateArabic(item.timestamp)}</div>
+          <span class="text-[9px] text-slate-400 font-mono">${formatTime(item.timestamp)}</span>
         </td>
-        <td class="py-2 px-2 font-numeric-table">
-          <div class="font-bold text-sky-400 text-xs truncate leading-none mb-0.5">${item.invoiceNumber || 'INV-DIRECT'}</div>
-          ${item.barcode ? `<span class="text-[10px] text-slate-400 font-mono truncate block leading-none">#${item.barcode}</span>` : ''}
+        <td class="py-1.5 px-1.5 font-numeric-table">
+          <div class="font-bold text-sky-400 text-[11px] truncate leading-none mb-0.5">${item.invoiceNumber || 'INV-DIRECT'}</div>
+          ${item.barcode ? `<span class="text-[9px] text-slate-400 font-mono truncate block leading-none">#${item.barcode}</span>` : ''}
         </td>
-        <td class="py-2 px-2 overflow-hidden">
-          <div class="font-bold text-white text-xs truncate leading-tight" title="${item.name}">${item.name}</div>
-          <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300 border border-slate-700/60 truncate max-w-full">${catName}</span>
+        <td class="py-1.5 px-1.5 overflow-hidden">
+          <div class="font-bold text-white text-[11px] truncate leading-tight" title="${item.name}">${item.name}</div>
+          <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[8px] font-bold bg-slate-800 text-slate-300 border border-slate-700/60 truncate max-w-full">${catName}</span>
         </td>
-        <td class="py-2 px-1 font-numeric-table font-bold text-white text-center">
+        <td class="py-1.5 px-1 font-numeric-table font-bold text-white text-center">
           ${item.quantity || 1}
         </td>
-        <td class="py-2 px-1 font-numeric-table font-bold text-slate-300 text-center">
+        <td class="py-1.5 px-1 font-numeric-table font-bold text-slate-300 text-center">
           ${formatMoney(item.price)}
         </td>
-        <td class="py-2 px-1 font-numeric-table font-extrabold text-emerald-400 text-center">
+        <td class="py-1.5 px-1 font-numeric-table font-extrabold text-emerald-400 text-center">
           ${formatMoney(totalRow)}
         </td>
-        <td class="py-2 px-1 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-center">
+        <td class="py-1.5 px-1 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-center">
           ${profit >= 0 ? '+' : ''}${formatMoney(profit)}
         </td>
-        <td class="py-2 px-1.5 overflow-hidden">
-          <div class="font-bold text-slate-200 text-[11px] truncate" title="${item.customerName || 'عميل نقدي'}">${item.customerName || 'نقدي'}</div>
-          ${item.customerPhone ? `<div class="text-[9px] font-numeric-table text-slate-400 font-mono truncate">${item.customerPhone}</div>` : ''}
+        <td class="py-1.5 px-1 overflow-hidden">
+          <div class="font-bold text-slate-200 text-[10px] truncate" title="${item.customerName || 'عميل نقدي'}">${item.customerName || 'نقدي'}</div>
+          ${item.customerPhone ? `<div class="text-[8px] font-numeric-table text-slate-400 font-mono truncate">${item.customerPhone}</div>` : ''}
         </td>
-        <td class="py-2 px-1 text-center">
-          <div class="flex items-center justify-center gap-1">
-            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة الفاتورة" class="p-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors">
-              <span class="material-symbols-outlined text-[14px]">receipt_long</span>
+        <td class="py-1.5 px-0.5 text-center">
+          <div class="flex items-center justify-center gap-0.5">
+            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة" class="p-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[13px]">receipt_long</span>
             </button>
-            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer transition-colors">
-              <span class="material-symbols-outlined text-[14px]">edit</span>
+            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل" class="p-1 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[13px]">edit</span>
             </button>
-            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف واسترجاع" class="p-1 rounded bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer transition-colors">
-              <span class="material-symbols-outlined text-[14px]">delete</span>
+            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف" class="p-1 rounded bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[13px]">delete</span>
             </button>
           </div>
         </td>

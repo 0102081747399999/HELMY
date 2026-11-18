@@ -304,95 +304,83 @@
   <div id="main-content-wrapper" class="lg:pr-72 w-full min-h-screen bg-background flex flex-col transition-all duration-200">
     
     <!-- Top Cashier Header -->
-    <header id="app-header" class="fixed top-0 right-0 lg:right-72 left-0 h-16 bg-surface-container-lowest/95 backdrop-blur-xl border-b border-surface-container shadow-[0_1px_8px_rgba(15,23,42,0.04)] z-40 flex items-center justify-between px-3 lg:px-6 gap-2">
+    <header id="app-header" class="fixed top-0 right-0 lg:right-72 left-0 h-14 bg-surface-container-lowest/95 backdrop-blur-xl border-b border-surface-container shadow-[0_1px_8px_rgba(15,23,42,0.04)] z-40 flex items-center justify-between px-2 sm:px-4 gap-2">
       
-      <!-- Right: Mobile Sidebar Toggle + Brand -->
-      <div class="flex items-center gap-2.5">
-        <button onclick="window.toggleSidebar()" class="lg:hidden p-2 rounded-lg text-on-surface hover:bg-surface-container transition-colors cursor-pointer">
-          <span class="material-symbols-outlined text-xl">menu</span>
+      <!-- Right: Mobile Sidebar Toggle + Top Brand (Image + "سنترال حلمي") -->
+      <div class="flex items-center gap-2 shrink-0">
+        <button onclick="window.toggleSidebar()" class="lg:hidden p-1.5 rounded-lg text-on-surface hover:bg-surface-container transition-colors cursor-pointer" title="القائمة">
+          <span class="material-symbols-outlined text-lg">menu</span>
         </button>
+        <!-- صورة سنترال حلمي مع الاسم مرئي دائماً -->
         <div class="flex items-center gap-2">
-          <span class="font-bold text-sm text-white lg:hidden">سنترال حلمي</span>
-          <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-low border border-slate-700/50">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="text-[11px] font-bold text-on-surface">سحابي Firebase</span>
+          <div class="w-8 h-8 rounded-full overflow-hidden border border-amber-500/70 shadow-sm shrink-0 ring-1 ring-amber-500/40">
+            <img src="images/hilmy-gold-banner.jpg" alt="سنترال حلمي" class="w-full h-full object-cover" />
           </div>
+          <span class="font-black text-sm text-amber-300 whitespace-nowrap hidden xs:inline sm:inline">سنترال حلمي</span>
         </div>
       </div>
 
-      <!-- Center: Smart Manual Code Input & Barcode / Camera -->
-      <div class="flex-1 max-w-xl mx-2 sm:mx-4 flex items-center gap-2 relative">
+      <!-- Center: كود البيع والمخزن المرئي (بدون كلمة تنفيذ - الكود ظاهر وكبير وواضح) -->
+      <div class="flex-1 max-w-lg mx-1 sm:mx-3 flex items-center gap-1.5 relative">
         <div class="relative flex-1 group">
-          <span class="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-rose-500 text-xl pointer-events-none group-focus-within:text-amber-400 transition-colors">search</span>
+          <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-amber-400 text-lg pointer-events-none group-focus-within:text-amber-300 transition-colors">qr_code_scanner</span>
           <input 
             type="text" 
             id="quickCodeManualInput" 
             autocomplete="off"
             spellcheck="false"
-            dir="rtl"
-            placeholder="اكتب الكود أو الباركود..." 
-            class="w-full h-11 sm:h-12 bg-slate-950 border-2 border-slate-700/80 focus:border-amber-400 rounded-full pr-10 pl-28 sm:pl-32 text-base sm:text-lg font-numeric-table font-bold text-white tracking-wider placeholder:text-slate-500 placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-400/25 shadow-md shadow-black/40 transition-all"
+            placeholder="اكتب الكود مرئي..." 
+            style="color: #fde047 !important; font-weight: 900 !important; font-size: 1.25rem !important; caret-color: #fde047;"
+            class="w-full h-10 sm:h-11 bg-slate-950 border-2 border-amber-500/80 focus:border-amber-300 rounded-full pr-10 pl-16 text-center sm:text-right sm:pr-10 sm:pl-16 font-numeric-table font-black tracking-wider placeholder:text-slate-500 placeholder:text-xs placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-400/30 shadow-md shadow-black/50 transition-all text-amber-300"
           />
-          <div class="absolute left-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+          <div class="absolute left-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
             <!-- Clear Button -->
             <button 
               type="button" 
               id="quickCodeClearBtn"
               onclick="window.clearQuickCodeInput()" 
-              class="hidden w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-all border border-slate-700/60" 
+              class="hidden w-7 h-7 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-all border border-slate-700/60" 
               title="مسح">
-              <span class="material-symbols-outlined text-xs sm:text-sm font-bold">close</span>
+              <span class="material-symbols-outlined text-xs font-bold">close</span>
             </button>
 
-            <!-- Execute Button -->
+            <!-- Search / Action Icon Button (NO 'تنفيذ' text!) -->
             <button 
               type="button" 
               onclick="window.triggerManualCodeSearch()" 
-              class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/60 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shrink-0">
-              <span id="quickCodeExecuteBtnText">تنفيذ ↵</span>
-              <span class="material-symbols-outlined text-xs">arrow_back</span>
+              class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white flex items-center justify-center shadow-md shadow-rose-950/60 cursor-pointer transition-all active:scale-95 shrink-0" 
+              title="بحث بالكود (Enter)">
+              <span class="material-symbols-outlined text-sm font-bold">search</span>
             </button>
           </div>
         </div>
-        <button type="button" onclick="window.openCameraScanner()" class="h-11 sm:h-12 px-3 sm:px-4 rounded-full bg-slate-900/90 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md" title="مسح باركود بالكاميرا (F3)">
-          <span class="material-symbols-outlined text-xl">photo_camera</span>
-          <span class="text-xs font-bold hidden md:inline">كاميرا</span>
-        </button>
-        <button type="button" onclick="window.openPhoneAccessModal()" class="h-11 sm:h-12 px-3 sm:px-4 rounded-full bg-slate-900/90 hover:bg-slate-800 text-sky-400 hover:text-sky-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md" title="تشغيل على الموبايل">
-          <span class="material-symbols-outlined text-xl">smartphone</span>
-          <span class="text-xs font-bold hidden xl:inline">موبايل</span>
+        <button type="button" onclick="window.openCameraScanner()" class="h-9 sm:h-10 px-2.5 sm:px-3 rounded-full bg-slate-900/90 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow" title="مسح باركود بالكاميرا (F3)">
+          <span class="material-symbols-outlined text-lg">photo_camera</span>
         </button>
       </div>
 
-      <!-- Left: Clock, Cash Drawer, Quick POS, Theme & Fullscreen -->
-      <div class="flex items-center gap-2">
-        <div class="hidden 2xl:flex flex-col items-end text-left border-l border-outline-variant/30 pl-2.5">
-          <span id="header-live-clock" class="font-numeric-table font-bold text-xs text-on-surface tracking-wider">--:--:--</span>
-          <span id="header-live-date" class="font-label-sm text-[10px] text-on-surface-variant">--/--/----</span>
-        </div>
-
-        <button onclick="window.openOpeningCashModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-low border border-slate-700/50 hover:border-emerald-500/50 text-xs transition-all cursor-pointer" title="درج النقدية">
-          <span class="material-symbols-outlined text-emerald-400 text-sm">payments</span>
+      <!-- Left: Cash Drawer, Low Stock, Cloud Sync & POS (Compact & Sleek) -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button onclick="window.openOpeningCashModal()" class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-low border border-slate-700/50 hover:border-emerald-500/50 text-xs transition-all cursor-pointer" title="درج النقدية">
+          <span class="material-symbols-outlined text-emerald-400 text-xs">payments</span>
           <span id="header-cash-balance" class="font-numeric-table font-bold text-emerald-400 text-xs">0.00 ج.م</span>
         </button>
 
-        <!-- Shortages Notification Button -->
-        <button onclick="window.openLowStockModal()" id="btn-header-low-stock" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 text-xs transition-all cursor-pointer" title="كشف النواقص والأصناف المنتهية">
-          <span class="material-symbols-outlined text-amber-400 text-sm animate-pulse">warning</span>
-          <span class="font-bold text-amber-400 text-xs hidden sm:inline">النواقص:</span>
+        <button onclick="window.openLowStockModal()" id="btn-header-low-stock" class="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 text-xs transition-all cursor-pointer" title="كشف النواقص">
+          <span class="material-symbols-outlined text-amber-400 text-xs animate-pulse">warning</span>
           <span id="header-low-stock-count" class="font-numeric-table font-bold text-amber-300 text-xs">0</span>
         </button>
 
         <!-- Live Firebase Cloud Sync Badge -->
-        <button onclick="window.triggerCloudSyncManual()" id="firebase-status-badge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 text-xs transition-all cursor-pointer" title="حالة سحابة فيربيز (helmy-10237) - اضغط للمزامنة الفورية">
+        <button onclick="window.triggerCloudSyncManual()" id="firebase-status-badge" class="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 text-xs transition-all cursor-pointer" title="مزامنة فيربيز">
           <span id="firebase-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="material-symbols-outlined text-amber-400 text-sm">cloud_sync</span>
-          <span id="firebase-status-text" class="font-bold text-emerald-300 text-xs hidden lg:inline">فيربيز: helmy-10237</span>
+          <span class="material-symbols-outlined text-amber-400 text-xs">cloud_sync</span>
+          <span id="firebase-status-text" class="font-bold text-emerald-300 text-[11px] hidden xl:inline">سحابي</span>
         </button>
 
-        <button onclick="window.triggerQuickPOS()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 border border-rose-400/30 transition-all cursor-pointer">
-          <span class="material-symbols-outlined text-sm">point_of_sale</span>
-          <span class="hidden sm:inline">كاشير سريع (F2)</span>
+        <button onclick="window.triggerQuickPOS()" class="flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow transition-all cursor-pointer">
+          <span class="material-symbols-outlined text-xs">point_of_sale</span>
+          <span class="hidden sm:inline">كاشير (F2)</span>
         </button>
       </div>
 
@@ -1696,124 +1684,124 @@
       </section>
 
       <!-- ==========================================
-           VIEW: ALL SALES MASTER (شاشة المبيعات الشاملة والبيع الكلي)
+           VIEW: ALL SALES MASTER (شاشة المبيعات الشاملة - مدمجة وصغيرة)
            ========================================== -->
-      <section id="view-all-sales-master" class="hidden flex flex-col gap-6">
+      <section id="view-all-sales-master" class="hidden flex flex-col gap-3">
         
-        <!-- Header Banner -->
-        <div class="bg-slate-900/90 p-5 rounded-2xl shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md text-white">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-600/20 to-red-600/30 border border-rose-500/40 text-rose-500 flex items-center justify-center shrink-0 shadow-sm">
-              <span class="material-symbols-outlined text-2xl">receipt_long</span>
+        <!-- Header Banner (مدمج وأنيق) -->
+        <div class="bg-slate-900/90 p-2.5 px-3.5 rounded-xl shadow-md border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 backdrop-blur-md text-white">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-600/20 to-red-600/30 border border-rose-500/40 text-rose-500 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-lg">receipt_long</span>
             </div>
             <div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <h2 class="font-bold text-on-surface text-lg">سجل المبيعات الشامل والتقارير التفصيلية</h2>
-                <span id="all-sales-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">0 فواتير مباعة</span>
+              <div class="flex items-center gap-2">
+                <h2 class="font-bold text-on-surface text-sm sm:text-base">سجل المبيعات الشامل</h2>
+                <span id="all-sales-count-badge" class="px-2 py-0.2 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">0 فواتير</span>
               </div>
-              <p class="text-xs text-on-surface-variant mt-0.5">صفحة متكاملة تعرض كل ما يتم بيعه في سنترال حلمي بالتفصيل الدقيق والتواريخ والأسعار والأرباح</p>
+              <p class="text-[10px] text-on-surface-variant">عرض تفصيلي وسريع لكل ما تم بيعه بالتاريخ والأسعار</p>
             </div>
           </div>
 
-          <div class="flex items-center gap-2 flex-wrap">
-            <button onclick="window.triggerQuickPOS()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 flex items-center gap-2 transition-all cursor-pointer">
-              <span class="material-symbols-outlined text-lg">add_shopping_cart</span>
-              <span>💰 إجراء بيع فوري جديد (F2)</span>
+          <div class="flex items-center gap-2">
+            <button onclick="window.triggerQuickPOS()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow flex items-center gap-1.5 transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-sm">add_shopping_cart</span>
+              <span>إجراء بيع فوري (F2)</span>
             </button>
           </div>
         </div>
 
-        <!-- Global Sales KPIs -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg flex flex-col gap-1 backdrop-blur-md hover:border-slate-700 transition-all text-white">
-            <span class="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-emerald-500 text-base">payments</span>
-              <span>إجمالي المبيعات المحققة</span>
+        <!-- Global Sales KPIs (مدمجة وصغيرة) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div class="p-2 px-3 rounded-xl bg-slate-900/90 border border-slate-800 shadow flex flex-col gap-0.5 backdrop-blur-md text-white">
+            <span class="text-[10px] text-on-surface-variant font-bold flex items-center gap-1">
+              <span class="material-symbols-outlined text-emerald-500 text-sm">payments</span>
+              <span>إجمالي المبيعات</span>
             </span>
-            <span id="all-sales-stat-total" class="font-numeric-table font-bold text-2xl text-emerald-500">0.00 ج.م</span>
-            <span class="text-[11px] text-on-surface-variant">شامل كافة الأقسام</span>
+            <span id="all-sales-stat-total" class="font-numeric-table font-black text-lg text-emerald-400">0.00 ج.م</span>
+            <span class="text-[9px] text-slate-400">كافة الأقسام</span>
           </div>
 
-          <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg flex flex-col gap-1 backdrop-blur-md hover:border-slate-700 transition-all text-white">
-            <span class="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-teal-500 text-base">trending_up</span>
-              <span>صافي الأرباح المحققة</span>
+          <div class="p-2 px-3 rounded-xl bg-slate-900/90 border border-slate-800 shadow flex flex-col gap-0.5 backdrop-blur-md text-white">
+            <span class="text-[10px] text-on-surface-variant font-bold flex items-center gap-1">
+              <span class="material-symbols-outlined text-teal-500 text-sm">trending_up</span>
+              <span>صافي الأرباح</span>
             </span>
-            <span id="all-sales-stat-profit" class="font-numeric-table font-bold text-2xl text-teal-400">+0.00 ج.م</span>
-            <span class="text-[11px] text-emerald-400 font-bold">أرباح نقدية فعلية</span>
+            <span id="all-sales-stat-profit" class="font-numeric-table font-black text-lg text-teal-400">+0.00 ج.م</span>
+            <span class="text-[9px] text-emerald-400 font-bold">أرباح فعلية</span>
           </div>
 
-          <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg flex flex-col gap-1 backdrop-blur-md hover:border-slate-700 transition-all text-white">
-            <span class="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-rose-500 text-base">shopping_bag</span>
-              <span>إجمالي عدد القطع المباعة</span>
+          <div class="p-2 px-3 rounded-xl bg-slate-900/90 border border-slate-800 shadow flex flex-col gap-0.5 backdrop-blur-md text-white">
+            <span class="text-[10px] text-on-surface-variant font-bold flex items-center gap-1">
+              <span class="material-symbols-outlined text-rose-500 text-sm">shopping_bag</span>
+              <span>القطع المباعة</span>
             </span>
-            <span id="all-sales-stat-items-count" class="font-numeric-table font-bold text-2xl text-on-surface">0</span>
-            <span class="text-[11px] text-on-surface-variant">قطعة خرجت من المخازن</span>
+            <span id="all-sales-stat-items-count" class="font-numeric-table font-black text-lg text-on-surface">0</span>
+            <span class="text-[9px] text-slate-400">قطعة بالمخزن</span>
           </div>
 
-          <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg flex flex-col gap-1 backdrop-blur-md hover:border-slate-700 transition-all text-white">
-            <span class="text-xs text-on-surface-variant font-bold flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-sky-500 text-base">receipt_long</span>
-              <span>عدد فواتير وعمليات البيع</span>
+          <div class="p-2 px-3 rounded-xl bg-slate-900/90 border border-slate-800 shadow flex flex-col gap-0.5 backdrop-blur-md text-white">
+            <span class="text-[10px] text-on-surface-variant font-bold flex items-center gap-1">
+              <span class="material-symbols-outlined text-sky-500 text-sm">receipt_long</span>
+              <span>فواتير البيع</span>
             </span>
-            <span id="all-sales-stat-invoices-count" class="font-numeric-table font-bold text-2xl text-sky-400">0</span>
-            <span class="text-[11px] text-on-surface-variant">عملية بيع مسجلة</span>
+            <span id="all-sales-stat-invoices-count" class="font-numeric-table font-black text-lg text-sky-400">0</span>
+            <span class="text-[9px] text-slate-400">عملية مسجلة</span>
           </div>
         </div>
 
         <!-- Sales Ledger Content (صفحة كاملة مخصصة لسجل المبيعات) -->
-        <div id="master-sales-tab-content" class="flex flex-col gap-4">
-          <!-- Filters Bar -->
-          <div class="bg-slate-900/90 p-4 rounded-2xl shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 backdrop-blur-md text-white">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs font-bold text-on-surface-variant">تصفية القسم:</span>
-              <select id="all-sales-filter-cat" onchange="window.setAllSalesCategoryFilter(this.value)" class="bg-surface-container-low text-on-surface rounded-xl px-3 py-1.5 text-xs border border-outline-variant/30 font-bold focus:outline-none">
+        <div id="master-sales-tab-content" class="flex flex-col gap-2.5">
+          <!-- Filters Bar (مدمج وصغير) -->
+          <div class="bg-slate-900/90 p-2 px-3 rounded-xl shadow border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-2 backdrop-blur-md text-white">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[10px] font-bold text-on-surface-variant">القسم:</span>
+              <select id="all-sales-filter-cat" onchange="window.setAllSalesCategoryFilter(this.value)" class="bg-surface-container-low text-on-surface rounded-lg px-2 py-0.5 text-[10px] border border-outline-variant/30 font-bold focus:outline-none">
                 <option value="all">جميع الأقسام</option>
-                <option value="phones">قسم التليفونات</option>
-                <option value="chargers">قسم الشواحن</option>
-                <option value="cables">قسم الوصلات</option>
-                <option value="headphones">قسم السماعات</option>
-                <option value="speakers">قسم الصبات</option>
-                <option value="covers">قسم الجرابات</option>
-                <option value="accessories">قسم الإكسسوارات</option>
+                <option value="phones">التليفونات</option>
+                <option value="chargers">الشواحن</option>
+                <option value="cables">الوصلات</option>
+                <option value="headphones">السماعات</option>
+                <option value="speakers">الصبات</option>
+                <option value="covers">الجرابات</option>
+                <option value="accessories">الإكسسوارات</option>
                 <option value="manual">المخزن اليدوي</option>
               </select>
 
-              <span class="text-xs font-bold text-on-surface-variant mr-2">الفترة:</span>
+              <span class="text-[10px] font-bold text-on-surface-variant mr-1">الفترة:</span>
               <div class="flex items-center gap-1">
-                <button onclick="window.setAllSalesDateFilter('all')" data-all-sales-date="all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white shadow-sm ring-1 ring-rose-500/40 cursor-pointer">الكل (جميع الأيام)</button>
-                <button onclick="window.setAllSalesDateFilter('today')" data-all-sales-date="today" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer">اليوم</button>
-                <button onclick="window.setAllSalesDateFilter('yesterday')" data-all-sales-date="yesterday" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer">أمس</button>
-                <button onclick="window.setAllSalesDateFilter('week')" data-all-sales-date="week" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer">آخر 7 أيام</button>
-                <button onclick="window.setAllSalesDateFilter('month')" data-all-sales-date="month" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer">هذا الشهر</button>
+                <button onclick="window.setAllSalesDateFilter('all')" data-all-sales-date="all" class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary text-white cursor-pointer">الكل</button>
+                <button onclick="window.setAllSalesDateFilter('today')" data-all-sales-date="today" class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer">اليوم</button>
+                <button onclick="window.setAllSalesDateFilter('yesterday')" data-all-sales-date="yesterday" class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer">أمس</button>
+                <button onclick="window.setAllSalesDateFilter('week')" data-all-sales-date="week" class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer">7 أيام</button>
+                <button onclick="window.setAllSalesDateFilter('month')" data-all-sales-date="month" class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container-low text-on-surface border border-outline-variant/30 hover:bg-surface-container cursor-pointer">الشهر</button>
               </div>
             </div>
 
             <div class="relative flex-1 max-w-xs">
-              <span class="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg">search</span>
-              <input type="text" id="all-sales-search-input" oninput="window.setAllSalesSearch(this.value)" placeholder="بحث بالصنف، الكود، العميل، التليفون..." class="w-full bg-surface-container-low text-on-surface rounded-xl pr-10 pl-4 py-2 text-xs border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-primary font-bold"/>
+              <span class="material-symbols-outlined absolute right-2.5 top-1.5 text-slate-400 text-sm">search</span>
+              <input type="text" id="all-sales-search-input" oninput="window.setAllSalesSearch(this.value)" placeholder="بحث بالصنف أو الكود..." class="w-full bg-surface-container-low text-on-surface rounded-lg pr-7 pl-3 py-1 text-[10px] border border-outline-variant/30 focus:outline-none focus:ring-1 focus:ring-primary font-bold"/>
             </div>
           </div>
 
           <!-- Master Sales Table (Compact & Screen-Fitted) -->
-          <div class="bg-slate-900/90 rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col backdrop-blur-md text-white">
+          <div class="bg-slate-900/90 rounded-xl shadow-lg border border-slate-800 overflow-hidden flex flex-col backdrop-blur-md text-white">
             <div class="w-full overflow-hidden">
               <table class="w-full table-fixed text-right text-xs">
-                <thead class="bg-slate-950/95 text-slate-300 border-b border-slate-800 text-[11px] font-bold">
+                <thead class="bg-slate-950 text-slate-300 border-b border-slate-800 text-[10px] font-bold">
                   <tr>
-                    <th class="w-[13%] py-2.5 px-2">تاريخ البيع</th>
-                    <th class="w-[12%] py-2.5 px-2">الفاتورة / الكود</th>
-                    <th class="w-[28%] py-2.5 px-2">الصنف والقسم</th>
-                    <th class="w-[6%] py-2.5 px-1 text-center">الكمية</th>
-                    <th class="w-[10%] py-2.5 px-1 text-center">سعر البيع</th>
-                    <th class="w-[11%] py-2.5 px-1 text-center">الإجمالي</th>
-                    <th class="w-[9%] py-2.5 px-1 text-center">الربح</th>
-                    <th class="w-[6%] py-2.5 px-1.5">العميل</th>
-                    <th class="w-[5%] py-2.5 px-1 text-center">إجراء</th>
+                    <th class="w-[12%] py-2 px-1.5">التاريخ</th>
+                    <th class="w-[12%] py-2 px-1.5">الفاتورة/الكود</th>
+                    <th class="w-[28%] py-2 px-1.5">الصنف والقسم</th>
+                    <th class="w-[6%] py-2 px-1 text-center">الكمية</th>
+                    <th class="w-[10%] py-2 px-1 text-center">السعر</th>
+                    <th class="w-[11%] py-2 px-1 text-center">الإجمالي</th>
+                    <th class="w-[9%] py-2 px-1 text-center">الربح</th>
+                    <th class="w-[7%] py-2 px-1">العميل</th>
+                    <th class="w-[5%] py-2 px-1 text-center">إجراء</th>
                   </tr>
                 </thead>
-                <tbody id="all-sales-table-body" class="divide-y divide-slate-800/80 text-[11px]">
+                <tbody id="all-sales-table-body" class="divide-y divide-slate-800/80 text-[10px]">
                   <!-- Populated by JS -->
                 </tbody>
               </table>
@@ -1850,147 +1838,144 @@
   </div>
 
   <!-- ==========================================
-       MODAL 1: SMART CODE ACTION (بيع أم تسجيل في المخزون)
+       MODAL 1: SMART CODE ACTION (بيع أم توريد - مدمج وصغير)
        ========================================== -->
-  <div id="modal-smart-code-action" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-3 sm:p-5">
-    <div class="bg-slate-900 text-slate-100 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-800 animate-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+  <div id="modal-smart-code-action" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-2 sm:p-4">
+    <div class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-800 animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
       
-      <div class="p-4 sm:p-5 bg-navy-dark text-white border-b border-slate-800 flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-2.5">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-600 to-red-600 flex items-center justify-center shadow-md">
-            <span class="material-symbols-outlined text-white text-2xl">qr_code_scanner</span>
+      <!-- Modal Header (مدمج وصغير) -->
+      <div class="p-3 px-4 bg-navy-dark text-white border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-600 to-red-600 flex items-center justify-center shadow">
+            <span class="material-symbols-outlined text-white text-lg">qr_code_scanner</span>
           </div>
           <div>
-            <h3 class="font-title-lg font-bold text-white text-base">نظام الكود الذكي — بيع أم تسجيل</h3>
-            <p class="text-xs text-rose-300">تم التعرف على الصنف بالكود: اختر الإجراء المطلوب فورياً</p>
+            <h3 class="font-bold text-white text-sm">نظام الكود السريع</h3>
+            <p class="text-[10px] text-rose-300">تم التعرف على الصنف: اختر بيع أو توريد</p>
           </div>
         </div>
         <button type="button" onclick="window.closeSmartCodeActionModal()" class="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer">
-          <span class="material-symbols-outlined text-2xl">close</span>
+          <span class="material-symbols-outlined text-xl">close</span>
         </button>
       </div>
 
-      <div class="p-5 overflow-y-auto flex flex-col gap-4">
+      <div class="p-3.5 overflow-y-auto flex flex-col gap-2.5">
         
-        <!-- Product Quick Summary Card -->
-        <div class="p-4 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-2.5">
+        <!-- Product Quick Summary Card (مدمج وأنيق) -->
+        <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1.5">
           <div class="flex items-center justify-between">
-            <span id="smart-modal-category-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary text-white">قسم السماعات</span>
-            <span id="smart-modal-code-badge" class="font-numeric-table text-xs font-bold text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/30">كود: 70</span>
+            <span id="smart-modal-category-badge" class="px-2 py-0.2 rounded-full text-[10px] font-bold bg-primary text-white">قسم السماعات</span>
+            <span id="smart-modal-code-badge" class="font-numeric-table text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.2 rounded-full border border-amber-500/40">كود: 70</span>
           </div>
-          <h4 id="smart-modal-prod-name" class="font-bold text-on-surface text-base">اسم الصنف</h4>
+          <h4 id="smart-modal-prod-name" class="font-bold text-white text-xs truncate">اسم الصنف</h4>
           
-          <div class="grid grid-cols-2 gap-2 pt-2 border-t border-outline-variant/20 text-xs">
+          <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
             <div>
-              <span class="text-on-surface-variant text-[11px] block">الرصيد بالمخزن:</span>
-              <span id="smart-modal-stock" class="font-numeric-table font-bold text-rose-500 text-sm">0 قطع</span>
+              <span class="text-slate-400 text-[10px] block">الرصيد بالمخزن:</span>
+              <span id="smart-modal-stock" class="font-numeric-table font-bold text-rose-400 text-xs">0 قطع</span>
             </div>
             <div>
-              <span class="text-on-surface-variant text-[11px] block">سعر البيع:</span>
-              <span id="smart-modal-sell-price" class="font-numeric-table font-bold text-emerald-400 text-sm">0.00 ج.م</span>
+              <span class="text-slate-400 text-[10px] block">سعر البيع:</span>
+              <span id="smart-modal-sell-price" class="font-numeric-table font-bold text-emerald-400 text-xs">0.00 ج.م</span>
             </div>
             <span id="smart-modal-buy-price" class="hidden">0.00 ج.م</span>
           </div>
-          <div class="pt-1 text-[11px] text-on-surface-variant flex items-center justify-between border-t border-outline-variant/20">
-            <span>تاريخ آخر توريد / إضافة:</span>
-            <span id="smart-modal-last-date" class="font-numeric-table font-bold text-on-surface">15 نوفمبر 2026</span>
+          <div class="pt-1 text-[10px] text-slate-400 flex items-center justify-between border-t border-slate-800/80">
+            <span>آخر تحديث:</span>
+            <span id="smart-modal-last-date" class="font-numeric-table font-bold text-slate-300">15 نوفمبر 2026</span>
           </div>
         </div>
 
-        <!-- Choice Screen: 2 Big Action Buttons -->
-        <div id="smart-action-choose-section" class="flex flex-col gap-3">
-          <span class="text-xs font-bold text-on-surface-variant">ماذا تريد أن تفعل بهذا الصنف الآن؟</span>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button type="button" onclick="window.setSmartModalTab('sale')" class="p-4 rounded-2xl bg-gradient-to-br from-rose-600/15 via-red-600/10 to-transparent hover:bg-rose-600/25 border border-rose-500/40 flex flex-col items-center justify-center gap-2 group transition-all cursor-pointer">
-              <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                <span class="material-symbols-outlined text-2xl">point_of_sale</span>
-              </div>
-              <span class="font-bold text-rose-400 text-sm">💰 بيع الصنف الآن</span>
-              <span class="text-[11px] text-on-surface-variant text-center">خصم من المخزن وتنزيل تلقائي في صفحة المبيعات</span>
+        <!-- Choice Screen: 2 Compact Action Buttons (مدمج وغير مبالغ فيه) -->
+        <div id="smart-action-choose-section" class="flex flex-col gap-2">
+          <span class="text-[11px] font-bold text-slate-400">اختر الإجراء المطلوب فورياً:</span>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" onclick="window.setSmartModalTab('sale')" class="p-2.5 rounded-xl bg-gradient-to-r from-rose-600/25 to-red-600/15 hover:bg-rose-600/35 border border-rose-500/50 flex flex-col items-center justify-center gap-1 group transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-xl text-rose-400 group-hover:scale-110 transition-transform">point_of_sale</span>
+              <span class="font-bold text-rose-300 text-xs">💰 بيع الصنف</span>
+              <span class="text-[9px] text-slate-400">ينزل بالمبيعات</span>
             </button>
 
-            <button type="button" onclick="window.setSmartModalTab('restock')" class="p-4 rounded-2xl bg-gradient-to-br from-emerald-600/15 via-teal-600/10 to-transparent hover:bg-emerald-600/25 border border-emerald-500/40 flex flex-col items-center justify-center gap-2 group transition-all cursor-pointer">
-              <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                <span class="material-symbols-outlined text-2xl">inventory_2</span>
-              </div>
-              <span class="font-bold text-emerald-400 text-sm">📦 تسجيل وتوريد للمخزون</span>
-              <span class="text-[11px] text-on-surface-variant text-center">زيادة الكمية بالمخزن وتحديث تاريخ التوريد</span>
+            <button type="button" onclick="window.setSmartModalTab('restock')" class="p-2.5 rounded-xl bg-gradient-to-r from-emerald-600/25 to-teal-600/15 hover:bg-emerald-600/35 border border-emerald-500/50 flex flex-col items-center justify-center gap-1 group transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-xl text-emerald-400 group-hover:scale-110 transition-transform">inventory_2</span>
+              <span class="font-bold text-emerald-300 text-xs">📦 توريد للمخزن</span>
+              <span class="text-[9px] text-slate-400">إضافة رصيد</span>
             </button>
           </div>
         </div>
 
-        <!-- Sale Form Section -->
-        <div id="smart-action-sale-section" class="hidden flex-col gap-3.5 bg-surface-container-low p-4 rounded-2xl border border-rose-500/30">
-          <div class="flex items-center justify-between pb-2 border-b border-outline-variant/20">
-            <span class="font-bold text-xs text-rose-400 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-base">point_of_sale</span>
-              <span>تأكيد عملية البيع (ستنزل في شاشة المبيعات الشاملة)</span>
+        <!-- Sale Form Section (مدمج وصغير) -->
+        <div id="smart-action-sale-section" class="hidden flex-col gap-2 bg-slate-950/80 p-3 rounded-xl border border-rose-500/40">
+          <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
+            <span class="font-bold text-xs text-rose-400 flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">point_of_sale</span>
+              <span>تأكيد البيع الفوري</span>
             </span>
-            <button type="button" onclick="window.setSmartModalTab('choose')" class="text-xs text-on-surface-variant hover:text-white cursor-pointer">رجوع ↩</button>
+            <button type="button" onclick="window.setSmartModalTab('choose')" class="text-[11px] text-slate-400 hover:text-white cursor-pointer">رجوع ↩</button>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-xs font-bold text-on-surface-variant mb-1">الكمية المباعة *</label>
-              <input type="number" id="smart-sale-qty" value="1" min="1" class="w-full bg-surface-container text-on-surface font-numeric-table font-bold rounded-xl px-3 py-2 text-sm border border-outline-variant/40 focus:ring-2 focus:ring-rose-500 focus:outline-none"/>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">الكمية المباعة *</label>
+              <input type="number" id="smart-sale-qty" value="1" min="1" class="w-full bg-slate-900 text-white font-numeric-table font-bold rounded-lg px-2 py-1.5 text-xs border border-slate-700 focus:ring-1 focus:ring-rose-500 focus:outline-none"/>
             </div>
             <div>
-              <label class="block text-xs font-bold text-on-surface-variant mb-1">سعر البيع الفعلي (ج.م) *</label>
-              <input type="number" id="smart-sale-price" step="0.5" class="w-full bg-surface-container text-on-surface font-numeric-table font-bold text-emerald-400 rounded-xl px-3 py-2 text-sm border border-outline-variant/40 focus:ring-2 focus:ring-rose-500 focus:outline-none"/>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-bold text-on-surface-variant mb-1">اسم العميل (اختياري)</label>
-              <input type="text" id="smart-sale-customer" value="عميل نقدي" class="w-full bg-surface-container text-on-surface rounded-xl px-3 py-2 text-xs border border-outline-variant/40 focus:outline-none"/>
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-on-surface-variant mb-1">هاتف العميل (اختياري)</label>
-              <input type="tel" id="smart-sale-phone" placeholder="010xxxxxxxx" class="w-full bg-surface-container text-on-surface font-numeric-table rounded-xl px-3 py-2 text-xs border border-outline-variant/40 focus:outline-none"/>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">سعر البيع (ج.م) *</label>
+              <input type="number" id="smart-sale-price" step="0.5" class="w-full bg-slate-900 text-emerald-400 font-numeric-table font-bold rounded-lg px-2 py-1.5 text-xs border border-slate-700 focus:ring-1 focus:ring-rose-500 focus:outline-none"/>
             </div>
           </div>
 
-          <button type="button" onclick="window.confirmSmartCodeSale()" class="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 flex items-center justify-center gap-2 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-base">check_circle</span>
-            <span>تأكيد البيع وتنزيل في شاشة المبيعات الشاملة</span>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">اسم العميل</label>
+              <input type="text" id="smart-sale-customer" value="عميل نقدي" class="w-full bg-slate-900 text-white rounded-lg px-2 py-1.5 text-[11px] border border-slate-700 focus:outline-none"/>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">هاتف العميل</label>
+              <input type="tel" id="smart-sale-phone" placeholder="010xxxxxxxx" class="w-full bg-slate-900 text-white font-numeric-table rounded-lg px-2 py-1.5 text-[11px] border border-slate-700 focus:outline-none"/>
+            </div>
+          </div>
+
+          <button type="button" onclick="window.confirmSmartCodeSale()" class="w-full py-2 rounded-lg bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow flex items-center justify-center gap-1.5 transition-all cursor-pointer mt-1">
+            <span class="material-symbols-outlined text-sm">check_circle</span>
+            <span>تأكيد البيع وتنزيل في السجل</span>
           </button>
         </div>
 
-        <!-- Restock Form Section -->
-        <div id="smart-action-restock-section" class="hidden flex-col gap-3.5 bg-surface-container-low p-4 rounded-2xl border border-emerald-500/30">
-          <div class="flex items-center justify-between pb-2 border-b border-outline-variant/20">
-            <span class="font-bold text-xs text-emerald-400 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-base">inventory_2</span>
-              <span>تسجيل وتوريد للمخزون الحالي</span>
+        <!-- Restock Form Section (مدمج وصغير) -->
+        <div id="smart-action-restock-section" class="hidden flex-col gap-2 bg-slate-950/80 p-3 rounded-xl border border-emerald-500/40">
+          <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
+            <span class="font-bold text-xs text-emerald-400 flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">inventory_2</span>
+              <span>تسجيل وتوريد للمخزن</span>
             </span>
-            <button type="button" onclick="window.setSmartModalTab('choose')" class="text-xs text-on-surface-variant hover:text-white cursor-pointer">رجوع ↩</button>
+            <button type="button" onclick="window.setSmartModalTab('choose')" class="text-[11px] text-slate-400 hover:text-white cursor-pointer">رجوع ↩</button>
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-on-surface-variant mb-1">الكمية المضافة للمخزن *</label>
-            <div class="flex items-center gap-2">
-              <input type="number" id="smart-restock-qty" value="1" min="1" class="w-full bg-surface-container text-on-surface font-numeric-table font-bold rounded-xl px-3 py-2 text-sm border border-outline-variant/40 focus:ring-2 focus:ring-emerald-500 focus:outline-none"/>
-              <button type="button" onclick="document.getElementById('smart-restock-qty').value = parseInt(document.getElementById('smart-restock-qty').value||0) + 1" class="px-2.5 py-2 rounded-lg bg-surface-container text-xs font-bold cursor-pointer">+1</button>
-              <button type="button" onclick="document.getElementById('smart-restock-qty').value = parseInt(document.getElementById('smart-restock-qty').value||0) + 5" class="px-2.5 py-2 rounded-lg bg-surface-container text-xs font-bold cursor-pointer">+5</button>
-              <button type="button" onclick="document.getElementById('smart-restock-qty').value = parseInt(document.getElementById('smart-restock-qty').value||0) + 10" class="px-2.5 py-2 rounded-lg bg-surface-container text-xs font-bold cursor-pointer">+10</button>
+            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">الكمية المضافة *</label>
+            <div class="flex items-center gap-1.5">
+              <input type="number" id="smart-restock-qty" value="1" min="1" class="w-full bg-slate-900 text-white font-numeric-table font-bold rounded-lg px-2 py-1.5 text-xs border border-slate-700 focus:ring-1 focus:ring-emerald-500 focus:outline-none"/>
+              <button type="button" onclick="document.getElementById('smart-restock-qty').value = parseInt(document.getElementById('smart-restock-qty').value||0) + 1" class="px-2 py-1 rounded bg-slate-800 text-[10px] font-bold cursor-pointer">+1</button>
+              <button type="button" onclick="document.getElementById('smart-restock-qty').value = parseInt(document.getElementById('smart-restock-qty').value||0) + 5" class="px-2 py-1 rounded bg-slate-800 text-[10px] font-bold cursor-pointer">+5</button>
+              <button type="button" onclick="document.getElementById('smart-restock-qty').value = parseInt(document.getElementById('smart-restock-qty').value||0) + 10" class="px-2 py-1 rounded bg-slate-800 text-[10px] font-bold cursor-pointer">+10</button>
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-xs font-bold text-on-surface-variant mb-1">سعر الشراء الجديد (اختياري)</label>
-              <input type="number" id="smart-restock-buy-price" step="0.5" class="w-full bg-surface-container text-on-surface font-numeric-table rounded-xl px-3 py-2 text-xs border border-outline-variant/40 focus:outline-none"/>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">سعر الشراء الجديد</label>
+              <input type="number" id="smart-restock-buy-price" step="0.5" class="w-full bg-slate-900 text-white font-numeric-table rounded-lg px-2 py-1.5 text-[11px] border border-slate-700 focus:outline-none"/>
             </div>
             <div>
-              <label class="block text-xs font-bold text-on-surface-variant mb-1">سعر البيع الجديد (اختياري)</label>
-              <input type="number" id="smart-restock-sell-price" step="0.5" class="w-full bg-surface-container text-on-surface font-numeric-table rounded-xl px-3 py-2 text-xs border border-outline-variant/40 focus:outline-none"/>
+              <label class="block text-[10px] font-bold text-slate-400 mb-0.5">سعر البيع الجديد</label>
+              <input type="number" id="smart-restock-sell-price" step="0.5" class="w-full bg-slate-900 text-white font-numeric-table rounded-lg px-2 py-1.5 text-[11px] border border-slate-700 focus:outline-none"/>
             </div>
           </div>
 
-          <button type="button" onclick="window.confirmSmartCodeRestock()" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 flex items-center justify-center gap-2 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-base">save</span>
-            <span>تأكيد التسجيل وتوريد للمخزون مع التاريخ</span>
+          <button type="button" onclick="window.confirmSmartCodeRestock()" class="w-full py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow flex items-center justify-center gap-1.5 transition-all cursor-pointer mt-1">
+            <span class="material-symbols-outlined text-sm">save</span>
+            <span>تأكيد توريد المخزن</span>
           </button>
         </div>
 
@@ -9385,45 +9370,45 @@ function renderMasterSalesTable(allSales) {
       : (totalRow - ((item.buyPrice || 0) * (item.quantity || 1)));
     const catName = getCategoryArabicName(item.category);
     return `
-      <tr class="border-b border-slate-800/80 hover:bg-slate-800/40 transition-colors text-[11px] leading-tight">
-        <td class="py-2 px-2 text-slate-300 font-numeric-table">
-          <div class="font-bold text-white text-[11px] leading-none mb-0.5 truncate">${formatDateArabic(item.timestamp)}</div>
-          <span class="text-[10px] text-slate-400 font-mono">${formatTime(item.timestamp)}</span>
+      <tr class="border-b border-slate-800/80 hover:bg-slate-800/40 transition-colors text-[10px] leading-tight">
+        <td class="py-1.5 px-1.5 text-slate-300 font-numeric-table">
+          <div class="font-bold text-white text-[10px] leading-none mb-0.5 truncate">${formatDateArabic(item.timestamp)}</div>
+          <span class="text-[9px] text-slate-400 font-mono">${formatTime(item.timestamp)}</span>
         </td>
-        <td class="py-2 px-2 font-numeric-table">
-          <div class="font-bold text-sky-400 text-xs truncate leading-none mb-0.5">${item.invoiceNumber || 'INV-DIRECT'}</div>
-          ${item.barcode ? `<span class="text-[10px] text-slate-400 font-mono truncate block leading-none">#${item.barcode}</span>` : ''}
+        <td class="py-1.5 px-1.5 font-numeric-table">
+          <div class="font-bold text-sky-400 text-[11px] truncate leading-none mb-0.5">${item.invoiceNumber || 'INV-DIRECT'}</div>
+          ${item.barcode ? `<span class="text-[9px] text-slate-400 font-mono truncate block leading-none">#${item.barcode}</span>` : ''}
         </td>
-        <td class="py-2 px-2 overflow-hidden">
-          <div class="font-bold text-white text-xs truncate leading-tight" title="${item.name}">${item.name}</div>
-          <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300 border border-slate-700/60 truncate max-w-full">${catName}</span>
+        <td class="py-1.5 px-1.5 overflow-hidden">
+          <div class="font-bold text-white text-[11px] truncate leading-tight" title="${item.name}">${item.name}</div>
+          <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[8px] font-bold bg-slate-800 text-slate-300 border border-slate-700/60 truncate max-w-full">${catName}</span>
         </td>
-        <td class="py-2 px-1 font-numeric-table font-bold text-white text-center">
+        <td class="py-1.5 px-1 font-numeric-table font-bold text-white text-center">
           ${item.quantity || 1}
         </td>
-        <td class="py-2 px-1 font-numeric-table font-bold text-slate-300 text-center">
+        <td class="py-1.5 px-1 font-numeric-table font-bold text-slate-300 text-center">
           ${formatMoney(item.price)}
         </td>
-        <td class="py-2 px-1 font-numeric-table font-extrabold text-emerald-400 text-center">
+        <td class="py-1.5 px-1 font-numeric-table font-extrabold text-emerald-400 text-center">
           ${formatMoney(totalRow)}
         </td>
-        <td class="py-2 px-1 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-center">
+        <td class="py-1.5 px-1 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-center">
           ${profit >= 0 ? '+' : ''}${formatMoney(profit)}
         </td>
-        <td class="py-2 px-1.5 overflow-hidden">
-          <div class="font-bold text-slate-200 text-[11px] truncate" title="${item.customerName || 'عميل نقدي'}">${item.customerName || 'نقدي'}</div>
-          ${item.customerPhone ? `<div class="text-[9px] font-numeric-table text-slate-400 font-mono truncate">${item.customerPhone}</div>` : ''}
+        <td class="py-1.5 px-1 overflow-hidden">
+          <div class="font-bold text-slate-200 text-[10px] truncate" title="${item.customerName || 'عميل نقدي'}">${item.customerName || 'نقدي'}</div>
+          ${item.customerPhone ? `<div class="text-[8px] font-numeric-table text-slate-400 font-mono truncate">${item.customerPhone}</div>` : ''}
         </td>
-        <td class="py-2 px-1 text-center">
-          <div class="flex items-center justify-center gap-1">
-            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة الفاتورة" class="p-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors">
-              <span class="material-symbols-outlined text-[14px]">receipt_long</span>
+        <td class="py-1.5 px-0.5 text-center">
+          <div class="flex items-center justify-center gap-0.5">
+            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة" class="p-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[13px]">receipt_long</span>
             </button>
-            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer transition-colors">
-              <span class="material-symbols-outlined text-[14px]">edit</span>
+            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل" class="p-1 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[13px]">edit</span>
             </button>
-            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف واسترجاع" class="p-1 rounded bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer transition-colors">
-              <span class="material-symbols-outlined text-[14px]">delete</span>
+            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف" class="p-1 rounded bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[13px]">delete</span>
             </button>
           </div>
         </td>
