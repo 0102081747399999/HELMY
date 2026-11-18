@@ -72,6 +72,87 @@
       #app-sidebar.sidebar-closed { transform: translateX(100%); }
       #app-sidebar.sidebar-open { transform: translateX(0); }
     }
+
+    /* ==========================================================
+       SUPERIOR SMOOTH ROUNDED SYSTEM ("حواف دائرية عصرية فاخرة بالكامل")
+       ========================================================== */
+    .rounded-3xl {
+      border-radius: 34px !important;
+    }
+    .rounded-2xl {
+      border-radius: 26px !important;
+    }
+    .rounded-xl {
+      border-radius: 18px !important;
+    }
+    .rounded-lg {
+      border-radius: 14px !important;
+    }
+    .rounded-md {
+      border-radius: 10px !important;
+    }
+    .rounded-full {
+      border-radius: 9999px !important;
+    }
+
+    /* All Cards, Panels, KPI Containers deeply curved */
+    .bg-slate-900\/90,
+    .bg-slate-900,
+    .bg-navy-card,
+    .dark-glass-card {
+      border-radius: 26px !important;
+    }
+
+    /* Modals Deep Luxury Curved Corners */
+    [id^="modal-"] > div:not(.modal-backdrop),
+    .modal-animate,
+    .modal-content {
+      border-radius: 36px !important;
+      overflow: hidden !important;
+    }
+
+    /* Input Fields & Dropdowns Smooth Circular Edges */
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      border-radius: 18px !important;
+    }
+
+    /* Category Filter Tabs & Badges as Circular Pills */
+    [data-charger-tab],
+    [data-cable-tab],
+    [data-headphone-tab],
+    [data-speaker-tab],
+    [data-phone-brand],
+    [data-cover-tab],
+    [data-accessories-tab],
+    [data-manual-sub],
+    [data-sales-cat],
+    [data-sales-date],
+    nav a {
+      border-radius: 9999px !important;
+    }
+
+    /* Circular Buttons */
+    button.rounded-xl,
+    button.rounded-2xl {
+      border-radius: 20px !important;
+    }
+    button.rounded-full {
+      border-radius: 9999px !important;
+    }
+
+    /* Table Masking for perfectly curved corners */
+    .overflow-hidden {
+      overflow: hidden !important;
+      border-radius: 26px !important;
+    }
+    table thead tr:first-child th:first-child {
+      border-top-right-radius: 24px !important;
+    }
+    table thead tr:first-child th:last-child {
+      border-top-left-radius: 24px !important;
+    }
   </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased selection:bg-rose-600 selection:text-white pb-16 lg:pb-0">
@@ -88,8 +169,8 @@
       <!-- Store Brand Header -->
       <div class="h-16 px-4 flex items-center justify-between bg-navy-dark border-b border-slate-800 shrink-0">
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-950 border border-red-500/40 shadow-md shrink-0 p-0.5 flex items-center justify-center">
-            <span class="material-symbols-outlined text-rose-500 text-2xl">phonelink_ring</span>
+          <div class="w-10 h-10 rounded-2xl overflow-hidden bg-slate-950 border border-amber-500/50 shadow-md shrink-0 p-0.5 flex items-center justify-center ring-1 ring-amber-500/30">
+            <img src="images/hilmy-gold-banner.jpg" alt="سنترال حلمي" class="w-full h-full object-cover rounded-xl" />
           </div>
           <div class="flex flex-col min-w-0">
             <span class="font-title-md text-white font-black leading-tight truncate text-base">سنترال حلمي</span>
@@ -240,41 +321,55 @@
       </div>
 
       <!-- Center: Smart Manual Code Input & Barcode / Camera -->
-      <div class="flex-1 max-w-lg mx-2 flex items-center gap-2 relative">
-        <div class="relative flex-1">
-          <span class="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-rose-500 text-xl pointer-events-none">search</span>
+      <div class="flex-1 max-w-2xl mx-2 sm:mx-4 flex items-center gap-2 relative">
+        <div class="relative flex-1 group">
+          <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-rose-500 text-2xl pointer-events-none group-focus-within:text-amber-400 transition-colors">search</span>
           <input 
             type="text" 
             id="quickCodeManualInput" 
             autocomplete="off"
             spellcheck="false"
-            placeholder="⚡ اكتب الكود هنا (مثلاً: 70)..." 
-            class="w-full bg-slate-900 border-2 border-rose-500/80 rounded-xl pr-11 pl-28 py-2.5 text-sm sm:text-base font-numeric-table text-white font-black placeholder:text-slate-400 placeholder:text-xs placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400 shadow-inner tracking-wider"
+            dir="rtl"
+            placeholder="⚡ اكتب الكود هنا (مثال: 70 أو 2)..." 
+            style="color: #fde047 !important; font-weight: 900 !important; font-size: 1.45rem !important; caret-color: #fde047;"
+            class="w-full h-14 bg-slate-950 border-2 border-rose-500/90 focus:border-amber-400 rounded-full pr-13 pl-56 sm:pl-64 text-xl sm:text-2xl font-numeric-table font-black tracking-widest placeholder:text-slate-500 placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:ring-4 focus:ring-amber-400/25 shadow-xl shadow-black/50 transition-all"
           />
-          <div class="absolute left-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          <div class="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+            <!-- Inline Found Item Match Hint -->
+            <span id="quickCodeMatchHint" class="hidden px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] sm:text-xs font-bold truncate max-w-[110px] sm:max-w-[150px] shadow-sm animate-pulse"></span>
+            
+            <!-- Live Code Preview Pill -->
+            <span id="quickCodeLiveBadge" class="hidden px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 text-xs sm:text-sm font-black flex items-center gap-1 shadow-sm">
+              <span class="text-[10px] text-amber-400/80">الكود:</span>
+              <strong id="quickCodeLiveNum" class="text-white text-sm sm:text-base font-numeric-table"></strong>
+            </span>
+
+            <!-- Clear Button -->
             <button 
               type="button" 
               id="quickCodeClearBtn"
               onclick="window.clearQuickCodeInput()" 
-              class="hidden px-1.5 py-1 text-slate-400 hover:text-white text-xs cursor-pointer" 
+              class="hidden w-9 h-9 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-all border border-slate-700/60" 
               title="مسح">
-              <span class="material-symbols-outlined text-sm">close</span>
+              <span class="material-symbols-outlined text-sm font-bold">close</span>
             </button>
+
+            <!-- Execute Button -->
             <button 
               type="button" 
               onclick="window.triggerManualCodeSearch()" 
-              class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs shadow-md shadow-rose-950/40 flex items-center gap-1.5 cursor-pointer transition-all">
-              <span>تنفيذ</span>
-              <span class="material-symbols-outlined text-xs">arrow_back</span>
+              class="px-5 py-2.5 rounded-full bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-md shadow-rose-950/60 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shrink-0">
+              <span id="quickCodeExecuteBtnText">تنفيذ ↵</span>
+              <span class="material-symbols-outlined text-sm">arrow_back</span>
             </button>
           </div>
         </div>
-        <button type="button" onclick="window.openCameraScanner()" class="px-2.5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700/60 transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-sm" title="مسح باركود بالكاميرا (F3)">
-          <span class="material-symbols-outlined text-[19px]">photo_camera</span>
-          <span class="text-xs font-bold hidden md:inline">كاميرا (F3)</span>
+        <button type="button" onclick="window.openCameraScanner()" class="h-14 px-4 rounded-full bg-slate-900/90 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md" title="مسح باركود بالكاميرا (F3)">
+          <span class="material-symbols-outlined text-2xl">photo_camera</span>
+          <span class="text-xs font-bold hidden md:inline">كاميرا</span>
         </button>
-        <button type="button" onclick="window.openPhoneAccessModal()" class="px-2.5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-sky-400 hover:text-sky-300 border border-slate-700/60 transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-sm" title="تشغيل على الموبايل">
-          <span class="material-symbols-outlined text-[19px]">smartphone</span>
+        <button type="button" onclick="window.openPhoneAccessModal()" class="h-14 px-4 rounded-full bg-slate-900/90 hover:bg-slate-800 text-sky-400 hover:text-sky-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md" title="تشغيل على الموبايل">
+          <span class="material-symbols-outlined text-2xl">smartphone</span>
           <span class="text-xs font-bold hidden xl:inline">📱 موبايل</span>
         </button>
       </div>
@@ -286,26 +381,26 @@
           <span id="header-live-date" class="font-label-sm text-[10px] text-on-surface-variant">--/--/----</span>
         </div>
 
-        <button onclick="window.openOpeningCashModal()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface-container-low border border-slate-700/50 hover:border-emerald-500/50 text-xs transition-all cursor-pointer" title="درج النقدية">
+        <button onclick="window.openOpeningCashModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-low border border-slate-700/50 hover:border-emerald-500/50 text-xs transition-all cursor-pointer" title="درج النقدية">
           <span class="material-symbols-outlined text-emerald-400 text-sm">payments</span>
           <span id="header-cash-balance" class="font-numeric-table font-bold text-emerald-400 text-xs">0.00 ج.م</span>
         </button>
 
         <!-- Shortages Notification Button -->
-        <button onclick="window.openLowStockModal()" id="btn-header-low-stock" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 text-xs transition-all cursor-pointer" title="كشف النواقص والأصناف المنتهية">
+        <button onclick="window.openLowStockModal()" id="btn-header-low-stock" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 text-xs transition-all cursor-pointer" title="كشف النواقص والأصناف المنتهية">
           <span class="material-symbols-outlined text-amber-400 text-sm animate-pulse">warning</span>
           <span class="font-bold text-amber-400 text-xs hidden sm:inline">النواقص:</span>
           <span id="header-low-stock-count" class="font-numeric-table font-bold text-amber-300 text-xs">0</span>
         </button>
 
         <!-- Live Firebase Cloud Sync Badge -->
-        <button onclick="window.triggerCloudSyncManual()" id="firebase-status-badge" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 text-xs transition-all cursor-pointer" title="حالة سحابة فيربيز (helmy-10237) - اضغط للمزامنة الفورية">
+        <button onclick="window.triggerCloudSyncManual()" id="firebase-status-badge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/40 hover:bg-emerald-500/20 text-xs transition-all cursor-pointer" title="حالة سحابة فيربيز (helmy-10237) - اضغط للمزامنة الفورية">
           <span id="firebase-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span class="material-symbols-outlined text-amber-400 text-sm">cloud_sync</span>
           <span id="firebase-status-text" class="font-bold text-emerald-300 text-xs hidden lg:inline">فيربيز: helmy-10237</span>
         </button>
 
-        <button onclick="window.triggerQuickPOS()" class="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 border border-rose-400/30 transition-all cursor-pointer">
+        <button onclick="window.triggerQuickPOS()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/40 border border-rose-400/30 transition-all cursor-pointer">
           <span class="material-symbols-outlined text-sm">point_of_sale</span>
           <span class="hidden sm:inline">كاشير سريع (F2)</span>
         </button>
@@ -321,33 +416,32 @@
            ========================================== -->
       <section id="view-dashboard-overview" class="flex flex-col gap-6">
         
-        <!-- Store Hero Banner (بانر سنترال حلمي الثابت الفاخر باسم حلمي) -->
-        <div class="relative w-full h-44 sm:h-56 md:h-64 lg:h-72 rounded-2xl overflow-hidden shadow-2xl border-2 border-rose-900/60 bg-slate-950 select-none">
-          <img src="images/hilmy-banner.svg" alt="سنترال حلمي - إشراف وإدارة محمد حلمي" class="w-full h-full object-cover object-center" />
-          <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent pointer-events-none"></div>
+        <!-- Store Hero Banner (بانر سنترال حلمي الملكي الذهبي الفاخر) -->
+        <div class="relative w-full aspect-[16/7] sm:aspect-[16/6] max-h-[420px] rounded-3xl overflow-hidden shadow-2xl border-2 border-amber-500/50 bg-slate-950 select-none group">
+          <img src="images/hilmy-gold-banner.jpg" alt="سنترال حلمي - إشراف وإدارة محمد حلمي" class="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.01]" />
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/15 pointer-events-none"></div>
           
           <!-- Official Store Floating Badges on Banner -->
-          <div class="absolute top-3 right-4 px-3.5 py-1.5 rounded-full bg-slate-950/85 border border-rose-500/60 backdrop-blur-md text-xs font-black text-rose-300 flex items-center gap-2 shadow-xl">
+          <div class="absolute top-3 right-4 px-3.5 py-1.5 rounded-full bg-slate-950/85 border border-amber-500/60 backdrop-blur-md text-xs font-black text-amber-300 flex items-center gap-2 shadow-xl">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>سنترال حلمي • الصرح الشامل للهواتف والملحقات</span>
           </div>
 
-          <div class="absolute bottom-3 left-4 px-3.5 py-1.5 rounded-xl bg-slate-950/85 border border-amber-500/50 backdrop-blur-md text-xs font-black text-amber-300 flex items-center gap-2 shadow-xl">
+          <div class="absolute bottom-3 left-4 px-3.5 py-1.5 rounded-full bg-slate-950/85 border border-amber-500/60 backdrop-blur-md text-xs font-black text-amber-300 flex items-center gap-2 shadow-xl">
             <span>👑</span>
-            <span>إدارة: محمد حلمي</span>
+            <span>إشراف وإدارة: محمد حلمي</span>
           </div>
         </div>
 
         <!-- Store Header & Management Bar (كل الكتابة واللوجو مترتبة بره بنظام وشياكة) -->
-        <div class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl backdrop-blur-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+        <div class="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl backdrop-blur-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
           
           <!-- القسم الأيمن: اللوجو + الاسم + وسم إدارة محمد حلمي + الشارات -->
           <div class="flex items-center gap-4 sm:gap-5 flex-wrap sm:flex-nowrap">
             <!-- صندوق اللوجو المستقل -->
-            <div class="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-gradient-to-br from-rose-600 via-red-600 to-rose-950 p-[2px] shadow-xl shrink-0 ring-2 ring-rose-500/40">
-              <div class="w-full h-full bg-slate-950 rounded-[14px] flex flex-col items-center justify-center">
-                <span class="text-2xl font-black text-rose-500 tracking-wider">حلمي</span>
-                <span class="text-[9px] font-bold text-slate-400 tracking-widest uppercase">POS</span>
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-500 via-yellow-500 to-amber-700 p-[2px] shadow-xl shrink-0 ring-2 ring-amber-500/40 overflow-hidden">
+              <div class="w-full h-full bg-slate-950 rounded-[14px] overflow-hidden flex items-center justify-center">
+                <img src="images/hilmy-gold-banner.jpg" alt="شعار حلمي" class="w-full h-full object-cover object-center" />
               </div>
             </div>
 
@@ -6680,17 +6774,90 @@ window.setAccessoriesTab = (tab) => {
 // SMART QUICK CODE SYSTEM ("اكتب الكود يطلب مني بيع أو تسجيل")
 // =========================================================================
 
-function setupSmartCodeEvents() {
+// Arabic digit to Latin digit conversion (٠١٢٣٤٥٦٧٨٩ -> 0123456789)
+window.normalizeArabicDigits = function(str) {
+  if (!str) return '';
+  const arabicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+  return String(str).replace(/[٠-٩]/g, d => arabicDigits.indexOf(d));
+};
+
+window.updateQuickCodeDisplay = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
   const clearBtn = document.getElementById('quickCodeClearBtn');
+  const executeBtnText = document.getElementById('quickCodeExecuteBtnText');
+  const liveBadge = document.getElementById('quickCodeLiveBadge');
+  const liveNum = document.getElementById('quickCodeLiveNum');
+  const matchHint = document.getElementById('quickCodeMatchHint');
+
+  if (!codeInput) return;
+
+  // Convert Arabic numerals to Latin numerals on the fly
+  const originalVal = codeInput.value || '';
+  const normalized = window.normalizeArabicDigits(originalVal);
+  if (normalized !== originalVal) {
+    const selStart = codeInput.selectionStart;
+    codeInput.value = normalized;
+    try { codeInput.setSelectionRange(selStart, selStart); } catch(e){}
+  }
+
+  const val = codeInput.value.trim();
+
+  // 1. Toggle Clear Button
+  if (clearBtn) {
+    if (val.length > 0) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  // 2. Update Execute Button Text dynamically (e.g. "تنفيذ ( 2 ) ↵")
+  if (executeBtnText) {
+    if (val.length > 0) {
+      executeBtnText.textContent = `تنفيذ ( ${val} ) ↵`;
+    } else {
+      executeBtnText.textContent = 'تنفيذ ↵';
+    }
+  }
+
+  // 3. Update Live Code Badge
+  if (liveBadge && liveNum) {
+    if (val.length > 0) {
+      liveNum.textContent = val;
+      liveBadge.classList.remove('hidden');
+    } else {
+      liveBadge.classList.add('hidden');
+    }
+  }
+
+  // 4. Inline Found Item Hint (without dropdown list)
+  if (matchHint) {
+    if (val.length > 0 && Array.isArray(Store.products) && Store.products.length > 0) {
+      const q = val.toLowerCase();
+      const qNum = parseInt(val, 10);
+      const matched = Store.products.find(p => {
+        const b = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
+        const id = String(p.id != null ? p.id : '').trim().toLowerCase();
+        if (b && b === q) return true;
+        if (id && id === q) return true;
+        if (!isNaN(qNum) && parseInt(b, 10) === qNum) return true;
+        return false;
+      });
+      if (matched) {
+        matchHint.textContent = `✓ ${matched.name}`;
+        matchHint.classList.remove('hidden');
+      } else {
+        matchHint.classList.add('hidden');
+      }
+    } else {
+      matchHint.classList.add('hidden');
+    }
+  }
+};
+
+function setupSmartCodeEvents() {
+  const codeInput = document.getElementById('quickCodeManualInput');
 
   if (codeInput) {
-    codeInput.addEventListener('input', (e) => {
-      const val = (e.target.value || '').trim();
-      if (clearBtn) {
-        if (val.length > 0) clearBtn.classList.remove('hidden');
-        else clearBtn.classList.add('hidden');
-      }
+    codeInput.addEventListener('input', () => {
+      window.updateQuickCodeDisplay();
     });
 
     codeInput.addEventListener('keydown', (e) => {
@@ -6699,17 +6866,51 @@ function setupSmartCodeEvents() {
         window.triggerManualCodeSearch();
       }
     });
+
+    codeInput.addEventListener('focus', () => {
+      window.updateQuickCodeDisplay();
+    });
   }
+
+  // Global listener: If user types numbers while not focused on another input or open modal,
+  // automatically redirect digits to the code input so numbers are never lost!
+  window.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable);
+    if (isInput) return;
+
+    // Check if any modal is currently visible
+    const openModal = document.querySelector('[id^="modal-"]:not(.hidden), .modal-backdrop:not(.hidden)');
+    if (openModal) return;
+
+    // If typing digits 0-9 or Arabic digits
+    if (/^[0-9٠-٩]$/.test(e.key)) {
+      const quickInput = document.getElementById('quickCodeManualInput');
+      if (quickInput) {
+        quickInput.focus();
+        quickInput.value += window.normalizeArabicDigits(e.key);
+        window.updateQuickCodeDisplay();
+        e.preventDefault();
+      }
+    }
+  });
+
+  // Auto-focus code input on initial page load
+  setTimeout(() => {
+    const input = document.getElementById('quickCodeManualInput');
+    if (input && document.activeElement === document.body) {
+      input.focus();
+    }
+  }, 400);
 }
 
 window.clearQuickCodeInput = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
-  const clearBtn = document.getElementById('quickCodeClearBtn');
   if (codeInput) {
     codeInput.value = '';
     codeInput.focus();
   }
-  if (clearBtn) clearBtn.classList.add('hidden');
+  window.updateQuickCodeDisplay();
 };
 
 window.triggerCloudSyncManual = async function() {

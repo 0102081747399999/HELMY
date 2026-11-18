@@ -1942,17 +1942,90 @@ window.setAccessoriesTab = (tab) => {
 // SMART QUICK CODE SYSTEM ("اكتب الكود يطلب مني بيع أو تسجيل")
 // =========================================================================
 
-function setupSmartCodeEvents() {
+// Arabic digit to Latin digit conversion (٠١٢٣٤٥٦٧٨٩ -> 0123456789)
+window.normalizeArabicDigits = function(str) {
+  if (!str) return '';
+  const arabicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+  return String(str).replace(/[٠-٩]/g, d => arabicDigits.indexOf(d));
+};
+
+window.updateQuickCodeDisplay = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
   const clearBtn = document.getElementById('quickCodeClearBtn');
+  const executeBtnText = document.getElementById('quickCodeExecuteBtnText');
+  const liveBadge = document.getElementById('quickCodeLiveBadge');
+  const liveNum = document.getElementById('quickCodeLiveNum');
+  const matchHint = document.getElementById('quickCodeMatchHint');
+
+  if (!codeInput) return;
+
+  // Convert Arabic numerals to Latin numerals on the fly
+  const originalVal = codeInput.value || '';
+  const normalized = window.normalizeArabicDigits(originalVal);
+  if (normalized !== originalVal) {
+    const selStart = codeInput.selectionStart;
+    codeInput.value = normalized;
+    try { codeInput.setSelectionRange(selStart, selStart); } catch(e){}
+  }
+
+  const val = codeInput.value.trim();
+
+  // 1. Toggle Clear Button
+  if (clearBtn) {
+    if (val.length > 0) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  // 2. Update Execute Button Text dynamically (e.g. "تنفيذ ( 2 ) ↵")
+  if (executeBtnText) {
+    if (val.length > 0) {
+      executeBtnText.textContent = `تنفيذ ( ${val} ) ↵`;
+    } else {
+      executeBtnText.textContent = 'تنفيذ ↵';
+    }
+  }
+
+  // 3. Update Live Code Badge
+  if (liveBadge && liveNum) {
+    if (val.length > 0) {
+      liveNum.textContent = val;
+      liveBadge.classList.remove('hidden');
+    } else {
+      liveBadge.classList.add('hidden');
+    }
+  }
+
+  // 4. Inline Found Item Hint (without dropdown list)
+  if (matchHint) {
+    if (val.length > 0 && Array.isArray(Store.products) && Store.products.length > 0) {
+      const q = val.toLowerCase();
+      const qNum = parseInt(val, 10);
+      const matched = Store.products.find(p => {
+        const b = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
+        const id = String(p.id != null ? p.id : '').trim().toLowerCase();
+        if (b && b === q) return true;
+        if (id && id === q) return true;
+        if (!isNaN(qNum) && parseInt(b, 10) === qNum) return true;
+        return false;
+      });
+      if (matched) {
+        matchHint.textContent = `✓ ${matched.name}`;
+        matchHint.classList.remove('hidden');
+      } else {
+        matchHint.classList.add('hidden');
+      }
+    } else {
+      matchHint.classList.add('hidden');
+    }
+  }
+};
+
+function setupSmartCodeEvents() {
+  const codeInput = document.getElementById('quickCodeManualInput');
 
   if (codeInput) {
-    codeInput.addEventListener('input', (e) => {
-      const val = (e.target.value || '').trim();
-      if (clearBtn) {
-        if (val.length > 0) clearBtn.classList.remove('hidden');
-        else clearBtn.classList.add('hidden');
-      }
+    codeInput.addEventListener('input', () => {
+      window.updateQuickCodeDisplay();
     });
 
     codeInput.addEventListener('keydown', (e) => {
@@ -1961,17 +2034,51 @@ function setupSmartCodeEvents() {
         window.triggerManualCodeSearch();
       }
     });
+
+    codeInput.addEventListener('focus', () => {
+      window.updateQuickCodeDisplay();
+    });
   }
+
+  // Global listener: If user types numbers while not focused on another input or open modal,
+  // automatically redirect digits to the code input so numbers are never lost!
+  window.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable);
+    if (isInput) return;
+
+    // Check if any modal is currently visible
+    const openModal = document.querySelector('[id^="modal-"]:not(.hidden), .modal-backdrop:not(.hidden)');
+    if (openModal) return;
+
+    // If typing digits 0-9 or Arabic digits
+    if (/^[0-9٠-٩]$/.test(e.key)) {
+      const quickInput = document.getElementById('quickCodeManualInput');
+      if (quickInput) {
+        quickInput.focus();
+        quickInput.value += window.normalizeArabicDigits(e.key);
+        window.updateQuickCodeDisplay();
+        e.preventDefault();
+      }
+    }
+  });
+
+  // Auto-focus code input on initial page load
+  setTimeout(() => {
+    const input = document.getElementById('quickCodeManualInput');
+    if (input && document.activeElement === document.body) {
+      input.focus();
+    }
+  }, 400);
 }
 
 window.clearQuickCodeInput = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
-  const clearBtn = document.getElementById('quickCodeClearBtn');
   if (codeInput) {
     codeInput.value = '';
     codeInput.focus();
   }
-  if (clearBtn) clearBtn.classList.add('hidden');
+  window.updateQuickCodeDisplay();
 };
 
 window.triggerCloudSyncManual = async function() {

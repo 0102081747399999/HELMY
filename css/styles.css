@@ -86,6 +86,87 @@ input[type="number"] {
   }
 }
 
+/* ==========================================================
+   SUPERIOR SMOOTH ROUNDED SYSTEM ("حواف دائرية عصرية فاخرة بالسستم")
+   ========================================================== */
+.rounded-3xl {
+  border-radius: 34px !important;
+}
+.rounded-2xl {
+  border-radius: 26px !important;
+}
+.rounded-xl {
+  border-radius: 18px !important;
+}
+.rounded-lg {
+  border-radius: 14px !important;
+}
+.rounded-md {
+  border-radius: 10px !important;
+}
+.rounded-full {
+  border-radius: 9999px !important;
+}
+
+/* Cards, Panels & KPI Containers deeply curved */
+.bg-slate-900\/90,
+.bg-slate-900,
+.bg-navy-card,
+.dark-glass-card {
+  border-radius: 26px !important;
+}
+
+/* Modals Deep Luxury Curved Corners */
+[id^="modal-"] > div:not(.modal-backdrop),
+.modal-animate,
+.modal-content {
+  border-radius: 36px !important;
+  overflow: hidden !important;
+}
+
+/* Input Fields & Dropdowns Smooth Circular Edges */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: 18px !important;
+}
+
+/* Category Filter Tabs & Badges as Circular Pills */
+[data-charger-tab],
+[data-cable-tab],
+[data-headphone-tab],
+[data-speaker-tab],
+[data-phone-brand],
+[data-cover-tab],
+[data-accessories-tab],
+[data-manual-sub],
+[data-sales-cat],
+[data-sales-date],
+nav a {
+  border-radius: 9999px !important;
+}
+
+/* Circular Buttons */
+button.rounded-xl,
+button.rounded-2xl {
+  border-radius: 20px !important;
+}
+button.rounded-full {
+  border-radius: 9999px !important;
+}
+
+/* Table Masking for perfectly curved corners */
+.overflow-hidden {
+  overflow: hidden !important;
+  border-radius: 26px !important;
+}
+table thead tr:first-child th:first-child {
+  border-top-right-radius: 24px !important;
+}
+table thead tr:first-child th:last-child {
+  border-top-left-radius: 24px !important;
+}
+
 /* ==========================================================================
    1. Dark Onyx Luxury POS Theme (Option 4 - Default Active Theme)
    ========================================================================== */
