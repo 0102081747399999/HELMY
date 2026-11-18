@@ -190,9 +190,9 @@
           العمليات والمالية
         </div>
 
-        <a href="javascript:void(0)" data-path="dashboard-overview" aria-current="page" class="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary text-white font-title-md shadow-md ring-1 ring-rose-500/40 transition-colors">
-          <span class="material-symbols-outlined text-xl text-white">analytics</span>
-          <span class="font-body-md text-sm">الإدارة والتقارير العامة</span>
+        <a href="javascript:void(0)" data-path="dashboard-overview" aria-current="page" class="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-600/30 via-yellow-600/20 to-amber-700/30 border border-amber-500/50 text-amber-300 font-bold shadow-md transition-colors">
+          <span class="material-symbols-outlined text-xl text-amber-400">admin_panel_settings</span>
+          <span class="font-body-md text-sm">👑 لوحة الإدارة العامة والتحكم</span>
         </a>
 
         <a href="javascript:void(0)" data-path="all-sales-master" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-navy-card hover:text-rose-400 transition-colors text-xs font-bold bg-rose-600/15 border border-rose-500/30">
@@ -321,56 +321,46 @@
       </div>
 
       <!-- Center: Smart Manual Code Input & Barcode / Camera -->
-      <div class="flex-1 max-w-2xl mx-2 sm:mx-4 flex items-center gap-2 relative">
+      <div class="flex-1 max-w-xl mx-2 sm:mx-4 flex items-center gap-2 relative">
         <div class="relative flex-1 group">
-          <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-rose-500 text-2xl pointer-events-none group-focus-within:text-amber-400 transition-colors">search</span>
+          <span class="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-rose-500 text-xl pointer-events-none group-focus-within:text-amber-400 transition-colors">search</span>
           <input 
             type="text" 
             id="quickCodeManualInput" 
             autocomplete="off"
             spellcheck="false"
             dir="rtl"
-            placeholder="⚡ اكتب الكود هنا (مثال: 70 أو 2)..." 
-            style="color: #fde047 !important; font-weight: 900 !important; font-size: 1.45rem !important; caret-color: #fde047;"
-            class="w-full h-14 bg-slate-950 border-2 border-rose-500/90 focus:border-amber-400 rounded-full pr-13 pl-56 sm:pl-64 text-xl sm:text-2xl font-numeric-table font-black tracking-widest placeholder:text-slate-500 placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:ring-4 focus:ring-amber-400/25 shadow-xl shadow-black/50 transition-all"
+            placeholder="اكتب الكود أو الباركود..." 
+            class="w-full h-11 sm:h-12 bg-slate-950 border-2 border-slate-700/80 focus:border-amber-400 rounded-full pr-10 pl-28 sm:pl-32 text-base sm:text-lg font-numeric-table font-bold text-white tracking-wider placeholder:text-slate-500 placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-400/25 shadow-md shadow-black/40 transition-all"
           />
-          <div class="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
-            <!-- Inline Found Item Match Hint -->
-            <span id="quickCodeMatchHint" class="hidden px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] sm:text-xs font-bold truncate max-w-[110px] sm:max-w-[150px] shadow-sm animate-pulse"></span>
-            
-            <!-- Live Code Preview Pill -->
-            <span id="quickCodeLiveBadge" class="hidden px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 text-xs sm:text-sm font-black flex items-center gap-1 shadow-sm">
-              <span class="text-[10px] text-amber-400/80">الكود:</span>
-              <strong id="quickCodeLiveNum" class="text-white text-sm sm:text-base font-numeric-table"></strong>
-            </span>
-
+          <div class="absolute left-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
             <!-- Clear Button -->
             <button 
               type="button" 
               id="quickCodeClearBtn"
               onclick="window.clearQuickCodeInput()" 
-              class="hidden w-9 h-9 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-all border border-slate-700/60" 
+              class="hidden w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-all border border-slate-700/60" 
               title="مسح">
-              <span class="material-symbols-outlined text-sm font-bold">close</span>
+              <span class="material-symbols-outlined text-xs sm:text-sm font-bold">close</span>
             </button>
 
             <!-- Execute Button -->
             <button 
               type="button" 
               onclick="window.triggerManualCodeSearch()" 
-              class="px-5 py-2.5 rounded-full bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-md shadow-rose-950/60 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shrink-0">
+              class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950/60 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shrink-0">
               <span id="quickCodeExecuteBtnText">تنفيذ ↵</span>
-              <span class="material-symbols-outlined text-sm">arrow_back</span>
+              <span class="material-symbols-outlined text-xs">arrow_back</span>
             </button>
           </div>
         </div>
-        <button type="button" onclick="window.openCameraScanner()" class="h-14 px-4 rounded-full bg-slate-900/90 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md" title="مسح باركود بالكاميرا (F3)">
-          <span class="material-symbols-outlined text-2xl">photo_camera</span>
+        <button type="button" onclick="window.openCameraScanner()" class="h-11 sm:h-12 px-3 sm:px-4 rounded-full bg-slate-900/90 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md" title="مسح باركود بالكاميرا (F3)">
+          <span class="material-symbols-outlined text-xl">photo_camera</span>
           <span class="text-xs font-bold hidden md:inline">كاميرا</span>
         </button>
-        <button type="button" onclick="window.openPhoneAccessModal()" class="h-14 px-4 rounded-full bg-slate-900/90 hover:bg-slate-800 text-sky-400 hover:text-sky-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md" title="تشغيل على الموبايل">
-          <span class="material-symbols-outlined text-2xl">smartphone</span>
-          <span class="text-xs font-bold hidden xl:inline">📱 موبايل</span>
+        <button type="button" onclick="window.openPhoneAccessModal()" class="h-11 sm:h-12 px-3 sm:px-4 rounded-full bg-slate-900/90 hover:bg-slate-800 text-sky-400 hover:text-sky-300 border border-slate-700/80 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md" title="تشغيل على الموبايل">
+          <span class="material-symbols-outlined text-xl">smartphone</span>
+          <span class="text-xs font-bold hidden xl:inline">موبايل</span>
         </button>
       </div>
 
@@ -540,6 +530,51 @@
             </div>
             <span id="stat-dash-low-stock" class="font-numeric-table font-bold text-2xl text-amber-400">0</span>
             <span class="text-[11px] text-on-surface-variant">أصناف خرجت من المخزن وتحتاج توريد</span>
+          </div>
+        </div>
+
+        <!-- Executive Management Direct Controls (لوحة التحكم السريع للإدارة) -->
+        <div class="bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-xl backdrop-blur-md flex flex-col gap-3 text-white">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400 text-xl">admin_panel_settings</span>
+              <h3 class="font-bold text-sm text-white">أوامر التحكم والإدارة المباشرة</h3>
+            </div>
+            <span class="text-xs text-amber-400 font-bold bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">الإدارة المركزية</span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button onclick="window.navigateTo('all-sales-master')" class="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 hover:border-rose-500/50 flex flex-col items-center gap-1.5 text-center transition-all cursor-pointer group">
+              <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined text-xl">receipt_long</span>
+              </div>
+              <span class="font-bold text-xs text-white">سجل المبيعات الشامل</span>
+              <span class="text-[10px] text-slate-400">كشف المبيعات والتواريخ</span>
+            </button>
+
+            <button onclick="window.navigateTo('manual-inventory')" class="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 hover:border-amber-500/50 flex flex-col items-center gap-1.5 text-center transition-all cursor-pointer group">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined text-xl">inventory_2</span>
+              </div>
+              <span class="font-bold text-xs text-white">إدارة مخازن البضاعة</span>
+              <span class="text-[10px] text-slate-400">8 أقسام ومخزن يدوي</span>
+            </button>
+
+            <button onclick="window.navigateTo('vodafone-monitor')" class="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 hover:border-sky-500/50 flex flex-col items-center gap-1.5 text-center transition-all cursor-pointer group">
+              <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined text-xl">query_stats</span>
+              </div>
+              <span class="font-bold text-xs text-white">إدارة الـ 18 خط كاش</span>
+              <span class="text-[10px] text-slate-400">الأرصدة والعمولات</span>
+            </button>
+
+            <button onclick="window.openOpeningCashModal()" class="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 hover:border-emerald-500/50 flex flex-col items-center gap-1.5 text-center transition-all cursor-pointer group">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined text-xl">payments</span>
+              </div>
+              <span class="font-bold text-xs text-white">درج النقدية والخزينة</span>
+              <span class="text-[10px] text-slate-400">السيولة والورديات</span>
+            </button>
           </div>
         </div>
 
@@ -1669,14 +1704,14 @@
         <div class="bg-slate-900/90 p-5 rounded-2xl shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md text-white">
           <div class="flex items-center gap-3">
             <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-600/20 to-red-600/30 border border-rose-500/40 text-rose-500 flex items-center justify-center shrink-0 shadow-sm">
-              <span class="material-symbols-outlined text-2xl">point_of_sale</span>
+              <span class="material-symbols-outlined text-2xl">receipt_long</span>
             </div>
             <div>
               <div class="flex items-center gap-2 flex-wrap">
-                <h2 class="font-bold text-on-surface text-lg">شاشة المبيعات الشاملة والبيع الكلي</h2>
+                <h2 class="font-bold text-on-surface text-lg">سجل المبيعات الشامل والتقارير التفصيلية</h2>
                 <span id="all-sales-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">0 فواتير مباعة</span>
               </div>
-              <p class="text-xs text-on-surface-variant mt-0.5">صفحة كبرى شاملة تعرض كل ما يتم بيعه في سنترال حلمي لجميع الأقسام + كتالوج البيع الشامل</p>
+              <p class="text-xs text-on-surface-variant mt-0.5">صفحة متكاملة تعرض كل ما يتم بيعه في سنترال حلمي بالتفصيل الدقيق والتواريخ والأسعار والأرباح</p>
             </div>
           </div>
 
@@ -1727,19 +1762,7 @@
           </div>
         </div>
 
-        <!-- Master Tabs: سجل المبيعات الشامل VS كتالوج البيع الشامل -->
-        <div class="flex items-center gap-2 border-b border-outline-variant/30 pb-3 flex-wrap">
-          <button onclick="window.switchAllSalesMasterTab('sales')" id="tab-btn-master-sales" class="px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 flex items-center gap-2 cursor-pointer">
-            <span class="material-symbols-outlined text-base">receipt_long</span>
-            <span>📜 سجل المبيعات الشامل (كل ما تم بيعه بالتفصيل والتواريخ)</span>
-          </button>
-          <button onclick="window.switchAllSalesMasterTab('catalog')" id="tab-btn-master-catalog" class="px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-2 cursor-pointer">
-            <span class="material-symbols-outlined text-base">storefront</span>
-            <span>🛍️ كتالوج البيع الشامل (كل الأصناف المعروضة للبيع بالمحل)</span>
-          </button>
-        </div>
-
-        <!-- TAB 1 CONTENT: سجل المبيعات الشامل -->
+        <!-- Sales Ledger Content (صفحة كاملة مخصصة لسجل المبيعات) -->
         <div id="master-sales-tab-content" class="flex flex-col gap-4">
           <!-- Filters Bar -->
           <div class="bg-slate-900/90 p-4 rounded-2xl shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 backdrop-blur-md text-white">
@@ -1773,46 +1796,28 @@
             </div>
           </div>
 
-          <!-- Master Sales Table -->
+          <!-- Master Sales Table (Compact & Screen-Fitted) -->
           <div class="bg-slate-900/90 rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col backdrop-blur-md text-white">
-            <div class="overflow-x-auto">
-              <table class="w-full text-right text-sm">
-                <thead class="bg-surface-container-low text-on-surface-variant border-b border-outline-variant/20 text-xs">
+            <div class="w-full overflow-hidden">
+              <table class="w-full table-fixed text-right text-xs">
+                <thead class="bg-slate-950/95 text-slate-300 border-b border-slate-800 text-[11px] font-bold">
                   <tr>
-                    <th class="py-3 px-4 font-bold">تاريخ وتوقيت البيع</th>
-                    <th class="py-3 px-4 font-bold">الكود / الفاتورة</th>
-                    <th class="py-3 px-4 font-bold">اسم الصنف والقسم</th>
-                    <th class="py-3 px-4 font-bold">الكمية</th>
-                    <th class="py-3 px-4 font-bold">سعر البيع</th>
-                    <th class="py-3 px-4 font-bold">الإجمالي</th>
-                    <th class="py-3 px-4 font-bold">صافي الربح</th>
-                    <th class="py-3 px-4 font-bold">العميل ورقم الهاتف</th>
-                    <th class="py-3 px-4 font-bold text-center">الإجراءات</th>
+                    <th class="w-[13%] py-2.5 px-2">تاريخ البيع</th>
+                    <th class="w-[12%] py-2.5 px-2">الفاتورة / الكود</th>
+                    <th class="w-[28%] py-2.5 px-2">الصنف والقسم</th>
+                    <th class="w-[6%] py-2.5 px-1 text-center">الكمية</th>
+                    <th class="w-[10%] py-2.5 px-1 text-center">سعر البيع</th>
+                    <th class="w-[11%] py-2.5 px-1 text-center">الإجمالي</th>
+                    <th class="w-[9%] py-2.5 px-1 text-center">الربح</th>
+                    <th class="w-[6%] py-2.5 px-1.5">العميل</th>
+                    <th class="w-[5%] py-2.5 px-1 text-center">إجراء</th>
                   </tr>
                 </thead>
-                <tbody id="all-sales-table-body" class="divide-y divide-outline-variant/10 text-xs">
+                <tbody id="all-sales-table-body" class="divide-y divide-slate-800/80 text-[11px]">
                   <!-- Populated by JS -->
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-
-        <!-- TAB 2 CONTENT: كتالوج البيع الشامل (كل ما يعرض للبيع) -->
-        <div id="master-catalog-tab-content" class="hidden flex flex-col gap-4">
-          <div class="bg-slate-900/90 p-4 rounded-2xl shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 backdrop-blur-md text-white">
-            <div class="flex items-center gap-2 flex-wrap" id="catalog-category-filter-pills">
-              <!-- Category filter pills generated by JS -->
-            </div>
-            <div class="relative flex-1 max-w-sm">
-              <span class="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg">search</span>
-              <input type="text" id="master-catalog-search-input" oninput="window.renderMasterCatalog()" placeholder="بحث سريع في المعروض للبيع..." class="w-full bg-surface-container-low text-on-surface rounded-xl pr-10 pl-4 py-2 text-xs border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-primary font-bold"/>
-            </div>
-          </div>
-
-          <!-- Catalog Cards Grid -->
-          <div id="master-catalog-cards-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            <!-- Populated by JS -->
           </div>
         </div>
 
@@ -6784,10 +6789,6 @@ window.normalizeArabicDigits = function(str) {
 window.updateQuickCodeDisplay = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
   const clearBtn = document.getElementById('quickCodeClearBtn');
-  const executeBtnText = document.getElementById('quickCodeExecuteBtnText');
-  const liveBadge = document.getElementById('quickCodeLiveBadge');
-  const liveNum = document.getElementById('quickCodeLiveNum');
-  const matchHint = document.getElementById('quickCodeMatchHint');
 
   if (!codeInput) return;
 
@@ -6802,53 +6803,10 @@ window.updateQuickCodeDisplay = function() {
 
   const val = codeInput.value.trim();
 
-  // 1. Toggle Clear Button
+  // Toggle Clear Button
   if (clearBtn) {
     if (val.length > 0) clearBtn.classList.remove('hidden');
     else clearBtn.classList.add('hidden');
-  }
-
-  // 2. Update Execute Button Text dynamically (e.g. "تنفيذ ( 2 ) ↵")
-  if (executeBtnText) {
-    if (val.length > 0) {
-      executeBtnText.textContent = `تنفيذ ( ${val} ) ↵`;
-    } else {
-      executeBtnText.textContent = 'تنفيذ ↵';
-    }
-  }
-
-  // 3. Update Live Code Badge
-  if (liveBadge && liveNum) {
-    if (val.length > 0) {
-      liveNum.textContent = val;
-      liveBadge.classList.remove('hidden');
-    } else {
-      liveBadge.classList.add('hidden');
-    }
-  }
-
-  // 4. Inline Found Item Hint (without dropdown list)
-  if (matchHint) {
-    if (val.length > 0 && Array.isArray(Store.products) && Store.products.length > 0) {
-      const q = val.toLowerCase();
-      const qNum = parseInt(val, 10);
-      const matched = Store.products.find(p => {
-        const b = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
-        const id = String(p.id != null ? p.id : '').trim().toLowerCase();
-        if (b && b === q) return true;
-        if (id && id === q) return true;
-        if (!isNaN(qNum) && parseInt(b, 10) === qNum) return true;
-        return false;
-      });
-      if (matched) {
-        matchHint.textContent = `✓ ${matched.name}`;
-        matchHint.classList.remove('hidden');
-      } else {
-        matchHint.classList.add('hidden');
-      }
-    } else {
-      matchHint.classList.add('hidden');
-    }
   }
 };
 
@@ -9332,39 +9290,8 @@ export function renderAllSalesMasterPage() {
   setElemText('all-sales-kpi-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('all-sales-kpi-unique-items', `${allProducts.length} صنف مسجل`);
 
-  const activeTab = AppState.activeAllSalesTab || 'sales';
-  if (activeTab === 'sales') {
-    renderMasterSalesTable(allSales);
-  } else {
-    renderMasterCatalog();
-  }
+  renderMasterSalesTable(allSales);
 }
-
-window.switchAllSalesMasterTab = function(tab) {
-  AppState.activeAllSalesTab = tab;
-  const isSales = (tab === 'sales');
-  
-  const tabBtnSales = document.getElementById('tab-btn-master-sales') || document.getElementById('all-sales-tab-sales');
-  const tabBtnCatalog = document.getElementById('tab-btn-master-catalog') || document.getElementById('all-sales-tab-catalog');
-  const salesContainer = document.getElementById('master-sales-tab-content') || document.getElementById('master-tab-sales-container');
-  const catalogContainer = document.getElementById('master-catalog-tab-content') || document.getElementById('master-tab-catalog-container');
-
-  if (tabBtnSales) {
-    tabBtnSales.className = isSales 
-      ? 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 flex items-center gap-2 cursor-pointer'
-      : 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-2 cursor-pointer';
-  }
-  if (tabBtnCatalog) {
-    tabBtnCatalog.className = !isSales 
-      ? 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 flex items-center gap-2 cursor-pointer'
-      : 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-2 cursor-pointer';
-  }
-
-  if (salesContainer) salesContainer.classList.toggle('hidden', !isSales);
-  if (catalogContainer) catalogContainer.classList.toggle('hidden', isSales);
-
-  renderAllSalesMasterPage();
-};
 
 window.setAllSalesCategoryFilter = function(cat) {
   AppState.activeAllSalesCategoryFilter = cat;
@@ -9458,45 +9385,45 @@ function renderMasterSalesTable(allSales) {
       : (totalRow - ((item.buyPrice || 0) * (item.quantity || 1)));
     const catName = getCategoryArabicName(item.category);
     return `
-      <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
-        <td class="py-3 px-4 font-numeric-table text-on-surface font-medium whitespace-nowrap">
-          <div class="font-bold">${formatDateArabic(item.timestamp)}</div>
-          <span class="text-[10px] text-on-surface-variant">${formatTime(item.timestamp)}</span>
+      <tr class="border-b border-slate-800/80 hover:bg-slate-800/40 transition-colors text-[11px] leading-tight">
+        <td class="py-2 px-2 text-slate-300 font-numeric-table">
+          <div class="font-bold text-white text-[11px] leading-none mb-0.5 truncate">${formatDateArabic(item.timestamp)}</div>
+          <span class="text-[10px] text-slate-400 font-mono">${formatTime(item.timestamp)}</span>
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm whitespace-nowrap">
-          <div>${item.invoiceNumber || 'INV-DIRECT'}</div>
-          ${item.barcode ? `<span class="text-[11px] text-on-surface-variant font-mono">#${item.barcode}</span>` : ''}
+        <td class="py-2 px-2 font-numeric-table">
+          <div class="font-bold text-sky-400 text-xs truncate leading-none mb-0.5">${item.invoiceNumber || 'INV-DIRECT'}</div>
+          ${item.barcode ? `<span class="text-[10px] text-slate-400 font-mono truncate block leading-none">#${item.barcode}</span>` : ''}
         </td>
-        <td class="py-3 px-4">
-          <div class="font-bold text-on-surface text-sm">${item.name}</div>
-          <span class="inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface-container text-on-surface-variant">${catName}</span>
+        <td class="py-2 px-2 overflow-hidden">
+          <div class="font-bold text-white text-xs truncate leading-tight" title="${item.name}">${item.name}</div>
+          <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300 border border-slate-700/60 truncate max-w-full">${catName}</span>
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold text-on-surface text-center whitespace-nowrap">
-          ${item.quantity || 1} حبة
+        <td class="py-2 px-1 font-numeric-table font-bold text-white text-center">
+          ${item.quantity || 1}
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold text-slate-300 text-sm whitespace-nowrap">
-          ${formatMoney(item.price)} ج.م
+        <td class="py-2 px-1 font-numeric-table font-bold text-slate-300 text-center">
+          ${formatMoney(item.price)}
         </td>
-        <td class="py-3 px-4 font-numeric-table font-extrabold text-emerald-400 text-sm whitespace-nowrap">
-          ${formatMoney(totalRow)} ج.م
+        <td class="py-2 px-1 font-numeric-table font-extrabold text-emerald-400 text-center">
+          ${formatMoney(totalRow)}
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-sm whitespace-nowrap">
-          ${profit >= 0 ? '+' : ''}${formatMoney(profit)} ج.م
+        <td class="py-2 px-1 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-center">
+          ${profit >= 0 ? '+' : ''}${formatMoney(profit)}
         </td>
-        <td class="py-3 px-4">
-          <div class="font-bold text-on-surface">${item.customerName || 'عميل نقدي'}</div>
-          ${item.customerPhone ? `<div class="text-[11px] font-numeric-table text-on-surface-variant flex items-center gap-1 mt-0.5"><span class="material-symbols-outlined text-[13px]">call</span>${item.customerPhone}</div>` : ''}
+        <td class="py-2 px-1.5 overflow-hidden">
+          <div class="font-bold text-slate-200 text-[11px] truncate" title="${item.customerName || 'عميل نقدي'}">${item.customerName || 'نقدي'}</div>
+          ${item.customerPhone ? `<div class="text-[9px] font-numeric-table text-slate-400 font-mono truncate">${item.customerPhone}</div>` : ''}
         </td>
-        <td class="py-3 px-4 text-center whitespace-nowrap">
-          <div class="flex items-center justify-center gap-1.5">
-            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة وعرض الفاتورة" class="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary cursor-pointer">
-              <span class="material-symbols-outlined text-[17px]">receipt_long</span>
+        <td class="py-2 px-1 text-center">
+          <div class="flex items-center justify-center gap-1">
+            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة الفاتورة" class="p-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[14px]">receipt_long</span>
             </button>
-            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer">
-              <span class="material-symbols-outlined text-[17px]">edit</span>
+            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[14px]">edit</span>
             </button>
-            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف عملية البيع واسترجاع المخزون" class="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer">
-              <span class="material-symbols-outlined text-[17px]">delete_forever</span>
+            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف واسترجاع" class="p-1 rounded bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[14px]">delete</span>
             </button>
           </div>
         </td>

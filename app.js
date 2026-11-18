@@ -1952,10 +1952,6 @@ window.normalizeArabicDigits = function(str) {
 window.updateQuickCodeDisplay = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
   const clearBtn = document.getElementById('quickCodeClearBtn');
-  const executeBtnText = document.getElementById('quickCodeExecuteBtnText');
-  const liveBadge = document.getElementById('quickCodeLiveBadge');
-  const liveNum = document.getElementById('quickCodeLiveNum');
-  const matchHint = document.getElementById('quickCodeMatchHint');
 
   if (!codeInput) return;
 
@@ -1970,53 +1966,10 @@ window.updateQuickCodeDisplay = function() {
 
   const val = codeInput.value.trim();
 
-  // 1. Toggle Clear Button
+  // Toggle Clear Button
   if (clearBtn) {
     if (val.length > 0) clearBtn.classList.remove('hidden');
     else clearBtn.classList.add('hidden');
-  }
-
-  // 2. Update Execute Button Text dynamically (e.g. "تنفيذ ( 2 ) ↵")
-  if (executeBtnText) {
-    if (val.length > 0) {
-      executeBtnText.textContent = `تنفيذ ( ${val} ) ↵`;
-    } else {
-      executeBtnText.textContent = 'تنفيذ ↵';
-    }
-  }
-
-  // 3. Update Live Code Badge
-  if (liveBadge && liveNum) {
-    if (val.length > 0) {
-      liveNum.textContent = val;
-      liveBadge.classList.remove('hidden');
-    } else {
-      liveBadge.classList.add('hidden');
-    }
-  }
-
-  // 4. Inline Found Item Hint (without dropdown list)
-  if (matchHint) {
-    if (val.length > 0 && Array.isArray(Store.products) && Store.products.length > 0) {
-      const q = val.toLowerCase();
-      const qNum = parseInt(val, 10);
-      const matched = Store.products.find(p => {
-        const b = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
-        const id = String(p.id != null ? p.id : '').trim().toLowerCase();
-        if (b && b === q) return true;
-        if (id && id === q) return true;
-        if (!isNaN(qNum) && parseInt(b, 10) === qNum) return true;
-        return false;
-      });
-      if (matched) {
-        matchHint.textContent = `✓ ${matched.name}`;
-        matchHint.classList.remove('hidden');
-      } else {
-        matchHint.classList.add('hidden');
-      }
-    } else {
-      matchHint.classList.add('hidden');
-    }
   }
 };
 
@@ -4500,39 +4453,8 @@ export function renderAllSalesMasterPage() {
   setElemText('all-sales-kpi-profit-val', `+${formatMoney(totalProfitVal)} ج.م`);
   setElemText('all-sales-kpi-unique-items', `${allProducts.length} صنف مسجل`);
 
-  const activeTab = AppState.activeAllSalesTab || 'sales';
-  if (activeTab === 'sales') {
-    renderMasterSalesTable(allSales);
-  } else {
-    renderMasterCatalog();
-  }
+  renderMasterSalesTable(allSales);
 }
-
-window.switchAllSalesMasterTab = function(tab) {
-  AppState.activeAllSalesTab = tab;
-  const isSales = (tab === 'sales');
-  
-  const tabBtnSales = document.getElementById('tab-btn-master-sales') || document.getElementById('all-sales-tab-sales');
-  const tabBtnCatalog = document.getElementById('tab-btn-master-catalog') || document.getElementById('all-sales-tab-catalog');
-  const salesContainer = document.getElementById('master-sales-tab-content') || document.getElementById('master-tab-sales-container');
-  const catalogContainer = document.getElementById('master-catalog-tab-content') || document.getElementById('master-tab-catalog-container');
-
-  if (tabBtnSales) {
-    tabBtnSales.className = isSales 
-      ? 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 flex items-center gap-2 cursor-pointer'
-      : 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-2 cursor-pointer';
-  }
-  if (tabBtnCatalog) {
-    tabBtnCatalog.className = !isSales 
-      ? 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-primary text-white shadow-sm ring-1 ring-rose-500/40 flex items-center gap-2 cursor-pointer'
-      : 'px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-2 cursor-pointer';
-  }
-
-  if (salesContainer) salesContainer.classList.toggle('hidden', !isSales);
-  if (catalogContainer) catalogContainer.classList.toggle('hidden', isSales);
-
-  renderAllSalesMasterPage();
-};
 
 window.setAllSalesCategoryFilter = function(cat) {
   AppState.activeAllSalesCategoryFilter = cat;
@@ -4626,45 +4548,45 @@ function renderMasterSalesTable(allSales) {
       : (totalRow - ((item.buyPrice || 0) * (item.quantity || 1)));
     const catName = getCategoryArabicName(item.category);
     return `
-      <tr class="border-b border-surface-container-low hover:bg-surface-container-high transition-colors text-xs">
-        <td class="py-3 px-4 font-numeric-table text-on-surface font-medium whitespace-nowrap">
-          <div class="font-bold">${formatDateArabic(item.timestamp)}</div>
-          <span class="text-[10px] text-on-surface-variant">${formatTime(item.timestamp)}</span>
+      <tr class="border-b border-slate-800/80 hover:bg-slate-800/40 transition-colors text-[11px] leading-tight">
+        <td class="py-2 px-2 text-slate-300 font-numeric-table">
+          <div class="font-bold text-white text-[11px] leading-none mb-0.5 truncate">${formatDateArabic(item.timestamp)}</div>
+          <span class="text-[10px] text-slate-400 font-mono">${formatTime(item.timestamp)}</span>
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold text-secondary text-sm whitespace-nowrap">
-          <div>${item.invoiceNumber || 'INV-DIRECT'}</div>
-          ${item.barcode ? `<span class="text-[11px] text-on-surface-variant font-mono">#${item.barcode}</span>` : ''}
+        <td class="py-2 px-2 font-numeric-table">
+          <div class="font-bold text-sky-400 text-xs truncate leading-none mb-0.5">${item.invoiceNumber || 'INV-DIRECT'}</div>
+          ${item.barcode ? `<span class="text-[10px] text-slate-400 font-mono truncate block leading-none">#${item.barcode}</span>` : ''}
         </td>
-        <td class="py-3 px-4">
-          <div class="font-bold text-on-surface text-sm">${item.name}</div>
-          <span class="inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface-container text-on-surface-variant">${catName}</span>
+        <td class="py-2 px-2 overflow-hidden">
+          <div class="font-bold text-white text-xs truncate leading-tight" title="${item.name}">${item.name}</div>
+          <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300 border border-slate-700/60 truncate max-w-full">${catName}</span>
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold text-on-surface text-center whitespace-nowrap">
-          ${item.quantity || 1} حبة
+        <td class="py-2 px-1 font-numeric-table font-bold text-white text-center">
+          ${item.quantity || 1}
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold text-slate-300 text-sm whitespace-nowrap">
-          ${formatMoney(item.price)} ج.م
+        <td class="py-2 px-1 font-numeric-table font-bold text-slate-300 text-center">
+          ${formatMoney(item.price)}
         </td>
-        <td class="py-3 px-4 font-numeric-table font-extrabold text-emerald-400 text-sm whitespace-nowrap">
-          ${formatMoney(totalRow)} ج.م
+        <td class="py-2 px-1 font-numeric-table font-extrabold text-emerald-400 text-center">
+          ${formatMoney(totalRow)}
         </td>
-        <td class="py-3 px-4 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-sm whitespace-nowrap">
-          ${profit >= 0 ? '+' : ''}${formatMoney(profit)} ج.م
+        <td class="py-2 px-1 font-numeric-table font-bold ${profit >= 0 ? 'text-teal-400' : 'text-rose-400'} text-center">
+          ${profit >= 0 ? '+' : ''}${formatMoney(profit)}
         </td>
-        <td class="py-3 px-4">
-          <div class="font-bold text-on-surface">${item.customerName || 'عميل نقدي'}</div>
-          ${item.customerPhone ? `<div class="text-[11px] font-numeric-table text-on-surface-variant flex items-center gap-1 mt-0.5"><span class="material-symbols-outlined text-[13px]">call</span>${item.customerPhone}</div>` : ''}
+        <td class="py-2 px-1.5 overflow-hidden">
+          <div class="font-bold text-slate-200 text-[11px] truncate" title="${item.customerName || 'عميل نقدي'}">${item.customerName || 'نقدي'}</div>
+          ${item.customerPhone ? `<div class="text-[9px] font-numeric-table text-slate-400 font-mono truncate">${item.customerPhone}</div>` : ''}
         </td>
-        <td class="py-3 px-4 text-center whitespace-nowrap">
-          <div class="flex items-center justify-center gap-1.5">
-            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة وعرض الفاتورة" class="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary cursor-pointer">
-              <span class="material-symbols-outlined text-[17px]">receipt_long</span>
+        <td class="py-2 px-1 text-center">
+          <div class="flex items-center justify-center gap-1">
+            <button onclick="window.printInvoiceReceipt('${item.invoiceId}')" title="طباعة الفاتورة" class="p-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[14px]">receipt_long</span>
             </button>
-            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer">
-              <span class="material-symbols-outlined text-[17px]">edit</span>
+            <button onclick="window.openEditSaleModal('${item.invoiceId}', ${item.itemIndex})" title="تعديل عملية البيع" class="p-1 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[14px]">edit</span>
             </button>
-            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف عملية البيع واسترجاع المخزون" class="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer">
-              <span class="material-symbols-outlined text-[17px]">delete_forever</span>
+            <button onclick="window.confirmDeleteSale('${item.invoiceId}')" title="حذف واسترجاع" class="p-1 rounded bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 cursor-pointer transition-colors">
+              <span class="material-symbols-outlined text-[14px]">delete</span>
             </button>
           </div>
         </td>
