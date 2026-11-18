@@ -1333,7 +1333,7 @@ function renderChargersPage() {
 
   let filtered = allChargers;
   if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
-  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+  if (search) filtered = filtered.filter(p => String(p.name || '').toLowerCase().includes(search) || String(p.barcode || '').toLowerCase().includes(search));
 
   // Render Inventory Table
   const tbody = document.getElementById('chargers-table-body');
@@ -1435,7 +1435,7 @@ function renderCablesPage() {
 
   let filtered = allCables;
   if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
-  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+  if (search) filtered = filtered.filter(p => String(p.name || '').toLowerCase().includes(search) || String(p.barcode || '').toLowerCase().includes(search));
 
   const tbody = document.getElementById('cables-table-body');
   if (tbody) {
@@ -1535,7 +1535,7 @@ function renderHeadphonesPage() {
 
   let filtered = allHeadphones;
   if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
-  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+  if (search) filtered = filtered.filter(p => String(p.name || '').toLowerCase().includes(search) || String(p.barcode || '').toLowerCase().includes(search));
 
   const tbody = document.getElementById('headphones-table-body');
   if (tbody) {
@@ -1632,7 +1632,7 @@ function renderSpeakersPage() {
 
   let filtered = allSpeakers;
   if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
-  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+  if (search) filtered = filtered.filter(p => String(p.name || '').toLowerCase().includes(search) || String(p.barcode || '').toLowerCase().includes(search));
 
   const tbody = document.getElementById('speakersTableBody');
   if (tbody) {
@@ -1726,9 +1726,9 @@ function renderPhonesPage() {
   if (activeStatus !== 'all') filtered = filtered.filter(p => p.status === activeStatus);
   if (search) {
     filtered = filtered.filter(p => 
-      (p.name || '').toLowerCase().includes(search) || 
-      (p.imei || '').toLowerCase().includes(search) ||
-      (p.barcode || '').toLowerCase().includes(search)
+      String(p.name || '').toLowerCase().includes(search) || 
+      String(p.imei || '').toLowerCase().includes(search) ||
+      String(p.barcode || '').toLowerCase().includes(search)
     );
   }
 
@@ -1838,7 +1838,7 @@ function renderCoversPage() {
 
   let filtered = allCovers;
   if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
-  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+  if (search) filtered = filtered.filter(p => String(p.name || '').toLowerCase().includes(search) || String(p.barcode || '').toLowerCase().includes(search));
 
   const tbody = document.getElementById('covers-table-body');
   if (tbody) {
@@ -1941,7 +1941,7 @@ function renderAccessoriesPage() {
 
   let filtered = allAcc;
   if (activeTab !== 'all') filtered = filtered.filter(p => p.subcategory === activeTab);
-  if (search) filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(search) || (p.barcode || '').toLowerCase().includes(search));
+  if (search) filtered = filtered.filter(p => String(p.name || '').toLowerCase().includes(search) || String(p.barcode || '').toLowerCase().includes(search));
 
   const tbody = document.getElementById('accessories-table-body');
   if (tbody) {
@@ -2014,10 +2014,183 @@ function setupSmartCodeEvents() {
       if (e.key === 'Enter') {
         e.preventDefault();
         window.triggerManualCodeSearch();
+      } else if (e.key === 'Escape') {
+        const dropdown = document.getElementById('quick-code-live-dropdown');
+        if (dropdown) dropdown.classList.add('hidden');
       }
     });
   }
+
+  // Close live dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('quick-code-live-dropdown');
+    const input = document.getElementById('quickCodeManualInput');
+    if (!dropdown || dropdown.classList.contains('hidden')) return;
+    if (input && input.contains(e.target)) return;
+    if (dropdown.contains(e.target)) return;
+    dropdown.classList.add('hidden');
+  });
 }
+
+window.clearQuickCodeInput = function() {
+  const codeInput = document.getElementById('quickCodeManualInput');
+  const clearBtn = document.getElementById('quickCodeClearBtn');
+  const dropdown = document.getElementById('quick-code-live-dropdown');
+  if (codeInput) {
+    codeInput.value = '';
+    codeInput.focus();
+  }
+  if (clearBtn) clearBtn.classList.add('hidden');
+  if (dropdown) dropdown.classList.add('hidden');
+};
+
+window.handleQuickCodeLiveSearch = function(rawVal) {
+  const clearBtn = document.getElementById('quickCodeClearBtn');
+  const dropdown = document.getElementById('quick-code-live-dropdown');
+  if (!dropdown) return;
+
+  const val = String(rawVal || '').trim();
+  if (clearBtn) {
+    if (val.length > 0) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  if (!val) {
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+    return;
+  }
+
+  const q = val.toLowerCase();
+  const qNum = parseInt(val, 10);
+
+  // Search matching products in Store.products
+  const matches = (Store.products || []).filter(p => {
+    const bStr = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
+    const imeiStr = String(p.imei != null ? p.imei : '').trim().toLowerCase();
+    const nameStr = String(p.name != null ? p.name : '').trim().toLowerCase();
+    const idStr = String(p.id != null ? p.id : '').trim().toLowerCase();
+
+    // 1. Direct code/barcode/IMEI matches
+    if (bStr === q || imeiStr === q || idStr === q) return true;
+    if (!isNaN(qNum)) {
+      const bNum = parseInt(bStr, 10);
+      if (!isNaN(bNum) && bNum === qNum) return true;
+    }
+    // 2. Partial matches on barcode or IMEI
+    if (bStr.includes(q) || imeiStr.includes(q)) return true;
+    // 3. Name matches
+    if (nameStr.includes(q)) return true;
+    return false;
+  });
+
+  // Sort: exact code match first, then barcode startswith, then in-stock
+  matches.sort((a, b) => {
+    const aBar = String(a.barcode != null ? a.barcode : '').trim().toLowerCase();
+    const bBar = String(b.barcode != null ? b.barcode : '').trim().toLowerCase();
+    if (aBar === q && bBar !== q) return -1;
+    if (bBar === q && aBar !== q) return 1;
+    if (aBar.startsWith(q) && !bBar.startsWith(q)) return -1;
+    if (bBar.startsWith(q) && !aBar.startsWith(q)) return 1;
+    return (b.quantity || 0) - (a.quantity || 0);
+  });
+
+  const topMatches = matches.slice(0, 8);
+
+  if (topMatches.length === 0) {
+    dropdown.innerHTML = `
+      <div class="p-4 text-center">
+        <div class="flex items-center justify-center gap-2 text-rose-400 font-bold text-sm mb-1">
+          <span class="material-symbols-outlined text-lg">search_off</span>
+          <span>لا يوجد صنف مسجل بالكود أو الاسم: <span class="text-white underline font-numeric-table font-black">"${val}"</span></span>
+        </div>
+        <p class="text-xs text-slate-400 mb-3">يمكنك تسجيل هذا الكود كصنف جديد فوراً وإدخاله بالمخزن الآن</p>
+        <button 
+          type="button" 
+          onclick="window.quickAddNewProductFromSearch('${val.replace(/'/g, "\\'")}')" 
+          class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 mx-auto cursor-pointer">
+          <span class="material-symbols-outlined text-sm">add_circle</span>
+          <span>+ تسجيل صنف جديد بكود [${val}]</span>
+        </button>
+      </div>
+    `;
+    dropdown.classList.remove('hidden');
+    return;
+  }
+
+  // Render matching products
+  dropdown.innerHTML = `
+    <div class="p-2.5 bg-slate-950/90 text-xs font-bold text-slate-300 flex items-center justify-between border-b border-slate-800">
+      <span class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>نتائج البحث الفوري (${matches.length} صنف مطابق)</span>
+      </span>
+      <span class="text-[11px] text-rose-400">اضغط للبيع أو التوريد</span>
+    </div>
+    <div class="divide-y divide-slate-800/80">
+      ${topMatches.map(p => {
+        const pCode = p.barcode || p.imei || p.id || 'بدون كود';
+        const inStock = (p.quantity || 0) > 0;
+        const safeCode = String(pCode).replace(/'/g, "\\'");
+        return `
+          <div class="p-2.5 sm:p-3 hover:bg-slate-800/90 transition-colors flex items-center justify-between gap-3 cursor-pointer group" onclick="window.selectQuickSearchResult('${safeCode}', 'choose')">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="px-2.5 py-1 rounded-lg bg-rose-600/20 border border-rose-500/40 text-rose-300 font-numeric-table font-black text-xs shrink-0 shadow-xs">
+                #${pCode}
+              </span>
+              <div class="min-w-0">
+                <div class="font-bold text-white text-xs sm:text-sm group-hover:text-rose-400 transition-colors truncate">
+                  ${p.name}
+                </div>
+                <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5 flex-wrap">
+                  <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">${getCategoryArabicName(p.category)}</span>
+                  <span>المخزن: <b class="${inStock ? 'text-emerald-400' : 'text-rose-400 font-black'}">${p.quantity || 0}</b> قطع</span>
+                  <span>السعر: <b class="text-amber-300 font-numeric-table font-bold">${formatMoney(p.sellPrice)} ج.م</b></span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0" onclick="event.stopPropagation()">
+              <button 
+                type="button" 
+                onclick="window.selectQuickSearchResult('${safeCode}', 'sale')" 
+                class="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm flex items-center gap-1 cursor-pointer transition-colors"
+                title="بيع فوري">
+                <span>💰</span>
+                <span>بيع</span>
+              </button>
+              <button 
+                type="button" 
+                onclick="window.selectQuickSearchResult('${safeCode}', 'restock')" 
+                class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm flex items-center gap-1 cursor-pointer transition-colors"
+                title="توريد مخزون">
+                <span>+</span>
+                <span>توريد</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    ${matches.length > topMatches.length ? `
+      <div class="p-2 bg-slate-950/60 text-center text-[11px] text-slate-400 font-bold">
+        يوجد ${matches.length - topMatches.length} نتائج إضافية... اكتب الكود كاملاً أو اضغط تنفيذ
+      </div>
+    ` : ''}
+  `;
+  dropdown.classList.remove('hidden');
+};
+
+window.selectQuickSearchResult = function(code, action = 'choose') {
+  const dropdown = document.getElementById('quick-code-live-dropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+  window.openSmartCodeActionModal(code, action);
+};
+
+window.quickAddNewProductFromSearch = function(code) {
+  const dropdown = document.getElementById('quick-code-live-dropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+  window.openAddProductModal(getDefaultCategoryForCurrentView(), null, code);
+};
 
 window.triggerCloudSyncManual = async function() {
   showToast("⏳ جاري مزامنة ورفع كافة بيانات المحل إلى سحابة فيربيز (helmy-10237)...", "info", 3000);
@@ -2033,26 +2206,58 @@ window.triggerCloudSyncManual = async function() {
 
 window.triggerManualCodeSearch = function() {
   const codeInput = document.getElementById('quickCodeManualInput');
+  const dropdown = document.getElementById('quick-code-live-dropdown');
   if (!codeInput) return;
   const val = codeInput.value.trim();
   if (!val) {
     showToast("يرجى كتابة رقم الكود أو الباركود أولاً", "warning");
     return;
   }
+  if (dropdown) dropdown.classList.add('hidden');
   handleScannedBarcode(val);
-  codeInput.value = '';
 };
 
 window.openSmartCodeActionModal = function(code, defaultAction = 'choose') {
   if (!code) return;
-  const cleanCode = code.trim();
+  const cleanCode = String(code).trim();
+  if (!cleanCode) return;
 
-  // Find product by barcode, code, IMEI, or ID
-  const prod = Store.products.find(p => 
-    (p.barcode && p.barcode.trim().toLowerCase() === cleanCode.toLowerCase()) ||
-    (p.imei && p.imei.trim().toLowerCase() === cleanCode.toLowerCase()) ||
-    (p.id && String(p.id).trim().toLowerCase() === cleanCode.toLowerCase())
-  );
+  const q = cleanCode.toLowerCase();
+  const qNum = parseInt(cleanCode, 10);
+
+  // 1. Exact match on barcode, IMEI, or ID
+  let prod = Store.products.find(p => {
+    const bStr = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
+    const imeiStr = String(p.imei != null ? p.imei : '').trim().toLowerCase();
+    const idStr = String(p.id != null ? p.id : '').trim().toLowerCase();
+    return (bStr && bStr === q) || (imeiStr && imeiStr === q) || (idStr && idStr === q);
+  });
+
+  // 2. Numeric match (e.g., "70" matches numeric 70 or 070)
+  if (!prod && !isNaN(qNum)) {
+    prod = Store.products.find(p => {
+      const bStr = String(p.barcode != null ? p.barcode : '').trim();
+      const bNum = parseInt(bStr, 10);
+      return !isNaN(bNum) && bNum === qNum;
+    });
+  }
+
+  // 3. Substring / Containment fallback
+  if (!prod) {
+    prod = Store.products.find(p => {
+      const bStr = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
+      const imeiStr = String(p.imei != null ? p.imei : '').trim().toLowerCase();
+      return (bStr && (bStr.includes(q) || q.includes(bStr))) || (imeiStr && imeiStr.includes(q));
+    });
+  }
+
+  // 4. Product Name fallback
+  if (!prod) {
+    prod = Store.products.find(p => {
+      const nameStr = String(p.name != null ? p.name : '').trim().toLowerCase();
+      return nameStr && nameStr.includes(q);
+    });
+  }
 
   if (!prod) {
     playScanBeep(false);
@@ -2320,10 +2525,18 @@ export function handleScannedBarcode(barcode, targetField = null) {
   // 2. If Quick POS is currently open
   const posModal = document.getElementById('modal-quick-pos');
   if (targetField === 'pos' || (posModal && !posModal.classList.contains('hidden'))) {
-    const product = Store.products.find(p => 
-      (p.barcode && p.barcode.trim().toLowerCase() === cleanCode.toLowerCase()) ||
-      (p.imei && p.imei.trim().toLowerCase() === cleanCode.toLowerCase())
-    );
+    const q = cleanCode.toLowerCase();
+    const qNum = parseInt(cleanCode, 10);
+    const product = Store.products.find(p => {
+      const bStr = String(p.barcode != null ? p.barcode : '').trim().toLowerCase();
+      const imeiStr = String(p.imei != null ? p.imei : '').trim().toLowerCase();
+      if (bStr === q || imeiStr === q) return true;
+      if (!isNaN(qNum)) {
+        const bNum = parseInt(bStr, 10);
+        if (!isNaN(bNum) && bNum === qNum) return true;
+      }
+      return false;
+    });
 
     if (product) {
       if (product.category === 'phones' && product.status === 'sold') {
@@ -2993,7 +3206,11 @@ function setupQuickPOS() {
 
   window.addItemToCartFromBarcode = (barcode) => {
     if (!barcode) return;
-    const prod = Store.products.find(p => p.barcode === barcode || p.imei === barcode);
+    const bStr = String(barcode).trim().toLowerCase();
+    const prod = Store.products.find(p => 
+      (p.barcode != null && String(p.barcode).trim().toLowerCase() === bStr) || 
+      (p.imei != null && String(p.imei).trim().toLowerCase() === bStr)
+    );
     if (prod) {
       window.triggerQuickPOS();
       addItemToCart(prod);
@@ -3051,9 +3268,9 @@ function renderPOSCatalog(category = 'all', searchQuery = '') {
   }
   if (searchQuery) {
     items = items.filter(p => 
-      (p.name || '').toLowerCase().includes(searchQuery) ||
-      (p.barcode || '').toLowerCase().includes(searchQuery) ||
-      (p.imei || '').toLowerCase().includes(searchQuery)
+      String(p.name || '').toLowerCase().includes(searchQuery) ||
+      String(p.barcode || '').toLowerCase().includes(searchQuery) ||
+      String(p.imei || '').toLowerCase().includes(searchQuery)
     );
   }
 
@@ -4159,10 +4376,10 @@ export function renderManualInventoryPage() {
   let filteredSales = sales;
   if (salesSearch) {
     filteredSales = filteredSales.filter(s => 
-      (s.name || '').toLowerCase().includes(salesSearch) ||
-      (s.barcode || '').toLowerCase().includes(salesSearch) ||
-      (s.customerName || '').toLowerCase().includes(salesSearch) ||
-      (s.invoiceNumber || '').toLowerCase().includes(salesSearch)
+      String(s.name || '').toLowerCase().includes(salesSearch) ||
+      String(s.barcode || '').toLowerCase().includes(salesSearch) ||
+      String(s.customerName || '').toLowerCase().includes(salesSearch) ||
+      String(s.invoiceNumber || '').toLowerCase().includes(salesSearch)
     );
   }
 
@@ -4180,10 +4397,10 @@ export function renderManualInventoryPage() {
   }
   if (search) {
     filtered = filtered.filter(p => 
-      (p.name || '').toLowerCase().includes(search) || 
-      (p.barcode || '').toLowerCase().includes(search) ||
-      (p.notes || '').toLowerCase().includes(search) ||
-      (p.subcategory || '').toLowerCase().includes(search)
+      String(p.name || '').toLowerCase().includes(search) || 
+      String(p.barcode || '').toLowerCase().includes(search) ||
+      String(p.notes || '').toLowerCase().includes(search) ||
+      String(p.subcategory || '').toLowerCase().includes(search)
     );
   }
 
@@ -4493,11 +4710,11 @@ function renderMasterSalesTable(allSales) {
 
   if (search) {
     filtered = filtered.filter(s => 
-      (s.name || '').toLowerCase().includes(search) ||
-      (s.invoiceNumber || '').toLowerCase().includes(search) ||
-      (s.customerName || '').toLowerCase().includes(search) ||
-      (s.customerPhone || '').toLowerCase().includes(search) ||
-      (s.barcode || '').toLowerCase().includes(search)
+      String(s.name || '').toLowerCase().includes(search) ||
+      String(s.invoiceNumber || '').toLowerCase().includes(search) ||
+      String(s.customerName || '').toLowerCase().includes(search) ||
+      String(s.customerPhone || '').toLowerCase().includes(search) ||
+      String(s.barcode || '').toLowerCase().includes(search)
     );
   }
 
@@ -4608,10 +4825,10 @@ window.renderMasterCatalog = function() {
   }
   if (search) {
     products = products.filter(p => 
-      (p.name || '').toLowerCase().includes(search) ||
-      (p.barcode || '').toLowerCase().includes(search) ||
-      (p.imei || '').toLowerCase().includes(search) ||
-      (p.brand || '').toLowerCase().includes(search)
+      String(p.name || '').toLowerCase().includes(search) ||
+      String(p.barcode || '').toLowerCase().includes(search) ||
+      String(p.imei || '').toLowerCase().includes(search) ||
+      String(p.brand || '').toLowerCase().includes(search)
     );
   }
 
